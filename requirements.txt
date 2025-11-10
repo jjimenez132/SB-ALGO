@@ -1,0 +1,6 @@
+duckdb
+pandas
+psycopg[binary]
+python-dateutil
+sqlalchemy
+streamlit

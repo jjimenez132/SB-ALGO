@@ -1,163 +1,214 @@
-# app.py — SB ALGO (Postgres or DuckDB auto)
-import math
-import re
+cat > app.py << 'EOF'
+import os
+from datetime import datetime
 
-import numpy as np
 import pandas as pd
+from sqlalchemy import create_engine, text
+from dotenv import load_dotenv
 import streamlit as st
 
-from db.utils import get_engine, read_sql
+# ------------------------------------------------------
+# Configuración básica
+# ------------------------------------------------------
+st.set_page_config(
+    page_title="SB ALGO — NBA Edge Engine",
+    page_icon="🏀",
+    layout="wide",
+)
 
-st.set_page_config(page_title="SB ALGO — NBA Edge Engine", page_icon="🏀", layout="wide")
-st.title("🏀 SB ALGO — NBA Edge Engine")
-st.caption("Lean MVP · Postgres/DuckDB autodetect")
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-ENGINE = get_engine()
-ENGINE_LABEL = "Postgres" if hasattr(ENGINE, "dialect") else "DuckDB"
-st.caption(f"Active data source: {ENGINE_LABEL}")
+# ------------------------------------------------------
+# Conexión a Postgres
+# ------------------------------------------------------
+@st.cache_resource
+def get_engine():
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL is not set. Add it to your .env file.")
+    return create_engine(DATABASE_URL)
 
-# ---------- Connections ----------
-def query_df(sql: str, params=None) -> pd.DataFrame:
-    return read_sql(sql, params=params)
 
-# ---------- Helpers ----------
-def normalize_season_str(season: str) -> str:
-    s = str(season)
-    if "-" in s:
-        return s.split("-")[0]
+@st.cache_data(show_spinner=False)
+def load_games():
+    engine = get_engine()
+    with engine.connect() as conn:
+        return pd.read_sql("SELECT * FROM games ORDER BY date", conn)
+
+
+@st.cache_data(show_spinner=False)
+def load_player_boxscores():
+    engine = get_engine()
+    with engine.connect() as conn:
+        return pd.read_sql("SELECT * FROM player_boxscores LIMIT 10000", conn)
+
+
+@st.cache_data(show_spinner=False)
+def load_seasons():
+    """
+    Calcular temporadas distintas desde games.
+    """
+    engine = get_engine()
+    with engine.connect() as conn:
+        result = conn.execute(text("SELECT DISTINCT season FROM games ORDER BY season"))
+        seasons = [row[0] for row in result.fetchall()]
+        return seasons
+
+
+# ------------------------------------------------------
+# Layout principal
+# ------------------------------------------------------
+def main():
+    st.title("🏀 SB ALGO — NBA Edge Engine")
+
+    # Status de conexión
     try:
-        start = int(s); return f"{start}-{str((start+1)%100).zfill(2)}"
-    except: return s
-
-def to_minutes(series: pd.Series) -> pd.Series:
-    s = series.fillna("").astype(str)
-    def parse(x):
-        m = re.match(r"^(\d+):(\d{1,2})$", x.strip())
-        if m: return int(m.group(1)) + int(m.group(2))/60.0
-        try: return float(x)
-        except: return np.nan
-    return s.map(parse)
-
-# ---------- Cached queries ----------
-@st.cache_data(ttl=600)
-def seasons_available():
-    try:
-        df = query_df("SELECT DISTINCT season FROM games ORDER BY season")
-        return df["season"].astype(str).tolist()
-    except Exception:
-        return []
-
-@st.cache_data(ttl=600)
-def teams_for_season(season: str):
-    return query_df("""
-        SELECT DISTINCT TEAM_ABBREVIATION AS team_abbr
-        FROM player_boxscores
-        WHERE season = :s OR season = :s_norm
-        ORDER BY team_abbr
-    """, {"s": season, "s_norm": normalize_season_str(season)})
-
-@st.cache_data(ttl=600)
-def players_for_team_season(team: str, season: str):
-    return query_df("""
-        SELECT PLAYER_ID, PLAYER_NAME
-        FROM player_boxscores
-        WHERE (season = :s OR season = :s_norm) AND TEAM_ABBREVIATION = :t
-        GROUP BY PLAYER_ID, PLAYER_NAME
-        ORDER BY PLAYER_NAME
-    """, {"s": season, "s_norm": normalize_season_str(season), "t": team})
-
-@st.cache_data(ttl=300)
-def last_n_games(player_id: int, season: str, n: int):
-    d = query_df("""
-        SELECT GAME_ID, TEAM_ABBREVIATION, START_POSITION, MIN, PTS, REB, AST, FG3M
-        FROM player_boxscores
-        WHERE (season = :s OR season = :s_norm) AND PLAYER_ID = :pid
-        ORDER BY GAME_ID DESC
-        LIMIT :n
-    """, {"s": season, "s_norm": normalize_season_str(season), "pid": int(player_id), "n": int(n)}).copy()
-    if not d.empty: d["MIN_float"] = to_minutes(d["MIN"])
-    return d
-
-@st.cache_data(ttl=600)
-def season_averages(player_id: int, season: str):
-    d = query_df("""
-        SELECT
-          AVG(CAST(PTS AS DOUBLE PRECISION))  AS PTS_avg,
-          AVG(CAST(REB AS DOUBLE PRECISION))  AS REB_avg,
-          AVG(CAST(AST AS DOUBLE PRECISION))  AS AST_avg,
-          AVG(CAST(FG3M AS DOUBLE PRECISION)) AS FG3M_avg,
-          AVG(CASE
-                WHEN MIN ~ '^[0-9]+:[0-5][0-9]$' THEN
-                      (CAST(split_part(MIN, ':', 1) AS DOUBLE PRECISION)
-                       + CAST(split_part(MIN, ':', 2) AS DOUBLE PRECISION)/60.0)
-                ELSE NULLIF(MIN, '')::DOUBLE PRECISION
-              END) AS MIN_avg
-        FROM player_boxscores
-        WHERE (season = :s OR season = :s_norm) AND PLAYER_ID = :pid
-    """, {"s": season, "s_norm": normalize_season_str(season), "pid": int(player_id)})
-    return d.iloc[0] if not d.empty else pd.Series(dtype=float)
-
-# ---------- UI ----------
-tabs = st.tabs(["🔥 Player Props", "💵 Moneylines", "📈 Spreads", "📊 Totals"])
-
-with tabs[0]:
-    st.subheader("Player Props — Historical Snapshot (Lean)")
-
-    seasons = seasons_available()
-    if not seasons:
-        st.error("No seasons found.")
+        engine = get_engine()
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        st.success("✅ Database Connected | Live on Render")
+    except Exception as e:
+        st.error("❌ Database Connection Failed")
+        st.exception(e)
         st.stop()
-    season_choice = st.selectbox("Season", options=seasons, index=len(seasons)-1)
 
-    tdf = teams_for_season(season_choice)
-    team_choice = st.selectbox("Team", tdf["team_abbr"].tolist())
+    # Cargar data
+    with st.spinner("Loading NBA data from PostgreSQL..."):
+        try:
+            games_df = load_games()
+        except Exception as e:
+            st.error(f"Error loading games: {e}")
+            games_df = pd.DataFrame()
 
-    pdf = players_for_team_season(team_choice, season_choice)
-    player_name = st.selectbox("Player", pdf["PLAYER_NAME"].tolist())
-    player_id = int(pdf.loc[pdf["PLAYER_NAME"]==player_name, "PLAYER_ID"].iloc[0])
+        try:
+            boxscores_df = load_player_boxscores()
+        except Exception as e:
+            st.error(f"Error loading boxscores: {e}")
+            boxscores_df = pd.DataFrame()
 
-    last_n = st.slider("Last N games", 5, 20, 10)
-    lg = last_n_games(player_id, season_choice, last_n)
-    av = season_averages(player_id, season_choice)
+        try:
+            seasons = load_seasons()
+        except Exception as e:
+            st.error(f"Error loading seasons: {e}")
+            seasons = []
 
-    colL, colR = st.columns([1,1], gap="large")
+    # Panel superior de resumen
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("🏀 Games", f"{len(games_df):,}")
+    with col2:
+        st.metric("📊 Player Performances", f"{len(boxscores_df):,}")
+    with col3:
+        st.metric("📅 Seasons", len(seasons))
 
-    with colL:
-        st.markdown(f"**Recent Games (last {last_n}) — {player_name} ({team_choice})**")
-        if lg.empty:
-            st.info("No recent rows found.")
+    if seasons:
+        st.caption(f"Seasons Available: {', '.join(str(s) for s in seasons)}")
+
+    # Tabs principales
+    tab_overview, tab_games, tab_players = st.tabs(
+        ["📊 Overview", "📅 Games Explorer", "👤 Player Explorer"]
+    )
+
+    # --------------------------------------------------
+    # TAB 1: OVERVIEW
+    # --------------------------------------------------
+    with tab_overview:
+        st.subheader("Database Overview")
+
+        if games_df.empty or boxscores_df.empty:
+            st.info("Waiting for data to be loaded into PostgreSQL...")
         else:
-            st.dataframe(lg[["GAME_ID","TEAM_ABBREVIATION","START_POSITION","MIN","PTS","REB","AST","FG3M"]],
-                         use_container_width=True, hide_index=True)
+            season_choice = st.selectbox(
+                "Select Season",
+                seasons,
+                index=len(seasons) - 1 if seasons else 0,
+            )
 
-    with colR:
-        st.markdown("**Season Averages**")
-        if av.empty:
-            st.info("No season averages available.")
+            season_games = games_df[games_df["season"] == season_choice]
+            st.write(f"**{len(season_games):,}** games in {season_choice} season")
+
+            # Show recent games
+            st.dataframe(
+                season_games.sort_values("date", ascending=False).head(50),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    # --------------------------------------------------
+    # TAB 2: GAMES EXPLORER
+    # --------------------------------------------------
+    with tab_games:
+        st.subheader("Games Explorer")
+
+        if games_df.empty:
+            st.info("No games data available yet.")
         else:
-            metrics = {k: av.get(k, np.nan) for k in ["PTS_avg","REB_avg","AST_avg","FG3M_avg","MIN_avg"]}
-            p1,p2,p3,p4,p5 = st.columns(5)
-            p1.metric("PTS", f"{metrics['PTS_avg']:.1f}" if not math.isnan(metrics['PTS_avg']) else "—")
-            p2.metric("REB", f"{metrics['REB_avg']:.1f}" if not math.isnan(metrics['REB_avg']) else "—")
-            p3.metric("AST", f"{metrics['AST_avg']:.1f}" if not math.isnan(metrics['AST_avg']) else "—")
-            p4.metric("3PM", f"{metrics['FG3M_avg']:.1f}" if not math.isnan(metrics['FG3M_avg']) else "—")
-            p5.metric("MIN", f"{metrics['MIN_avg']:.1f}" if not math.isnan(metrics['MIN_avg']) else "—")
+            left, right = st.columns(2)
+            with left:
+                season_filter = st.selectbox(
+                    "Season",
+                    seasons,
+                    index=len(seasons) - 1 if seasons else 0,
+                    key="games_season"
+                )
+            with right:
+                teams = sorted(
+                    set(games_df["home_team"].dropna().unique())
+                    | set(games_df["visitor_team"].dropna().unique())
+                )
+                team_filter = st.selectbox("Team (Home/Visitor)", ["(All)"] + teams)
 
-        st.divider()
-        st.markdown("**Baseline Projection (mean of last N)**")
-        if not lg.empty:
-            proj = lg[["PTS","REB","AST","FG3M"]].apply(pd.to_numeric, errors="coerce").mean()
-            c1,c2,c3,c4 = st.columns(4)
-            c1.metric("PTS proj", f"{proj['PTS']:.1f}")
-            c2.metric("REB proj", f"{proj['REB']:.1f}")
-            c3.metric("AST proj", f"{proj['AST']:.1f}")
-            c4.metric("3PM proj", f"{proj['FG3M']:.1f}")
+            df = games_df.copy()
+            df = df[df["season"] == season_filter]
+
+            if team_filter != "(All)":
+                df = df[
+                    (df["home_team"] == team_filter)
+                    | (df["visitor_team"] == team_filter)
+                ]
+
+            st.write(f"**{len(df):,}** games found")
+            st.dataframe(
+                df.sort_values("date", ascending=False).head(200),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    # --------------------------------------------------
+    # TAB 3: PLAYER EXPLORER
+    # --------------------------------------------------
+    with tab_players:
+        st.subheader("Player Explorer")
+
+        if boxscores_df.empty:
+            st.info("No player boxscore data available yet.")
         else:
-            st.info("Need at least one recent game.")
+            players = sorted(boxscores_df["player_name"].dropna().unique())
+            player = st.selectbox("Select Player", players)
 
-with tabs[1]:
-    st.subheader("Moneylines (placeholder)")
-with tabs[2]:
-    st.subheader("Spreads (placeholder)")
-with tabs[3]:
-    st.subheader("Totals (placeholder)")
+            player_df = boxscores_df[boxscores_df["player_name"] == player]
+
+            st.write(f"**{len(player_df):,}** performances for {player}")
+
+            # Show stats
+            if not player_df.empty and "pts" in player_df.columns:
+                cols = st.columns(4)
+                with cols[0]:
+                    st.metric("Avg PTS", f"{player_df['pts'].mean():.1f}")
+                with cols[1]:
+                    st.metric("Avg REB", f"{player_df['reb'].mean():.1f}")
+                with cols[2]:
+                    st.metric("Avg AST", f"{player_df['ast'].mean():.1f}")
+                with cols[3]:
+                    st.metric("Games", len(player_df))
+
+            st.dataframe(
+                player_df.head(50),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+
+if __name__ == "__main__":
+    main()
+EOF

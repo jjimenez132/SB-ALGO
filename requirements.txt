@@ -1,9 +1,12 @@
+cat > requirements.txt << 'EOF'
 streamlit==1.28.0
 pandas
 psycopg2-binary
 sqlalchemy
+python-dotenv
 basketball_reference_web_scraper
 requests
 beautifulsoup4
 python-dateutil
 nba_api
+EOF

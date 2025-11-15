@@ -1,4 +1,3 @@
-cat > requirements.txt << 'EOF'
 streamlit==1.28.0
 pandas
 psycopg2-binary
@@ -9,4 +8,3 @@ requests
 beautifulsoup4
 python-dateutil
 nba_api
-EOF

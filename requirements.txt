@@ -1,6 +1,9 @@
-duckdb
+streamlit==1.28.0
 pandas
-psycopg[binary]
-python-dateutil
+psycopg2-binary
 sqlalchemy
-streamlit
+basketball_reference_web_scraper
+requests
+beautifulsoup4
+python-dateutil
+nba_api

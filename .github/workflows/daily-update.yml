@@ -1,0 +1,28 @@
+name: Hourly Injury Reports
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Every hour
+  workflow_dispatch:
+
+jobs:
+  update-injuries:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install requests pandas sqlalchemy psycopg2-binary
+    
+    - name: Update Injuries
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      run: python etl/hourly_injuries_auto.py

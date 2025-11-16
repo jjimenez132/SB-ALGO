@@ -1,0 +1,103 @@
+name: Daily NBA Games
+
+on:
+  schedule:
+    - cron: '0 8 * * *'  # 3 AM EST = 8 AM UTC
+  workflow_dispatch:
+
+jobs:
+  fetch-games:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: pip install psycopg2-binary requests
+    
+    - name: Fetch yesterday's games
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      run: |
+        python3 << 'ENDOFPYTHON'
+        import requests
+        import psycopg2
+        import os
+        from datetime import datetime, timedelta
+
+        DATABASE_URL = os.environ['DATABASE_URL']
+        yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
+
+        url = f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={yesterday}"
+        games = requests.get(url).json()['events']
+
+        print(f"📥 {len(games)} games found")
+
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+
+        for game in games:
+            game_id = game['id']
+            comps = game['competitions'][0]
+            competitors = comps['competitors']
+            
+            home = next(c for c in competitors if c['homeAway'] == 'home')
+            away = next(c for c in competitors if c['homeAway'] == 'away')
+            
+            cur.execute("""
+                INSERT INTO games (date, visitor_team, visitor_pts, home_team, home_pts, season)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING
+            """, (
+                yesterday[:4]+'-'+yesterday[4:6]+'-'+yesterday[6:],
+                away['team']['displayName'],
+                float(away.get('score', 0)),
+                home['team']['displayName'],
+                float(home.get('score', 0)),
+                2025
+            ))
+            
+            box = requests.get(f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event={game_id}").json()
+            
+            count = 0
+            for team_data in box.get('boxscore', {}).get('players', []):
+                team = team_data['team']
+                for stat_group in team_data.get('statistics', []):
+                    for player in stat_group.get('athletes', []):
+                        athlete = player['athlete']
+                        stats_list = player.get('stats', [])
+                        stats = stats_list[0] if isinstance(stats_list, list) and len(stats_list) > 0 else {}
+                        
+                        if not isinstance(stats, dict):
+                            stats = {}
+                        
+                        cur.execute("""
+                            INSERT INTO player_boxscores 
+                            (game_id, player_id, team_id, team_abbreviation, player_name, min, pts, reb, ast, stl, blk, "TO", fgm, fga, fg3m, fg3a, ftm, fta, plus_minus, season)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT DO NOTHING
+                        """, (
+                            int(game_id), int(athlete['id']), str(team['id']), team['abbreviation'],
+                            athlete['displayName'], stats.get('minutes', '0'),
+                            float(stats.get('points', 0)), float(stats.get('rebounds', 0)),
+                            float(stats.get('assists', 0)), float(stats.get('steals', 0)),
+                            float(stats.get('blocks', 0)), float(stats.get('turnovers', 0)),
+                            float(stats.get('fieldGoalsMade', 0)), float(stats.get('fieldGoalsAttempted', 0)),
+                            float(stats.get('threePointFieldGoalsMade', 0)), float(stats.get('threePointFieldGoalsAttempted', 0)),
+                            float(stats.get('freeThrowsMade', 0)), float(stats.get('freeThrowsAttempted', 0)),
+                            float(stats.get('plusMinus', 0)), '2025-26'
+                        ))
+                        count += 1
+            
+            print(f"✅ {away['team']['abbreviation']}@{home['team']['abbreviation']}: {count} players")
+            conn.commit()
+
+        cur.close()
+        conn.close()
+        print("🎉 DONE!")
+        ENDOFPYTHON

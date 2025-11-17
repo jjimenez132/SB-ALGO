@@ -100,4 +100,4 @@ jobs:
         cur.close()
         conn.close()
         print("🎉 DONE!")
-        ENDOFPYTHON
+        python3 daily_games.py

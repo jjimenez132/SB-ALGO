@@ -32,7 +32,7 @@ class DailyPicksGenerator:
         return self.cur.fetchall()
     
     def get_active_players_in_game(self, team1, team2):
-        self.cur.execute("SELECT DISTINCT player_name FROM player_boxscores WHERE (team_id LIKE %s OR team_id LIKE %s) AND game_date >= %s AND pts > 5 ORDER BY game_date DESC", (f'%{team1}%', f'%{team2}%', (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')))
+    self.cur.execute("SELECT DISTINCT player_name FROM player_boxscores WHERE (team_id::text LIKE %s OR team_id::text LIKE %s) AND game_date >= %s AND pts > 5 ORDER BY game_date DESC", (f'%{team1}%', f'%{team2}%', (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')))
         players = self.cur.fetchall()
         active_players = []
         for p in players:

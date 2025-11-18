@@ -1,106 +1,117 @@
 import requests
 import psycopg2
-import os
 from datetime import datetime, timedelta
+import os
 
 DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db?sslmode=require')
 
-yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
-
-url = f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={yesterday}"
-games = requests.get(url).json()['events']
-
-print(f"📥 {len(games)} games found")
-
-conn = psycopg2.connect(DATABASE_URL)
-cur = conn.cursor()
-
-for game in games:
-    game_id = game['id']
-    comps = game['competitions'][0]
-    competitors = comps['competitors']
+def fetch_yesterday_games():
+    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
+    url = f'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={yesterday}'
     
-    home = next(c for c in competitors if c['homeAway'] == 'home')
-    away = next(c for c in competitors if c['homeAway'] == 'away')
+    response = requests.get(url)
+    data = response.json()
     
-    cur.execute("""
-        INSERT INTO games (date, visitor_team, visitor_pts, home_team, home_pts, season)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        ON CONFLICT DO NOTHING
-    """, (
-        yesterday[:4]+'-'+yesterday[4:6]+'-'+yesterday[6:],
-        away['team']['displayName'],
-        float(away.get('score', 0)),
-        home['team']['displayName'],
-        float(home.get('score', 0)),
-        2025
-    ))
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
     
-    # Get boxscore
-    box = requests.get(f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event={game_id}").json()
+    games = data.get('events', [])
+    print(f"📥 {len(games)} games found")
     
-    count = 0
-    for team_data in box.get('boxscore', {}).get('players', []):
-        team = team_data['team']
+    for game in games:
+        game_id = game['id']
+        game_date_str = game['date'][:10]
         
-        for stat_group in team_data.get('statistics', []):
-            # Get stat names/keys mapping
-            names = stat_group.get('names', [])
-            keys = stat_group.get('keys', [])
+        competitions = game.get('competitions', [])
+        if not competitions:
+            continue
             
-            for player in stat_group.get('athletes', []):
-                athlete = player['athlete']
-                stats_array = player.get('stats', [])
+        comp = competitions[0]
+        home_team = next((t for t in comp['competitors'] if t['homeAway'] == 'home'), None)
+        away_team = next((t for t in comp['competitors'] if t['homeAway'] == 'away'), None)
+        
+        if not home_team or not away_team:
+            continue
+        
+        visitor_name = away_team['team']['displayName']
+        home_name = home_team['team']['displayName']
+        visitor_score = float(away_team.get('score', 0))
+        home_score = float(home_team.get('score', 0))
+        
+        game_dt = datetime.strptime(game_date_str, '%Y-%m-%d')
+        if game_dt.month >= 10:
+            season = game_dt.year
+        else:
+            season = game_dt.year - 1
+        
+        season_str = f"{season}-{str(season+1)[-2:]}"
+        
+        cur.execute("""
+            INSERT INTO games (date, visitor_team, visitor_pts, home_team, home_pts, season)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (date, visitor_team, home_team) DO NOTHING
+        """, (game_date_str, visitor_name, visitor_score, home_name, home_score, season))
+        
+        boxscore_url = f'https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event={game_id}'
+        box_response = requests.get(boxscore_url)
+        box_data = box_response.json()
+        
+        players_count = 0
+        
+        if 'boxscore' in box_data and 'players' in box_data['boxscore']:
+            for team in box_data['boxscore']['players']:
+                team_name = team['team']['displayName']
+                team_abbr = team['team']['abbreviation']
                 
-                # Create dict from names and values
-                stats_dict = {}
-                for i, name in enumerate(names):
-                    if i < len(stats_array):
-                        stats_dict[name] = stats_array[i]
-                
-                # Parse stats
-                pts = float(stats_dict.get('PTS', 0))
-                reb = float(stats_dict.get('REB', 0))
-                ast = float(stats_dict.get('AST', 0))
-                stl = float(stats_dict.get('STL', 0))
-                blk = float(stats_dict.get('BLK', 0))
-                to = float(stats_dict.get('TO', 0))
-                minutes = stats_dict.get('MIN', '0')
-                plus_minus = stats_dict.get('+/-', '0')
-                
-                # Parse FG (3-7 format)
-                fg = stats_dict.get('FG', '0-0').split('-')
-                fgm = float(fg[0]) if len(fg) > 0 else 0
-                fga = float(fg[1]) if len(fg) > 1 else 0
-                
-                # Parse 3PT
-                three_pt = stats_dict.get('3PT', '0-0').split('-')
-                fg3m = float(three_pt[0]) if len(three_pt) > 0 else 0
-                fg3a = float(three_pt[1]) if len(three_pt) > 1 else 0
-                
-                # Parse FT
-                ft = stats_dict.get('FT', '0-0').split('-')
-                ftm = float(ft[0]) if len(ft) > 0 else 0
-                fta = float(ft[1]) if len(ft) > 1 else 0
-                
-                cur.execute("""
-                    INSERT INTO player_boxscores 
-                    (game_id, player_id, team_id, team_abbreviation, player_name, min, pts, reb, ast, stl, blk, "TO", fgm, fga, fg3m, fg3a, ftm, fta, plus_minus, season)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (game_id, player_id) DO UPDATE SET
-                    pts = EXCLUDED.pts, reb = EXCLUDED.reb, ast = EXCLUDED.ast
-                """, (
-                    int(game_id), int(athlete['id']), str(team['id']), team['abbreviation'],
-                    athlete['displayName'], minutes, pts, reb, ast, stl, blk, to,
-                    fgm, fga, fg3m, fg3a, ftm, fta, 
-                    float(plus_minus) if plus_minus and plus_minus != '--' else 0, 
-                    '2025-26'
-                ))
-                count += 1
+                for player in team.get('statistics', [{}])[0].get('athletes', []):
+                    player_name = player['athlete']['displayName']
+                    player_id = player['athlete']['id']
+                    stats = player.get('stats', [])
+                    
+                    if not stats or len(stats) < 15:
+                        continue
+                    
+                    minutes = stats[0] if stats[0] != '--' else '0'
+                    pts = float(stats[14]) if stats[14] != '--' else 0
+                    reb = float(stats[12]) if stats[12] != '--' else 0
+                    ast = float(stats[13]) if stats[13] != '--' else 0
+                    stl = float(stats[6]) if stats[6] != '--' else 0
+                    blk = float(stats[7]) if stats[7] != '--' else 0
+                    to = float(stats[8]) if stats[8] != '--' else 0
+                    
+                    fg = stats[1].split('-') if '-' in stats[1] else ['0', '0']
+                    fgm = float(fg[0]) if fg[0] != '--' else 0
+                    fga = float(fg[1]) if len(fg) > 1 and fg[1] != '--' else 0
+                    
+                    fg3 = stats[2].split('-') if '-' in stats[2] else ['0', '0']
+                    fg3m = float(fg3[0]) if fg3[0] != '--' else 0
+                    fg3a = float(fg3[1]) if len(fg3) > 1 and fg3[1] != '--' else 0
+                    
+                    ft = stats[3].split('-') if '-' in stats[3] else ['0', '0']
+                    ftm = float(ft[0]) if ft[0] != '--' else 0
+                    fta = float(ft[1]) if len(ft) > 1 and ft[1] != '--' else 0
+                    
+                    plus_minus = 0
+                    
+                    cur.execute("""
+                        INSERT INTO player_boxscores 
+                        (game_id, player_id, team_id, team_abbreviation, player_name, min,
+                         pts, reb, ast, stl, blk, "TO", fgm, fga, fg3m, fg3a, ftm, fta,
+                         plus_minus, season, game_date)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (game_id, player_id) DO NOTHING
+                    """, (game_id, player_id, team_name, team_abbr, player_name, minutes,
+                          pts, reb, ast, stl, blk, to, fgm, fga, fg3m, fg3a, ftm, fta,
+                          plus_minus, season_str, game_date_str))
+                    
+                    players_count += 1
+        
+        conn.commit()
+        print(f"✅ {away_team['team']['abbreviation']}@{home_team['team']['abbreviation']}: {players_count} players")
     
-    print(f"✅ {away['team']['abbreviation']}@{home['team']['abbreviation']}: {count} players")
-    conn.commit()
+    cur.close()
+    conn.close()
+    print("🎉 DONE!")
 
-cur.close()
-conn.close()
-print("🎉 DONE!")
+if __name__ == '__main__':
+    fetch_yesterday_games()

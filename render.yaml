@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: sb-algo-1
+    env: python
+    region: virginia
+    plan: free
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run premium_dashboard.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    envVars:
+      - key: DATABASE_URL
+        value: postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db?sslmode=require
+      - key: PYTHON_VERSION
+        value: 3.11.0

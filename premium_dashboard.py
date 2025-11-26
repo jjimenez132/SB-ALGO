@@ -471,11 +471,7 @@ with tab7:
                     with engine.connect() as conn:
                         if use_like:
                             query = text("""
-                                SELECT 
-                                    player_name,
-                                    team_abbreviation AS team,
-                                    game_date,
-                                    pts, reb, ast, min
+                                SELECT *
                                 FROM player_boxscores
                                 WHERE game_date >= :start_date AND game_date <= :end_date
                                 AND LOWER(player_name) LIKE LOWER(:player_search)
@@ -484,11 +480,7 @@ with tab7:
                             df = pd.read_sql(query, conn, params={"start_date": start_date, "end_date": end_date, "player_search": f"%{search_player}%"})
                         else:
                             query = text("""
-                                SELECT 
-                                    player_name,
-                                    team_abbreviation AS team,
-                                    game_date,
-                                    pts, reb, ast, min
+                                SELECT *
                                 FROM player_boxscores
                                 WHERE game_date >= :start_date AND game_date <= :end_date
                                 AND player_name = :player_name
@@ -500,7 +492,7 @@ with tab7:
                             st.warning(f"No data found for '{search_player}' in {selected_season}.")
                         else:
                             player_display_name = df['player_name'].iloc[0]
-                            player_team = df['team'].iloc[0]
+                            player_team = df['team_abbreviation'].iloc[0] if 'team_abbreviation' in df.columns else 'N/A'
                             games_played = len(df)
                             
                             # Player Header
@@ -513,29 +505,64 @@ with tab7:
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # Season Averages
+                            # Season Averages - dynamically find stat columns
                             st.markdown("### 📊 Season Averages")
                             
-                            avg_pts = df['pts'].mean()
-                            avg_reb = df['reb'].mean()
-                            avg_ast = df['ast'].mean()
-                            avg_min = df['min'].mean() if 'min' in df.columns and df['min'].notna().any() else 0
+                            # Define possible stat columns to look for
+                            stat_cols = ['pts', 'reb', 'ast', 'stl', 'blk', 'fg_pct', 'fg3_pct', 'ft_pct', 'oreb', 'dreb', 'pf', 'plus_minus']
                             
-                            # Display averages in nice cards
-                            col1, col2, col3, col4, col5 = st.columns(5)
-                            col1.metric("PPG", f"{avg_pts:.1f}")
-                            col2.metric("RPG", f"{avg_reb:.1f}")
-                            col3.metric("APG", f"{avg_ast:.1f}")
-                            col4.metric("MPG", f"{avg_min:.1f}")
-                            col5.metric("Games", f"{games_played}")
+                            # Find which ones exist and convert to numeric
+                            available_stats = {}
+                            for col in stat_cols:
+                                if col in df.columns:
+                                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                                    avg_val = df[col].mean()
+                                    if pd.notna(avg_val):
+                                        available_stats[col] = avg_val
+                            
+                            # Display stats in rows of 5
+                            stat_labels = {
+                                'pts': 'PPG', 'reb': 'RPG', 'ast': 'APG', 'stl': 'SPG', 'blk': 'BPG',
+                                'fg_pct': 'FG%', 'fg3_pct': '3P%', 'ft_pct': 'FT%', 
+                                'oreb': 'ORPG', 'dreb': 'DRPG', 'pf': 'PFPG', 'plus_minus': '+/-'
+                            }
+                            
+                            stat_items = list(available_stats.items())
+                            stat_items.append(('games', games_played))
+                            
+                            # Display in rows of 5
+                            for i in range(0, len(stat_items), 5):
+                                cols = st.columns(5)
+                                for j, col in enumerate(cols):
+                                    if i + j < len(stat_items):
+                                        stat_key, stat_val = stat_items[i + j]
+                                        label = stat_labels.get(stat_key, stat_key.upper())
+                                        if stat_key in ['fg_pct', 'fg3_pct', 'ft_pct']:
+                                            col.metric(label, f"{stat_val:.1f}%")
+                                        elif stat_key == 'games':
+                                            col.metric("Games", f"{stat_val}")
+                                        else:
+                                            col.metric(label, f"{stat_val:.1f}")
                             
                             # Game Log
                             st.markdown("### 📅 Game Log")
                             
-                            # Format dataframe for display
-                            display_df = df[['game_date', 'team', 'pts', 'reb', 'ast', 'min']].copy()
-                            display_df.columns = ['Date', 'Team', 'PTS', 'REB', 'AST', 'MIN']
-                            display_df['Date'] = pd.to_datetime(display_df['Date']).dt.strftime('%Y-%m-%d')
+                            # Select columns for display
+                            display_cols = ['game_date', 'team_abbreviation']
+                            for col in ['pts', 'reb', 'ast', 'stl', 'blk', 'fg_pct', 'fg3_pct', 'ft_pct', 'plus_minus']:
+                                if col in df.columns:
+                                    display_cols.append(col)
+                            
+                            display_df = df[display_cols].copy()
+                            display_df['game_date'] = pd.to_datetime(display_df['game_date']).dt.strftime('%Y-%m-%d')
+                            
+                            # Rename columns for display
+                            rename_map = {
+                                'game_date': 'Date', 'team_abbreviation': 'Team',
+                                'pts': 'PTS', 'reb': 'REB', 'ast': 'AST', 'stl': 'STL', 'blk': 'BLK',
+                                'fg_pct': 'FG%', 'fg3_pct': '3P%', 'ft_pct': 'FT%', 'plus_minus': '+/-'
+                            }
+                            display_df.rename(columns=rename_map, inplace=True)
                             
                             st.dataframe(display_df, use_container_width=True, height=400, hide_index=True)
                 

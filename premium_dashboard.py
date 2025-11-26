@@ -269,11 +269,11 @@ with tab6:
     
     if engine:
         try:
+            # Try to get injuries - use simple query first
             query = text("""
                 SELECT * 
                 FROM injuries 
-                ORDER BY updated_at DESC 
-                LIMIT 50
+                LIMIT 115
             """)
             
             with engine.connect() as conn:

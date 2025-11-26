@@ -311,12 +311,9 @@ with tab6:
         st.warning("Database connection required to view injury reports")
 
 # ============================================================================
-# FIXED DATA EXPLORER TAB (Tab 7)
+# FIXED DATA EXPLORER TAB (Tab 7) - v2
 # ============================================================================
-# 
-# PASTE THIS ENTIRE BLOCK to replace your current tab7 section in premium_dashboard.py
-# Find "with tab7:" and replace everything until the next "with tab8:" or end of tabs
-#
+# Replace your current tab7 section with this
 # ============================================================================
 
 with tab7:
@@ -382,7 +379,7 @@ with tab7:
                         ORDER BY game_date DESC
                         LIMIT 500
                     """
-                    df = pd.read_sql(query, conn, params=[start_date, end_date])
+                    df = pd.read_sql(query, conn, params=(start_date, end_date))
                 else:
                     query = """
                         SELECT 
@@ -398,7 +395,7 @@ with tab7:
                         ORDER BY game_date DESC
                         LIMIT 500
                     """
-                    df = pd.read_sql(query, conn, params=[start_date, end_date, selected_team, selected_team])
+                    df = pd.read_sql(query, conn, params=(start_date, end_date, selected_team, selected_team))
                 
                 conn.close()
                 
@@ -427,7 +424,8 @@ with tab7:
                         ORDER BY game_date DESC
                         LIMIT 500
                     """
-                    df = pd.read_sql(query, conn, params=[start_date, end_date, f"%{player_search.strip()}%"])
+                    search_param = f"%{player_search.strip()}%"
+                    df = pd.read_sql(query, conn, params=(start_date, end_date, search_param))
                 else:
                     query = """
                         SELECT 
@@ -440,7 +438,7 @@ with tab7:
                         ORDER BY game_date DESC
                         LIMIT 500
                     """
-                    df = pd.read_sql(query, conn, params=[start_date, end_date])
+                    df = pd.read_sql(query, conn, params=(start_date, end_date))
                 
                 conn.close()
                 

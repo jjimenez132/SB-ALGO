@@ -316,14 +316,64 @@ with tab7:
     if engine:
         st.markdown("### 🔍 Query Historical Data")
         
+        # Fetch all available seasons from database
+        try:
+            with engine.connect() as conn:
+                seasons_query = text("""
+                    SELECT DISTINCT season_id 
+                    FROM games 
+                    WHERE season_id IS NOT NULL
+                    ORDER BY season_id DESC
+                """)
+                result = conn.execute(seasons_query)
+                available_seasons = [row[0] for row in result.fetchall()]
+            
+            if not available_seasons:
+                available_seasons = ["2024-25", "2023-24", "2022-23"]  # Fallback
+                
+        except Exception as e:
+            st.warning(f"Could not load seasons: {str(e)}")
+            available_seasons = ["2024-25", "2023-24", "2022-23"]  # Fallback
+        
         col1, col2 = st.columns(2)
         with col1:
-            season = st.selectbox("Season", ["2024-25", "2023-24", "2022-23"])
+            season = st.selectbox("Season", available_seasons)
         with col2:
             stat_type = st.selectbox("Stat Type", ["Team Stats", "Player Stats", "Game Results"])
         
         if st.button("Load Data"):
-            st.info("Loading data from 72,483 game database...")
+            try:
+                with engine.connect() as conn:
+                    if stat_type == "Game Results":
+                        query = text(f"""
+                            SELECT game_date, team_abbreviation_home, team_abbreviation_away, 
+                                   pts_home, pts_away, wl_home
+                            FROM games 
+                            WHERE season_id = :season
+                            ORDER BY game_date DESC
+                            LIMIT 100
+                        """)
+                        df = pd.read_sql(query, conn, params={"season": season})
+                        st.dataframe(df, use_container_width=True, hide_index=True)
+                        st.success(f"✅ Showing {len(df)} games from {season}")
+                    
+                    elif stat_type == "Player Stats":
+                        query = text(f"""
+                            SELECT player_name, team_abbreviation, game_date, pts, reb, ast
+                            FROM player_boxscores 
+                            WHERE season_id = :season
+                            ORDER BY pts DESC
+                            LIMIT 100
+                        """)
+                        df = pd.read_sql(query, conn, params={"season": season})
+                        st.dataframe(df, use_container_width=True, hide_index=True)
+                        st.success(f"✅ Showing top 100 performances from {season}")
+                    
+                    else:  # Team Stats
+                        st.info(f"Team aggregation for {season} coming soon!")
+                        
+            except Exception as e:
+                st.error(f"Error loading data: {str(e)}")
     else:
         st.warning("Database connection required")
 

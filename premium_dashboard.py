@@ -210,7 +210,7 @@ with tab2:
                     }
                 ))
                 fig.update_layout(height=250, margin=dict(l=20, r=20, t=40, b=20))
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, key=f"game_probability_{i}")
 
 with tab3:
     st.markdown("## 🧠 Props Engine — Player Intelligence")

@@ -320,10 +320,10 @@ with tab7:
         try:
             with engine.connect() as conn:
                 seasons_query = text("""
-                    SELECT DISTINCT season_id 
+                    SELECT DISTINCT season_std 
                     FROM games 
-                    WHERE season_id IS NOT NULL
-                    ORDER BY season_id DESC
+                    WHERE season_std IS NOT NULL
+                    ORDER BY season_std DESC
                 """)
                 result = conn.execute(seasons_query)
                 available_seasons = [row[0] for row in result.fetchall()]
@@ -349,7 +349,7 @@ with tab7:
                             SELECT game_date, team_abbreviation_home, team_abbreviation_away, 
                                    pts_home, pts_away, wl_home
                             FROM games 
-                            WHERE season_id = :season
+                            WHERE season_std = :season
                             ORDER BY game_date DESC
                             LIMIT 100
                         """)
@@ -361,7 +361,7 @@ with tab7:
                         query = text(f"""
                             SELECT player_name, team_abbreviation, game_date, pts, reb, ast
                             FROM player_boxscores 
-                            WHERE season_id = :season
+                            WHERE season_std = :season
                             ORDER BY pts DESC
                             LIMIT 100
                         """)

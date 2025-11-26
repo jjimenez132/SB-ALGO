@@ -316,24 +316,24 @@ with tab7:
     if engine:
         st.markdown("### 🔍 Query Historical Data")
         
-        # Fetch all available seasons from database
+        # Fetch all available years from game_date
         try:
             with engine.connect() as conn:
                 seasons_query = text("""
-                    SELECT DISTINCT season_std 
+                    SELECT DISTINCT EXTRACT(YEAR FROM game_date)::text as year
                     FROM games 
-                    WHERE season_std IS NOT NULL
-                    ORDER BY season_std DESC
+                    WHERE game_date IS NOT NULL
+                    ORDER BY year DESC
                 """)
                 result = conn.execute(seasons_query)
                 available_seasons = [row[0] for row in result.fetchall()]
             
             if not available_seasons:
-                available_seasons = ["2024-25", "2023-24", "2022-23"]  # Fallback
+                available_seasons = ["2024", "2023", "2022"]
                 
         except Exception as e:
             st.warning(f"Could not load seasons: {str(e)}")
-            available_seasons = ["2024-25", "2023-24", "2022-23"]  # Fallback
+            available_seasons = ["2024", "2023", "2022"]
         
         col1, col2 = st.columns(2)
         with col1:
@@ -345,27 +345,27 @@ with tab7:
             try:
                 with engine.connect() as conn:
                     if stat_type == "Game Results":
-                        query = text(f"""
+                        query = text("""
                             SELECT game_date, team_abbreviation_home, team_abbreviation_away, 
                                    pts_home, pts_away, wl_home
                             FROM games 
-                            WHERE season_std = :season
+                            WHERE EXTRACT(YEAR FROM game_date) = :year
                             ORDER BY game_date DESC
                             LIMIT 100
                         """)
-                        df = pd.read_sql(query, conn, params={"season": season})
+                        df = pd.read_sql(query, conn, params={"year": int(season)})
                         st.dataframe(df, use_container_width=True, hide_index=True)
                         st.success(f"✅ Showing {len(df)} games from {season}")
                     
                     elif stat_type == "Player Stats":
-                        query = text(f"""
+                        query = text("""
                             SELECT player_name, team_abbreviation, game_date, pts, reb, ast
                             FROM player_boxscores 
-                            WHERE season_std = :season
+                            WHERE EXTRACT(YEAR FROM game_date) = :year
                             ORDER BY pts DESC
                             LIMIT 100
                         """)
-                        df = pd.read_sql(query, conn, params={"season": season})
+                        df = pd.read_sql(query, conn, params={"year": int(season)})
                         st.dataframe(df, use_container_width=True, hide_index=True)
                         st.success(f"✅ Showing top 100 performances from {season}")
                     

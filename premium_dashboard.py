@@ -343,18 +343,15 @@ with tab7:
     
     if stat_type == "Game Results":
         selected_team = st.selectbox("🏀 Select Team", teams_list, key="explorer_team")
-    else:
-        player_search_input = st.text_input("🔎 Search Player Name", "", key="explorer_player_search")
-    
-    if st.button("Load Data", key="explorer_load_btn"):
-        start_date, end_date = get_season_dates(selected_season)
         
-        if not engine:
-            st.error("Database connection not available")
-        else:
-            try:
-                with engine.connect() as conn:
-                    if stat_type == "Game Results":
+        if st.button("Load Data", key="explorer_load_btn"):
+            start_date, end_date = get_season_dates(selected_season)
+            
+            if not engine:
+                st.error("Database connection not available")
+            else:
+                try:
+                    with engine.connect() as conn:
                         if selected_team == "All Teams":
                             query = text("""
                                 SELECT 
@@ -397,51 +394,175 @@ with tab7:
                             c2.metric("Avg Home Pts", f"{df['home_pts'].mean():.1f}")
                             c3.metric("Avg Away Pts", f"{df['visitor_pts'].mean():.1f}")
                             st.dataframe(df, use_container_width=True, height=400)
-                    
-                    else:  # Player Stats
-                        if player_search_input and player_search_input.strip():
+                
+                except Exception as e:
+                    st.error(f"❌ Error loading data: {str(e)}")
+    
+    else:  # Player Stats - StatMuse style
+        st.markdown("---")
+        
+        # Get teams from player_boxscores
+        player_teams_list = []
+        if engine:
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("""
+                        SELECT DISTINCT team_abbreviation 
+                        FROM player_boxscores 
+                        WHERE team_abbreviation IS NOT NULL
+                        ORDER BY team_abbreviation
+                    """))
+                    player_teams_list = [row[0] for row in result.fetchall()]
+            except:
+                pass
+        
+        # Team selector
+        col_team, col_player = st.columns(2)
+        
+        with col_team:
+            selected_player_team = st.selectbox("🏀 Select Team", ["-- Select Team --"] + player_teams_list, key="player_team_select")
+        
+        # Get players for selected team
+        players_list = []
+        if selected_player_team != "-- Select Team --" and engine:
+            start_date, end_date = get_season_dates(selected_season)
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("""
+                        SELECT DISTINCT player_name 
+                        FROM player_boxscores 
+                        WHERE team_abbreviation = :team
+                        AND game_date >= :start_date AND game_date <= :end_date
+                        ORDER BY player_name
+                    """), {"team": selected_player_team, "start_date": start_date, "end_date": end_date})
+                    players_list = [row[0] for row in result.fetchall()]
+            except:
+                pass
+        
+        with col_player:
+            if players_list:
+                selected_player = st.selectbox("👤 Select Player", ["-- Select Player --"] + players_list, key="player_select")
+            else:
+                selected_player = st.selectbox("👤 Select Player", ["-- Select Team First --"], key="player_select_empty", disabled=True)
+                selected_player = None
+        
+        # Fallback search
+        st.markdown("**Or search by name:**")
+        player_search_input = st.text_input("🔎 Search Player Name", "", key="explorer_player_search", placeholder="e.g. LeBron James")
+        
+        if st.button("Load Player Stats", key="explorer_load_player_btn"):
+            start_date, end_date = get_season_dates(selected_season)
+            
+            # Determine which player to search
+            search_player = None
+            if player_search_input and player_search_input.strip():
+                search_player = player_search_input.strip()
+                use_like = True
+            elif selected_player and selected_player not in ["-- Select Player --", "-- Select Team First --"]:
+                search_player = selected_player
+                use_like = False
+            
+            if not search_player:
+                st.warning("Please select a player or enter a name to search.")
+            elif not engine:
+                st.error("Database connection not available")
+            else:
+                try:
+                    with engine.connect() as conn:
+                        if use_like:
                             query = text("""
                                 SELECT 
                                     player_name,
                                     team_abbreviation AS team,
                                     game_date,
-                                    pts, reb, ast, min
+                                    pts, reb, ast, stl, blk, tov, min, fgm, fga, fg3m, fg3a, ftm, fta
                                 FROM player_boxscores
                                 WHERE game_date >= :start_date AND game_date <= :end_date
                                 AND LOWER(player_name) LIKE LOWER(:player_search)
                                 ORDER BY game_date DESC
-                                LIMIT 500
                             """)
-                            search_param = f"%{player_search_input.strip()}%"
-                            df = pd.read_sql(query, conn, params={"start_date": start_date, "end_date": end_date, "player_search": search_param})
+                            df = pd.read_sql(query, conn, params={"start_date": start_date, "end_date": end_date, "player_search": f"%{search_player}%"})
                         else:
                             query = text("""
                                 SELECT 
                                     player_name,
                                     team_abbreviation AS team,
                                     game_date,
-                                    pts, reb, ast, min
+                                    pts, reb, ast, stl, blk, tov, min, fgm, fga, fg3m, fg3a, ftm, fta
                                 FROM player_boxscores
                                 WHERE game_date >= :start_date AND game_date <= :end_date
+                                AND player_name = :player_name
                                 ORDER BY game_date DESC
-                                LIMIT 500
                             """)
-                            df = pd.read_sql(query, conn, params={"start_date": start_date, "end_date": end_date})
+                            df = pd.read_sql(query, conn, params={"start_date": start_date, "end_date": end_date, "player_name": search_player})
                         
                         if df.empty:
-                            st.warning(f"No player data found for {selected_season}.")
+                            st.warning(f"No data found for '{search_player}' in {selected_season}.")
                         else:
-                            df['game_date'] = pd.to_datetime(df['game_date']).dt.strftime('%Y-%m-%d')
-                            st.success(f"✅ Found {len(df)} records for {selected_season}")
-                            c1, c2, c3, c4 = st.columns(4)
-                            c1.metric("Records", len(df))
-                            c2.metric("Avg PTS", f"{df['pts'].mean():.1f}")
-                            c3.metric("Avg REB", f"{df['reb'].mean():.1f}")
-                            c4.metric("Avg AST", f"{df['ast'].mean():.1f}")
-                            st.dataframe(df, use_container_width=True, height=400)
-            
-            except Exception as e:
-                st.error(f"❌ Error loading data: {str(e)}")
+                            player_display_name = df['player_name'].iloc[0]
+                            player_team = df['team'].iloc[0]
+                            games_played = len(df)
+                            
+                            # Player Header
+                            st.markdown("---")
+                            st.markdown(f"""
+                            <div style='background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%); 
+                                        padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem;'>
+                                <h2 style='margin: 0; color: #fff;'>🏀 {player_display_name}</h2>
+                                <p style='margin: 0.5rem 0 0 0; color: #a0a0a0; font-size: 1.1rem;'>{player_team} • {selected_season} Season</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Season Averages
+                            st.markdown("### 📊 Season Averages")
+                            
+                            avg_pts = df['pts'].mean()
+                            avg_reb = df['reb'].mean()
+                            avg_ast = df['ast'].mean()
+                            avg_stl = df['stl'].mean() if 'stl' in df.columns and df['stl'].notna().any() else 0
+                            avg_blk = df['blk'].mean() if 'blk' in df.columns and df['blk'].notna().any() else 0
+                            avg_tov = df['tov'].mean() if 'tov' in df.columns and df['tov'].notna().any() else 0
+                            avg_min = df['min'].mean() if 'min' in df.columns and df['min'].notna().any() else 0
+                            
+                            # Calculate shooting percentages
+                            total_fgm = df['fgm'].sum() if 'fgm' in df.columns else 0
+                            total_fga = df['fga'].sum() if 'fga' in df.columns else 0
+                            total_fg3m = df['fg3m'].sum() if 'fg3m' in df.columns else 0
+                            total_fg3a = df['fg3a'].sum() if 'fg3a' in df.columns else 0
+                            total_ftm = df['ftm'].sum() if 'ftm' in df.columns else 0
+                            total_fta = df['fta'].sum() if 'fta' in df.columns else 0
+                            
+                            fg_pct = (total_fgm / total_fga * 100) if total_fga > 0 else 0
+                            fg3_pct = (total_fg3m / total_fg3a * 100) if total_fg3a > 0 else 0
+                            ft_pct = (total_ftm / total_fta * 100) if total_fta > 0 else 0
+                            
+                            # Display averages in nice cards
+                            col1, col2, col3, col4, col5 = st.columns(5)
+                            col1.metric("PPG", f"{avg_pts:.1f}")
+                            col2.metric("RPG", f"{avg_reb:.1f}")
+                            col3.metric("APG", f"{avg_ast:.1f}")
+                            col4.metric("SPG", f"{avg_stl:.1f}")
+                            col5.metric("BPG", f"{avg_blk:.1f}")
+                            
+                            col6, col7, col8, col9, col10 = st.columns(5)
+                            col6.metric("MPG", f"{avg_min:.1f}")
+                            col7.metric("FG%", f"{fg_pct:.1f}%")
+                            col8.metric("3P%", f"{fg3_pct:.1f}%")
+                            col9.metric("FT%", f"{ft_pct:.1f}%")
+                            col10.metric("Games", f"{games_played}")
+                            
+                            # Game Log
+                            st.markdown("### 📅 Game Log")
+                            
+                            # Format dataframe for display
+                            display_df = df[['game_date', 'team', 'pts', 'reb', 'ast', 'stl', 'blk', 'min']].copy()
+                            display_df.columns = ['Date', 'Team', 'PTS', 'REB', 'AST', 'STL', 'BLK', 'MIN']
+                            display_df['Date'] = pd.to_datetime(display_df['Date']).dt.strftime('%Y-%m-%d')
+                            
+                            st.dataframe(display_df, use_container_width=True, height=400, hide_index=True)
+                
+                except Exception as e:
+                    st.error(f"❌ Error loading data: {str(e)}")
 
 with tab8:
     st.markdown("## 📊 Daily Reports — Performance Tracking")

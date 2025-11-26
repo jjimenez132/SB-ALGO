@@ -475,7 +475,7 @@ with tab7:
                                     player_name,
                                     team_abbreviation AS team,
                                     game_date,
-                                    pts, reb, ast, stl, blk, tov, min, fgm, fga, fg3m, fg3a, ftm, fta
+                                    pts, reb, ast, min
                                 FROM player_boxscores
                                 WHERE game_date >= :start_date AND game_date <= :end_date
                                 AND LOWER(player_name) LIKE LOWER(:player_search)
@@ -488,7 +488,7 @@ with tab7:
                                     player_name,
                                     team_abbreviation AS team,
                                     game_date,
-                                    pts, reb, ast, stl, blk, tov, min, fgm, fga, fg3m, fg3a, ftm, fta
+                                    pts, reb, ast, min
                                 FROM player_boxscores
                                 WHERE game_date >= :start_date AND game_date <= :end_date
                                 AND player_name = :player_name
@@ -519,44 +519,22 @@ with tab7:
                             avg_pts = df['pts'].mean()
                             avg_reb = df['reb'].mean()
                             avg_ast = df['ast'].mean()
-                            avg_stl = df['stl'].mean() if 'stl' in df.columns and df['stl'].notna().any() else 0
-                            avg_blk = df['blk'].mean() if 'blk' in df.columns and df['blk'].notna().any() else 0
-                            avg_tov = df['tov'].mean() if 'tov' in df.columns and df['tov'].notna().any() else 0
                             avg_min = df['min'].mean() if 'min' in df.columns and df['min'].notna().any() else 0
-                            
-                            # Calculate shooting percentages
-                            total_fgm = df['fgm'].sum() if 'fgm' in df.columns else 0
-                            total_fga = df['fga'].sum() if 'fga' in df.columns else 0
-                            total_fg3m = df['fg3m'].sum() if 'fg3m' in df.columns else 0
-                            total_fg3a = df['fg3a'].sum() if 'fg3a' in df.columns else 0
-                            total_ftm = df['ftm'].sum() if 'ftm' in df.columns else 0
-                            total_fta = df['fta'].sum() if 'fta' in df.columns else 0
-                            
-                            fg_pct = (total_fgm / total_fga * 100) if total_fga > 0 else 0
-                            fg3_pct = (total_fg3m / total_fg3a * 100) if total_fg3a > 0 else 0
-                            ft_pct = (total_ftm / total_fta * 100) if total_fta > 0 else 0
                             
                             # Display averages in nice cards
                             col1, col2, col3, col4, col5 = st.columns(5)
                             col1.metric("PPG", f"{avg_pts:.1f}")
                             col2.metric("RPG", f"{avg_reb:.1f}")
                             col3.metric("APG", f"{avg_ast:.1f}")
-                            col4.metric("SPG", f"{avg_stl:.1f}")
-                            col5.metric("BPG", f"{avg_blk:.1f}")
-                            
-                            col6, col7, col8, col9, col10 = st.columns(5)
-                            col6.metric("MPG", f"{avg_min:.1f}")
-                            col7.metric("FG%", f"{fg_pct:.1f}%")
-                            col8.metric("3P%", f"{fg3_pct:.1f}%")
-                            col9.metric("FT%", f"{ft_pct:.1f}%")
-                            col10.metric("Games", f"{games_played}")
+                            col4.metric("MPG", f"{avg_min:.1f}")
+                            col5.metric("Games", f"{games_played}")
                             
                             # Game Log
                             st.markdown("### 📅 Game Log")
                             
                             # Format dataframe for display
-                            display_df = df[['game_date', 'team', 'pts', 'reb', 'ast', 'stl', 'blk', 'min']].copy()
-                            display_df.columns = ['Date', 'Team', 'PTS', 'REB', 'AST', 'STL', 'BLK', 'MIN']
+                            display_df = df[['game_date', 'team', 'pts', 'reb', 'ast', 'min']].copy()
+                            display_df.columns = ['Date', 'Team', 'PTS', 'REB', 'AST', 'MIN']
                             display_df['Date'] = pd.to_datetime(display_df['Date']).dt.strftime('%Y-%m-%d')
                             
                             st.dataframe(display_df, use_container_width=True, height=400, hide_index=True)

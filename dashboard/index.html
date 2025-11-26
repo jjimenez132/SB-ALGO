@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NBA Algo - Full Access</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            text-align: center;
+        }
+        h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .subtitle { opacity: 0.9; }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .stat-card {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stat-label {
+            color: #888;
+            margin-top: 10px;
+            text-transform: uppercase;
+            font-size: 0.9em;
+        }
+        .picks-section {
+            background: #1a1a1a;
+            border-radius: 20px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+        .pick-card {
+            background: #0f0f0f;
+            border: 2px solid #333;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+        .pick-card:hover {
+            border-color: #667eea;
+            transform: translateX(5px);
+        }
+        .pick-info h3 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+        .pick-details {
+            color: #888;
+        }
+        .confidence-badge {
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .high { background: #4CAF50; }
+        .medium { background: #FFC107; color: #000; }
+        .low { background: #666; }
+        .live-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #4CAF50;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏀 NBA Betting Algorithm</h1>
+        <div class="subtitle">
+            <span class="live-dot"></span>
+            Full Access Dashboard - Black Friday Offer Active
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">73.2%</div>
+                <div class="stat-label">Win Rate (7 Days)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">+$3,450</div>
+                <div class="stat-label">Profit This Week</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">12-3</div>
+                <div class="stat-label">Last 15 Picks</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">LIVE</div>
+                <div class="stat-label">Status</div>
+            </div>
+        </div>
+
+        <div class="picks-section">
+            <h2 style="margin-bottom: 20px;">🎯 Tonight's Algorithm Picks</h2>
+            <div id="picks">
+                <!-- Picks load here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // This will connect to your API
+        const picks = [
+            { team: 'Lakers -3.5', opponent: 'vs Warriors', time: '10:00 PM', confidence: 'high', odds: '-110' },
+            { team: 'Celtics +2.5', opponent: '@ Heat', time: '7:30 PM', confidence: 'medium', odds: '-105' },
+            { team: 'OVER 218.5', opponent: 'Nuggets @ Suns', time: '9:00 PM', confidence: 'high', odds: '-110' }
+        ];
+
+        function loadPicks() {
+            const picksDiv = document.getElementById('picks');
+            picksDiv.innerHTML = picks.map(pick => `
+                <div class="pick-card">
+                    <div class="pick-info">
+                        <h3>${pick.team}</h3>
+                        <div class="pick-details">${pick.opponent} • ${pick.time} • ${pick.odds}</div>
+                    </div>
+                    <div class="confidence-badge ${pick.confidence}">${pick.confidence}</div>
+                </div>
+            `).join('');
+        }
+
+        loadPicks();
+    </script>
+</body>
+</html>

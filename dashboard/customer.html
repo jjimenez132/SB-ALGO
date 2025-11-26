@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NBA Algo - Premium Access</title>
+    <style>
+        body {
+            font-family: -apple-system, system-ui;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            padding: 40px 0;
+        }
+        .access-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 10px 30px;
+            border-radius: 30px;
+            margin-bottom: 20px;
+        }
+        .pick-card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .locked {
+            opacity: 0.5;
+            position: relative;
+        }
+        .locked::after {
+            content: "🔒 FULL ACCESS ONLY";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #000;
+            padding: 10px 20px;
+            border-radius: 10px;
+        }
+        .upgrade-banner {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="access-badge">50% ACCESS - BLACK FRIDAY SPECIAL</div>
+            <h1>NBA Algorithm Picks</h1>
+            <p>You're seeing 50% of tonight's premium picks</p>
+        </div>
+
+        <div id="picks">
+            <div class="pick-card">
+                <h3>🏀 Lakers -3.5</h3>
+                <p>vs Warriors • 10:00 PM • HIGH CONFIDENCE</p>
+            </div>
+            <div class="pick-card locked">
+                <h3>🏀 [HIDDEN PICK]</h3>
+                <p>Premium pick with 78% historical win rate</p>
+            </div>
+            <div class="pick-card">
+                <h3>🏀 OVER 218.5</h3>
+                <p>Nuggets @ Suns • 9:00 PM • MEDIUM CONFIDENCE</p>
+            </div>
+            <div class="pick-card locked">
+                <h3>🏀 [HIDDEN PICK]</h3>
+                <p>Premium pick - Upgrade for full access</p>
+            </div>
+        </div>
+
+        <div class="upgrade-banner">
+            <h2>🎁 BLACK FRIDAY: Get FULL Access</h2>
+            <p style="font-size: 1.3em; margin: 15px 0;">See ALL picks + Historical data + Live updates</p>
+            <p style="font-size: 2em; font-weight: bold;">$49/month</p>
+            <button style="background: white; color: #f5576c; border: none; padding: 15px 40px; border-radius: 30px; font-size: 1.2em; font-weight: bold; cursor: pointer; margin-top: 10px;">UPGRADE NOW</button>
+        </div>
+    </div>
+</body>
+</html>

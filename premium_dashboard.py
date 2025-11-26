@@ -316,8 +316,8 @@ with tab7:
     if engine:
         st.markdown("### 🔍 Query Historical Data")
         
-        # Just show last 5 seasons - simple and works
-        available_seasons = ["2025-26", "2024-25", "2023-24", "2022-23", "2021-22"]
+        # Simple: last 5 seasons
+        available_seasons = ["2024-25", "2023-24", "2022-23", "2021-22", "2020-21"]
         
         col1, col2 = st.columns(2)
         with col1:
@@ -325,8 +325,19 @@ with tab7:
         with col2:
             stat_type = st.selectbox("Stat Type", ["Game Results", "Player Stats"])
         
+        # Add search box based on stat type
+        if stat_type == "Player Stats":
+            player_search = st.text_input("🔍 Search Player", placeholder="e.g. LeBron James")
+        else:
+            team_search = st.selectbox("🏀 Select Team", [
+                "All Teams", "ATL", "BOS", "BKN", "CHA", "CHI", "CLE", "DAL", "DEN", "DET", "GSW",
+                "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", "MIN", "NOP", "NYK", "OKC",
+                "ORL", "PHI", "PHX", "POR", "SAC", "SAS", "TOR", "UTA", "WAS"
+            ])
+        
         if st.button("Load Data"):
-            st.info(f"Loading {stat_type} from {season}...")
+            st.info(f"📊 Querying {season} {stat_type}...")
+            # Data will load here - coming soon
     else:
         st.warning("Database connection required")
 

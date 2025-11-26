@@ -269,7 +269,6 @@ with tab6:
     
     if engine:
         try:
-            # Fetch real injury data - query all columns to see what's available
             query = text("""
                 SELECT * 
                 FROM injuries 
@@ -285,11 +284,9 @@ with tab6:
                 st.markdown(f"**Last updated:** {datetime.now().strftime('%B %d, %Y at %I:%M %p ET')} | **Total Reports:** {len(injuries_df)}")
                 st.markdown("---")
                 
-                # Display injuries in a clean format
                 for idx, row in injuries_df.iterrows():
                     col1, col2 = st.columns([3, 1])
                     with col1:
-                        # Show player name prominently
                         player_name = row.get('player_name', row.get('name', 'Unknown Player'))
                         status = row.get('status', row.get('injury_status', 'Out'))
                         description = row.get('description', row.get('details', row.get('injury', 'No details available')))
@@ -306,7 +303,6 @@ with tab6:
                 
         except Exception as e:
             st.error(f"Error loading injuries: {str(e)}")
-            st.markdown("**Debug info:** Check column names in injuries table")
     else:
         st.warning("Database connection required to view injury reports")
 
@@ -330,37 +326,20 @@ with tab7:
         end_date = f"{start_year + 1}-07-31"
         return start_date, end_date
     
-    # Get teams list dynamically
+    # Get teams list
     teams_list = ["All Teams"]
     if engine:
         try:
             with engine.connect() as conn:
-                # First check what columns exist in games table
-                cols_query = text("""
-                    SELECT column_name FROM information_schema.columns 
-                    WHERE table_name = 'games'
-                """)
-                cols_result = conn.execute(cols_query).fetchall()
-                games_columns = [row[0] for row in cols_result]
-                
-                # Find the home team column
-                home_team_col = None
-                for col in games_columns:
-                    if 'home' in col.lower() and ('team' in col.lower() or 'abbreviation' in col.lower()):
-                        home_team_col = col
-                        break
-                
-                if home_team_col:
-                    teams_query = text(f"""
-                        SELECT DISTINCT "{home_team_col}" as team 
-                        FROM games 
-                        WHERE "{home_team_col}" IS NOT NULL
-                        ORDER BY "{home_team_col}"
-                    """)
-                    result = conn.execute(teams_query)
-                    teams_list = ["All Teams"] + [row[0] for row in result.fetchall()]
-        except Exception as e:
-            st.warning(f"Could not load teams: {e}")
+                result = conn.execute(text("""
+                    SELECT DISTINCT home_team 
+                    FROM games 
+                    WHERE home_team IS NOT NULL
+                    ORDER BY home_team
+                """))
+                teams_list = ["All Teams"] + [row[0] for row in result.fetchall()]
+        except:
+            pass
     
     if stat_type == "Game Results":
         selected_team = st.selectbox("🏀 Select Team", teams_list, key="explorer_team")
@@ -376,71 +355,34 @@ with tab7:
             try:
                 with engine.connect() as conn:
                     if stat_type == "Game Results":
-                        # First, get actual column names from games table
-                        cols_query = text("""
-                            SELECT column_name FROM information_schema.columns 
-                            WHERE table_name = 'games'
-                        """)
-                        cols_result = conn.execute(cols_query).fetchall()
-                        games_columns = [row[0] for row in cols_result]
-                        
-                        # Find the right column names (case-insensitive matching)
-                        date_col = None
-                        home_team_col = None
-                        away_team_col = None
-                        pts_home_col = None
-                        pts_away_col = None
-                        wl_home_col = None
-                        
-                        for col in games_columns:
-                            col_lower = col.lower()
-                            if 'date' in col_lower and date_col is None:
-                                date_col = col
-                            if 'home' in col_lower and 'abbreviation' in col_lower:
-                                home_team_col = col
-                            if 'away' in col_lower and 'abbreviation' in col_lower:
-                                away_team_col = col
-                            if col_lower == 'pts_home' or (col_lower.startswith('pts') and 'home' in col_lower):
-                                pts_home_col = col
-                            if col_lower == 'pts_away' or (col_lower.startswith('pts') and 'away' in col_lower):
-                                pts_away_col = col
-                            if 'wl' in col_lower and 'home' in col_lower:
-                                wl_home_col = col
-                        
-                        # Debug: show found columns
-                        if not all([date_col, home_team_col, away_team_col]):
-                            st.warning(f"Available columns: {games_columns}")
-                            st.stop()
-                        
-                        # Build query with actual column names
                         if selected_team == "All Teams":
-                            query = text(f"""
+                            query = text("""
                                 SELECT 
-                                    "{date_col}" AS game_date,
-                                    "{home_team_col}" AS home_team,
-                                    "{away_team_col}" AS away_team,
-                                    "{pts_home_col}" AS home_pts,
-                                    "{pts_away_col}" AS away_pts,
-                                    "{wl_home_col}" AS home_result
+                                    date AS game_date,
+                                    home_team,
+                                    visitor_team,
+                                    home_pts,
+                                    visitor_pts,
+                                    home_win
                                 FROM games
-                                WHERE "{date_col}" >= :start_date AND "{date_col}" <= :end_date
-                                ORDER BY "{date_col}" DESC
+                                WHERE date >= :start_date AND date <= :end_date
+                                ORDER BY date DESC
                                 LIMIT 500
                             """)
                             df = pd.read_sql(query, conn, params={"start_date": start_date, "end_date": end_date})
                         else:
-                            query = text(f"""
+                            query = text("""
                                 SELECT 
-                                    "{date_col}" AS game_date,
-                                    "{home_team_col}" AS home_team,
-                                    "{away_team_col}" AS away_team,
-                                    "{pts_home_col}" AS home_pts,
-                                    "{pts_away_col}" AS away_pts,
-                                    "{wl_home_col}" AS home_result
+                                    date AS game_date,
+                                    home_team,
+                                    visitor_team,
+                                    home_pts,
+                                    visitor_pts,
+                                    home_win
                                 FROM games
-                                WHERE "{date_col}" >= :start_date AND "{date_col}" <= :end_date
-                                AND ("{home_team_col}" = :team OR "{away_team_col}" = :team)
-                                ORDER BY "{date_col}" DESC
+                                WHERE date >= :start_date AND date <= :end_date
+                                AND (home_team = :team OR visitor_team = :team)
+                                ORDER BY date DESC
                                 LIMIT 500
                             """)
                             df = pd.read_sql(query, conn, params={"start_date": start_date, "end_date": end_date, "team": selected_team})
@@ -453,79 +395,35 @@ with tab7:
                             c1, c2, c3 = st.columns(3)
                             c1.metric("Total Games", len(df))
                             c2.metric("Avg Home Pts", f"{df['home_pts'].mean():.1f}")
-                            c3.metric("Avg Away Pts", f"{df['away_pts'].mean():.1f}")
+                            c3.metric("Avg Away Pts", f"{df['visitor_pts'].mean():.1f}")
                             st.dataframe(df, use_container_width=True, height=400)
                     
                     else:  # Player Stats
-                        # First, get actual column names from player_boxscores table
-                        cols_query = text("""
-                            SELECT column_name FROM information_schema.columns 
-                            WHERE table_name = 'player_boxscores'
-                        """)
-                        cols_result = conn.execute(cols_query).fetchall()
-                        player_columns = [row[0] for row in cols_result]
-                        
-                        # Find the right column names
-                        date_col = None
-                        player_col = None
-                        team_col = None
-                        pts_col = None
-                        reb_col = None
-                        ast_col = None
-                        min_col = None
-                        
-                        for col in player_columns:
-                            col_lower = col.lower()
-                            if 'date' in col_lower and date_col is None:
-                                date_col = col
-                            if 'player' in col_lower and 'name' in col_lower:
-                                player_col = col
-                            if 'team' in col_lower and 'abbreviation' in col_lower:
-                                team_col = col
-                            if col_lower == 'pts':
-                                pts_col = col
-                            if col_lower == 'reb':
-                                reb_col = col
-                            if col_lower == 'ast':
-                                ast_col = col
-                            if col_lower == 'min':
-                                min_col = col
-                        
-                        if not all([date_col, player_col]):
-                            st.warning(f"Available columns: {player_columns}")
-                            st.stop()
-                        
                         if player_search_input and player_search_input.strip():
-                            query = text(f"""
+                            query = text("""
                                 SELECT 
-                                    "{player_col}" AS player_name,
-                                    "{team_col}" AS team,
-                                    "{date_col}" AS game_date,
-                                    "{pts_col}" AS pts, 
-                                    "{reb_col}" AS reb, 
-                                    "{ast_col}" AS ast, 
-                                    "{min_col}" AS min
+                                    player_name,
+                                    team_abbreviation AS team,
+                                    game_date,
+                                    pts, reb, ast, min
                                 FROM player_boxscores
-                                WHERE "{date_col}" >= :start_date AND "{date_col}" <= :end_date
-                                AND LOWER("{player_col}") LIKE LOWER(:player_search)
-                                ORDER BY "{date_col}" DESC
+                                WHERE game_date >= :start_date AND game_date <= :end_date
+                                AND LOWER(player_name) LIKE LOWER(:player_search)
+                                ORDER BY game_date DESC
                                 LIMIT 500
                             """)
                             search_param = f"%{player_search_input.strip()}%"
                             df = pd.read_sql(query, conn, params={"start_date": start_date, "end_date": end_date, "player_search": search_param})
                         else:
-                            query = text(f"""
+                            query = text("""
                                 SELECT 
-                                    "{player_col}" AS player_name,
-                                    "{team_col}" AS team,
-                                    "{date_col}" AS game_date,
-                                    "{pts_col}" AS pts, 
-                                    "{reb_col}" AS reb, 
-                                    "{ast_col}" AS ast, 
-                                    "{min_col}" AS min
+                                    player_name,
+                                    team_abbreviation AS team,
+                                    game_date,
+                                    pts, reb, ast, min
                                 FROM player_boxscores
-                                WHERE "{date_col}" >= :start_date AND "{date_col}" <= :end_date
-                                ORDER BY "{date_col}" DESC
+                                WHERE game_date >= :start_date AND game_date <= :end_date
+                                ORDER BY game_date DESC
                                 LIMIT 500
                             """)
                             df = pd.read_sql(query, conn, params={"start_date": start_date, "end_date": end_date})

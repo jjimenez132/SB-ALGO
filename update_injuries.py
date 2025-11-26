@@ -62,6 +62,10 @@ def get_espn_injuries():
 
 def create_injuries_table(engine):
     """Create injuries table if it doesn't exist"""
+    
+    # DROP the old table if it exists (schema mismatch from GitHub Actions version)
+    drop_table_sql = text("DROP TABLE IF EXISTS injuries CASCADE")
+    
     create_table_sql = text("""
         CREATE TABLE IF NOT EXISTS injuries (
             id SERIAL PRIMARY KEY,
@@ -77,6 +81,8 @@ def create_injuries_table(engine):
     """)
     
     with engine.connect() as conn:
+        conn.execute(drop_table_sql)
+        conn.commit()
         conn.execute(create_table_sql)
         conn.commit()
     

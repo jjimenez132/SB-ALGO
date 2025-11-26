@@ -269,12 +269,12 @@ with tab6:
     
     if engine:
         try:
-            # Fetch real injury data
+            # Fetch real injury data - query all columns to see what's available
             query = text("""
-                SELECT player_name, team, status, details, date 
+                SELECT * 
                 FROM injuries 
-                ORDER BY date DESC 
-                LIMIT 20
+                ORDER BY updated_at DESC 
+                LIMIT 50
             """)
             
             with engine.connect() as conn:
@@ -282,12 +282,31 @@ with tab6:
             
             if not injuries_df.empty:
                 st.markdown("### 🏥 Latest Injury Reports")
-                st.dataframe(injuries_df, use_container_width=True, hide_index=True)
+                st.markdown(f"**Last updated:** {datetime.now().strftime('%B %d, %Y at %I:%M %p ET')} | **Total Reports:** {len(injuries_df)}")
+                st.markdown("---")
+                
+                # Display injuries in a clean format
+                for idx, row in injuries_df.iterrows():
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        # Show player name prominently
+                        player_name = row.get('player_name', row.get('name', 'Unknown Player'))
+                        status = row.get('status', row.get('injury_status', 'Out'))
+                        description = row.get('description', row.get('details', row.get('injury', 'No details available')))
+                        
+                        st.markdown(f"**{player_name}** — {status}")
+                        st.markdown(f"_{description}_")
+                    with col2:
+                        updated = row.get('updated_at', row.get('date', ''))
+                        if updated:
+                            st.markdown(f"🕐 {updated}")
+                    st.markdown("---")
             else:
                 st.info("No recent injury reports found")
                 
         except Exception as e:
             st.error(f"Error loading injuries: {str(e)}")
+            st.markdown("**Debug info:** Check column names in injuries table")
     else:
         st.warning("Database connection required to view injury reports")
 

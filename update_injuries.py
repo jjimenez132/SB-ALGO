@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""
-ESPN NBA Injury Report Scraper
-Fetches real-time injury data from ESPN and stores in PostgreSQL
-Runs hourly via Render Cron Job
-"""
+"""ESPN NBA Injury Scraper - Fixed Version"""
 
 import requests
 import pandas as pd
@@ -17,17 +13,13 @@ def get_espn_injuries():
     print("🏥 Fetching NBA injury reports from ESPN...")
     
     try:
-        # ESPN's public injury API endpoint
         url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries"
-        
         response = requests.get(url, timeout=10)
         response.raise_for_status()
-        
         data = response.json()
         
         injuries = []
         
-        # Parse the response
         if 'injuries' in data:
             for team_data in data['injuries']:
                 team_name = team_data.get('team', {}).get('displayName', 'Unknown')
@@ -36,21 +28,28 @@ def get_espn_injuries():
                 for injury in team_data.get('injuries', []):
                     athlete = injury.get('athlete', {})
                     
-                    # Extract injury type - it comes as a dict, we need just the description
-                    injury_type_data = injury.get('type', {})
-                    if isinstance(injury_type_data, dict):
-                        injury_type = injury_type_data.get('description', 'Unknown')
+                    # CRITICAL FIX: Extract string from injury_type dict
+                    injury_type_raw = injury.get('type', {})
+                    if isinstance(injury_type_raw, dict):
+                        injury_type_str = injury_type_raw.get('description', 'unknown')
                     else:
-                        injury_type = str(injury_type_data)
+                        injury_type_str = str(injury_type_raw) if injury_type_raw else 'unknown'
+                    
+                    # Get date as string
+                    date_raw = injury.get('date', datetime.now().isoformat())
+                    if isinstance(date_raw, dict):
+                        date_str = str(date_raw.get('date', datetime.now().isoformat()))
+                    else:
+                        date_str = str(date_raw)
                     
                     injuries.append({
-                        'player_name': athlete.get('displayName', 'Unknown'),
-                        'team_name': team_name,
-                        'team_abbr': team_abbr,
-                        'status': injury.get('status', 'Out'),
-                        'description': injury.get('longComment', injury.get('shortComment', 'No details')),
-                        'injury_type': injury_type,
-                        'date': injury.get('date', datetime.now().isoformat()),
+                        'player_name': str(athlete.get('displayName', 'Unknown')),
+                        'team_name': str(team_name),
+                        'team_abbr': str(team_abbr),
+                        'status': str(injury.get('status', 'Out')),
+                        'description': str(injury.get('longComment', injury.get('shortComment', 'No details'))),
+                        'injury_type': injury_type_str,
+                        'date': date_str,
                         'updated_at': datetime.now()
                     })
         
@@ -72,9 +71,8 @@ def create_injuries_table(engine):
             status VARCHAR(50),
             description TEXT,
             injury_type VARCHAR(100),
-            date TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(player_name, updated_at)
+            date VARCHAR(100),
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     
@@ -87,7 +85,6 @@ def create_injuries_table(engine):
 def update_database(injuries):
     """Update PostgreSQL database with injury data"""
     
-    # Get database URL from environment
     database_url = os.getenv('DATABASE_URL')
     
     if not database_url:
@@ -97,32 +94,41 @@ def update_database(injuries):
     try:
         engine = create_engine(database_url)
         
-        # Create table if needed
         create_injuries_table(engine)
         
         if not injuries:
             print("⚠️ No injuries to update")
             return
         
-        # Clear old data (keep last 7 days only)
-        clear_old = text("""
-            DELETE FROM injuries 
-            WHERE updated_at < NOW() - INTERVAL '7 days'
-        """)
+        # Clear old data
+        clear_old = text("DELETE FROM injuries WHERE updated_at < NOW() - INTERVAL '7 days'")
         
         with engine.connect() as conn:
             conn.execute(clear_old)
             conn.commit()
         
-        # Convert to DataFrame
+        # Convert to DataFrame and insert
         df = pd.DataFrame(injuries)
         
-        # Insert new data (ignore duplicates)
-        df.to_sql('injuries', engine, if_exists='append', index=False, method='multi')
+        # Insert one by one to avoid issues
+        count = 0
+        with engine.connect() as conn:
+            for _, row in df.iterrows():
+                try:
+                    insert_sql = text("""
+                        INSERT INTO injuries (player_name, team_name, team_abbr, status, description, injury_type, date, updated_at)
+                        VALUES (:player_name, :team_name, :team_abbr, :status, :description, :injury_type, :date, :updated_at)
+                    """)
+                    conn.execute(insert_sql, row.to_dict())
+                    count += 1
+                except Exception as e:
+                    print(f"⚠️ Skipped {row['player_name']}: {str(e)[:100]}")
+                    continue
+            conn.commit()
         
-        print(f"✅ Successfully updated {len(injuries)} injury reports in database")
+        print(f"✅ Successfully updated {count} injury reports in database")
         
-        # Show sample
+        # Show total
         with engine.connect() as conn:
             result = conn.execute(text("SELECT COUNT(*) FROM injuries")).fetchone()
             total = result[0]
@@ -139,10 +145,7 @@ def main():
     print(f"⏰ Run time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)
     
-    # Fetch injuries from ESPN
     injuries = get_espn_injuries()
-    
-    # Update database
     update_database(injuries)
     
     print("=" * 60)

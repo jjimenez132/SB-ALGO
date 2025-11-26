@@ -310,115 +310,154 @@ with tab6:
     else:
         st.warning("Database connection required to view injury reports")
 
+# ============================================================================
+# FIXED DATA EXPLORER TAB (Tab 7)
+# ============================================================================
+# 
+# PASTE THIS ENTIRE BLOCK to replace your current tab7 section in premium_dashboard.py
+# Find "with tab7:" and replace everything until the next "with tab8:" or end of tabs
+#
+# ============================================================================
+
 with tab7:
-    st.markdown("## 📂 Data Explorer — Historical Stats")
+    st.markdown("## 📁 Data Explorer — Historical Stats")
+    st.markdown("### 🔍 Query Historical Data")
     
-    if engine:
-        st.markdown("### 🔍 Query Historical Data")
-        
-        # Exact seasons user requested
-        available_seasons = ["2025-26", "2024-25", "2023-24", "2022-23", "2021-22"]
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            season = st.selectbox("Season", available_seasons)
-        with col2:
-            stat_type = st.selectbox("Stat Type", ["Game Results", "Player Stats"])
-        
-        # Add search based on type
-        if stat_type == "Player Stats":
-            player_search = st.text_input("🔍 Search Player", placeholder="e.g. LeBron James")
-        else:
-            team_search = st.selectbox("🏀 Select Team", [
-                "All Teams", "ATL", "BOS", "BKN", "CHA", "CHI", "CLE", "DAL", "DEN", "DET", "GSW",
-                "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", "MIN", "NOP", "NYK", "OKC",
-                "ORL", "PHI", "PHX", "POR", "SAC", "SAS", "TOR", "UTA", "WAS"
-            ])
-        
-        if st.button("Load Data"):
-            try:
-                with engine.connect() as conn:
-                    if stat_type == "Game Results":
-                        # Query actual games
-                        if team_search == "All Teams":
-                            query = text("""
-                                SELECT game_date, team_abbreviation_home, team_abbreviation_away, 
-                                       pts_home, pts_away, wl_home
-                                FROM games 
-                                WHERE game_date >= :start_date AND game_date < :end_date
-                                ORDER BY game_date DESC
-                                LIMIT 200
-                            """)
-                        else:
-                            query = text("""
-                                SELECT game_date, team_abbreviation_home, team_abbreviation_away, 
-                                       pts_home, pts_away, wl_home
-                                FROM games 
-                                WHERE game_date >= :start_date AND game_date < :end_date
-                                  AND (team_abbreviation_home = :team OR team_abbreviation_away = :team)
-                                ORDER BY game_date DESC
-                                LIMIT 200
-                            """)
-                        
-                        # Calculate date range from season
-                        year = int(season.split('-')[0])
-                        start_date = f"{year}-10-01"
-                        end_date = f"{year+1}-07-01"
-                        
-                        params = {"start_date": start_date, "end_date": end_date}
-                        if team_search != "All Teams":
-                            params["team"] = team_search
-                        
-                        df = pd.read_sql(query, conn, params=params)
-                        
-                        if not df.empty:
-                            st.dataframe(df, use_container_width=True, hide_index=True)
-                            st.success(f"✅ Loaded {len(df)} games from {season}")
-                        else:
-                            st.warning(f"No games found for {season}")
-                    
-                    else:  # Player Stats
-                        if player_search:
-                            query = text("""
-                                SELECT player_name, team_abbreviation, game_date, pts, reb, ast, min
-                                FROM player_boxscores 
-                                WHERE game_date >= :start_date AND game_date < :end_date
-                                  AND LOWER(player_name) LIKE LOWER(:player)
-                                ORDER BY game_date DESC
-                                LIMIT 200
-                            """)
-                            year = int(season.split('-')[0])
-                            params = {
-                                "start_date": f"{year}-10-01",
-                                "end_date": f"{year+1}-07-01",
-                                "player": f"%{player_search}%"
-                            }
-                        else:
-                            query = text("""
-                                SELECT player_name, team_abbreviation, game_date, pts, reb, ast, min
-                                FROM player_boxscores 
-                                WHERE game_date >= :start_date AND game_date < :end_date
-                                ORDER BY pts DESC
-                                LIMIT 100
-                            """)
-                            year = int(season.split('-')[0])
-                            params = {
-                                "start_date": f"{year}-10-01",
-                                "end_date": f"{year+1}-07-01"
-                            }
-                        
-                        df = pd.read_sql(query, conn, params=params)
-                        
-                        if not df.empty:
-                            st.dataframe(df, use_container_width=True, hide_index=True)
-                            st.success(f"✅ Loaded {len(df)} player performances from {season}")
-                        else:
-                            st.warning(f"No player stats found")
-                            
-            except Exception as e:
-                st.error(f"Error loading data: {str(e)}")
+    SEASONS = ["2025-26", "2024-25", "2023-24", "2022-23", "2021-22"]
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        selected_season = st.selectbox("Season", SEASONS, key="explorer_season")
+    
+    with col2:
+        stat_type = st.selectbox("Stat Type", ["Game Results", "Player Stats"], key="explorer_stat_type")
+    
+    def get_season_dates(season_str):
+        start_year = int(season_str.split("-")[0])
+        start_date = f"{start_year}-10-01"
+        end_date = f"{start_year + 1}-07-31"
+        return start_date, end_date
+    
+    @st.cache_data(ttl=3600)
+    def get_all_teams():
+        try:
+            conn = get_db_connection()
+            query = """
+                SELECT DISTINCT team_abbreviation_home as team 
+                FROM games 
+                WHERE team_abbreviation_home IS NOT NULL
+                ORDER BY team_abbreviation_home
+            """
+            df = pd.read_sql(query, conn)
+            conn.close()
+            return ["All Teams"] + df['team'].tolist()
+        except:
+            return ["All Teams"]
+    
+    if stat_type == "Game Results":
+        teams_list = get_all_teams()
+        selected_team = st.selectbox("🏀 Select Team", teams_list, key="explorer_team")
     else:
-        st.warning("Database connection required")
+        player_search = st.text_input("🔎 Search Player Name", "", key="explorer_player_search")
+    
+    if st.button("Load Data", key="explorer_load_btn"):
+        start_date, end_date = get_season_dates(selected_season)
+        
+        try:
+            conn = get_db_connection()
+            
+            if stat_type == "Game Results":
+                if selected_team == "All Teams":
+                    query = """
+                        SELECT 
+                            game_date,
+                            team_abbreviation_home AS home_team,
+                            team_abbreviation_away AS away_team,
+                            pts_home AS home_pts,
+                            pts_away AS away_pts,
+                            wl_home AS home_result
+                        FROM games
+                        WHERE game_date >= %s AND game_date <= %s
+                        ORDER BY game_date DESC
+                        LIMIT 500
+                    """
+                    df = pd.read_sql(query, conn, params=[start_date, end_date])
+                else:
+                    query = """
+                        SELECT 
+                            game_date,
+                            team_abbreviation_home AS home_team,
+                            team_abbreviation_away AS away_team,
+                            pts_home AS home_pts,
+                            pts_away AS away_pts,
+                            wl_home AS home_result
+                        FROM games
+                        WHERE game_date >= %s AND game_date <= %s
+                        AND (team_abbreviation_home = %s OR team_abbreviation_away = %s)
+                        ORDER BY game_date DESC
+                        LIMIT 500
+                    """
+                    df = pd.read_sql(query, conn, params=[start_date, end_date, selected_team, selected_team])
+                
+                conn.close()
+                
+                if df.empty:
+                    st.warning(f"No game data found for {selected_season}.")
+                else:
+                    df['game_date'] = pd.to_datetime(df['game_date']).dt.strftime('%Y-%m-%d')
+                    st.success(f"✅ Found {len(df)} games for {selected_season}")
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Total Games", len(df))
+                    c2.metric("Avg Home Pts", f"{df['home_pts'].mean():.1f}")
+                    c3.metric("Avg Away Pts", f"{df['away_pts'].mean():.1f}")
+                    st.dataframe(df, use_container_width=True, height=400)
+            
+            else:
+                if player_search and player_search.strip():
+                    query = """
+                        SELECT 
+                            player_name,
+                            team_abbreviation AS team,
+                            game_date,
+                            pts, reb, ast, min
+                        FROM player_boxscores
+                        WHERE game_date >= %s AND game_date <= %s
+                        AND LOWER(player_name) LIKE LOWER(%s)
+                        ORDER BY game_date DESC
+                        LIMIT 500
+                    """
+                    df = pd.read_sql(query, conn, params=[start_date, end_date, f"%{player_search.strip()}%"])
+                else:
+                    query = """
+                        SELECT 
+                            player_name,
+                            team_abbreviation AS team,
+                            game_date,
+                            pts, reb, ast, min
+                        FROM player_boxscores
+                        WHERE game_date >= %s AND game_date <= %s
+                        ORDER BY game_date DESC
+                        LIMIT 500
+                    """
+                    df = pd.read_sql(query, conn, params=[start_date, end_date])
+                
+                conn.close()
+                
+                if df.empty:
+                    st.warning(f"No player data found for {selected_season}.")
+                else:
+                    df['game_date'] = pd.to_datetime(df['game_date']).dt.strftime('%Y-%m-%d')
+                    st.success(f"✅ Found {len(df)} records for {selected_season}")
+                    c1, c2, c3, c4 = st.columns(4)
+                    c1.metric("Records", len(df))
+                    c2.metric("Avg PTS", f"{df['pts'].mean():.1f}")
+                    c3.metric("Avg REB", f"{df['reb'].mean():.1f}")
+                    c4.metric("Avg AST", f"{df['ast'].mean():.1f}")
+                    st.dataframe(df, use_container_width=True, height=400)
+        
+        except Exception as e:
+            st.error(f"❌ Error loading data: {str(e)}")
 
 with tab8:
     st.markdown("## 📊 Daily Reports — Performance Tracking")

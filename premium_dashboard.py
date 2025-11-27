@@ -2773,23 +2773,622 @@ with tab7:
                     st.error(f"❌ Error loading data: {str(e)}")
 
 with tab8:
-    st.markdown("## 📊 Daily Reports — Performance Tracking")
+    # ========== PREMIUM HEADER ==========
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(212, 175, 55, 0.15) 100%);
+        border: 1px solid rgba(212, 175, 55, 0.3);
+        border-radius: 16px;
+        padding: 1.5rem 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 0 40px rgba(212, 175, 55, 0.1);
+    ">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <span style="font-size: 2.5rem;">📊</span>
+                <div>
+                    <h1 style="margin: 0; color: #fff; font-size: 1.8rem; font-weight: 700;">Daily Reports</h1>
+                    <p style="margin: 0.3rem 0 0 0; color: #a0aec0; font-size: 0.95rem;">Performance Tracking • Analytics Dashboard</p>
+                </div>
+            </div>
+            <div style="
+                background: rgba(16, 185, 129, 0.15);
+                border: 1px solid rgba(16, 185, 129, 0.3);
+                padding: 0.5rem 1rem;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            ">
+                <div style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981;"></div>
+                <span style="color: #10b981; font-size: 0.85rem; font-weight: 500;">""" + datetime.now().strftime('%B %d, %Y') + """</span>
+            </div>
+        </div>
+        <div style="height: 3px; background: linear-gradient(90deg, #667eea 0%, #D4AF37 50%, #667eea 100%); border-radius: 2px; margin-top: 1rem;"></div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    st.markdown("### 📅 Today's Summary")
-    st.info("Report generation coming soon — will show daily picks, results, and performance metrics")
-
-with tab9:
-    st.markdown("## ⚙️ Settings — Customize Your Experience")
+    # ========== TOP PICK OF THE DAY - HERO CARD ==========
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.05) 100%);
+        border: 2px solid rgba(16, 185, 129, 0.4);
+        border-radius: 16px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 0 30px rgba(16, 185, 129, 0.15);
+        position: relative;
+        overflow: hidden;
+    ">
+        <div style="
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #10b981 0%, #34d399 50%, #10b981 100%);
+        "></div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1.5rem;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.8rem;">
+                    <span style="font-size: 1.5rem;">⭐</span>
+                    <h2 style="color: #10b981; margin: 0; font-size: 1.2rem; font-weight: 600;">TOP PICK OF THE DAY</h2>
+                </div>
+                <h1 style="color: #fff; margin: 0; font-size: 2.5rem; font-weight: 700;">—</h1>
+                <p style="color: #a0aec0; font-size: 1rem; margin: 0.5rem 0 0 0;">Awaiting today's analysis...</p>
+            </div>
+            <div style="text-align: right;">
+                <div style="
+                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                    padding: 0.8rem 1.5rem;
+                    border-radius: 12px;
+                    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+                    margin-bottom: 0.8rem;
+                ">
+                    <p style="color: #fff; font-size: 0.75rem; margin: 0; opacity: 0.8;">CONFIDENCE</p>
+                    <p style="color: #fff; font-size: 1.8rem; margin: 0; font-weight: 700;">—%</p>
+                </div>
+                <p style="color: #6b7280; font-size: 0.8rem; margin: 0;">Expected Value: —</p>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    st.markdown("### 🎨 Display Preferences")
-    theme = st.selectbox("Theme", ["Dark Mode (Default)", "Light Mode"])
+    # ========== DAILY KPI CARDS ==========
+    st.markdown("""
+    <p style="color: #D4AF37; font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">📈 TODAY'S PERFORMANCE SNAPSHOT</p>
+    """, unsafe_allow_html=True)
     
-    st.markdown("### 🔔 Notifications")
-    email_alerts = st.checkbox("Email alerts for high-confidence plays", value=True)
-    sms_alerts = st.checkbox("SMS alerts for 85%+ confidence plays", value=False)
+    kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5 = st.columns(5)
     
-    st.markdown("### 💰 Bankroll Settings")
-    auto_kelly = st.checkbox("Auto-calculate Kelly Criterion bets", value=True)
+    with kpi_col1:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-top: 3px solid #10b981;
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+            min-height: 130px;
+        ">
+            <p style="color: #6b7280; font-size: 0.75rem; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Win Rate</p>
+            <h2 style="color: #10b981; margin: 0.5rem 0; font-size: 2rem; font-weight: 700;">—%</h2>
+            <p style="color: #10b981; font-size: 0.75rem; margin: 0;">↑ vs yesterday</p>
+        </div>
+        """, unsafe_allow_html=True)
     
-    if st.button("Save Settings"):
-        st.success("✅ Settings saved!")
+    with kpi_col2:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(102, 126, 234, 0.05) 100%);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-top: 3px solid #667eea;
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+            min-height: 130px;
+        ">
+            <p style="color: #6b7280; font-size: 0.75rem; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Total Picks</p>
+            <h2 style="color: #667eea; margin: 0.5rem 0; font-size: 2rem; font-weight: 700;">—</h2>
+            <p style="color: #667eea; font-size: 0.75rem; margin: 0;">Analyzed today</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with kpi_col3:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(212, 175, 55, 0.05) 100%);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-top: 3px solid #D4AF37;
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+            min-height: 130px;
+        ">
+            <p style="color: #6b7280; font-size: 0.75rem; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Units Won</p>
+            <h2 style="color: #D4AF37; margin: 0.5rem 0; font-size: 2rem; font-weight: 700;">—</h2>
+            <p style="color: #D4AF37; font-size: 0.75rem; margin: 0;">Net profit</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with kpi_col4:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(118, 75, 162, 0.15) 0%, rgba(118, 75, 162, 0.05) 100%);
+            border: 1px solid rgba(118, 75, 162, 0.3);
+            border-top: 3px solid #764ba2;
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+            min-height: 130px;
+        ">
+            <p style="color: #6b7280; font-size: 0.75rem; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">ROI</p>
+            <h2 style="color: #a78bfa; margin: 0.5rem 0; font-size: 2rem; font-weight: 700;">—%</h2>
+            <p style="color: #a78bfa; font-size: 0.75rem; margin: 0;">Daily return</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with kpi_col5:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(251, 191, 36, 0.05) 100%);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            border-top: 3px solid #fbbf24;
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+            min-height: 130px;
+        ">
+            <p style="color: #6b7280; font-size: 0.75rem; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Streak</p>
+            <h2 style="color: #fbbf24; margin: 0.5rem 0; font-size: 2rem; font-weight: 700;">—</h2>
+            <p style="color: #fbbf24; font-size: 0.75rem; margin: 0;">Current run</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== DAILY PICKS BREAKDOWN ==========
+    st.markdown("""
+    <p style="color: #667eea; font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">🎯 TODAY'S PICKS BREAKDOWN</p>
+    """, unsafe_allow_html=True)
+    
+    picks_col1, picks_col2 = st.columns([2, 1])
+    
+    with picks_col1:
+        st.markdown("""
+        <div style="
+            background: rgba(15, 20, 35, 0.6);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+            min-height: 320px;
+        ">
+            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.2rem;">
+                <span style="font-size: 1.2rem;">📋</span>
+                <h3 style="color: #e2e8f0; margin: 0; font-size: 1rem; font-weight: 600;">Pick Results</h3>
+            </div>
+            
+            <!-- Placeholder pick rows -->
+            <div style="
+                background: rgba(0, 0, 0, 0.2);
+                border: 1px solid rgba(107, 114, 128, 0.2);
+                border-radius: 8px;
+                padding: 1rem;
+                margin-bottom: 0.8rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            ">
+                <div>
+                    <p style="color: #9ca3af; font-size: 0.8rem; margin: 0;">Pick #1</p>
+                    <p style="color: #e2e8f0; font-size: 1rem; margin: 0.2rem 0 0 0; font-weight: 500;">—</p>
+                </div>
+                <div style="
+                    background: rgba(107, 114, 128, 0.2);
+                    padding: 0.3rem 0.8rem;
+                    border-radius: 20px;
+                ">
+                    <span style="color: #6b7280; font-size: 0.8rem;">Pending</span>
+                </div>
+            </div>
+            
+            <div style="
+                background: rgba(0, 0, 0, 0.2);
+                border: 1px solid rgba(107, 114, 128, 0.2);
+                border-radius: 8px;
+                padding: 1rem;
+                margin-bottom: 0.8rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            ">
+                <div>
+                    <p style="color: #9ca3af; font-size: 0.8rem; margin: 0;">Pick #2</p>
+                    <p style="color: #e2e8f0; font-size: 1rem; margin: 0.2rem 0 0 0; font-weight: 500;">—</p>
+                </div>
+                <div style="
+                    background: rgba(107, 114, 128, 0.2);
+                    padding: 0.3rem 0.8rem;
+                    border-radius: 20px;
+                ">
+                    <span style="color: #6b7280; font-size: 0.8rem;">Pending</span>
+                </div>
+            </div>
+            
+            <div style="
+                background: rgba(0, 0, 0, 0.2);
+                border: 1px solid rgba(107, 114, 128, 0.2);
+                border-radius: 8px;
+                padding: 1rem;
+                margin-bottom: 0.8rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            ">
+                <div>
+                    <p style="color: #9ca3af; font-size: 0.8rem; margin: 0;">Pick #3</p>
+                    <p style="color: #e2e8f0; font-size: 1rem; margin: 0.2rem 0 0 0; font-weight: 500;">—</p>
+                </div>
+                <div style="
+                    background: rgba(107, 114, 128, 0.2);
+                    padding: 0.3rem 0.8rem;
+                    border-radius: 20px;
+                ">
+                    <span style="color: #6b7280; font-size: 0.8rem;">Pending</span>
+                </div>
+            </div>
+            
+            <p style="color: #4b5563; font-size: 0.8rem; text-align: center; margin: 1rem 0 0 0; font-style: italic;">
+                Results will populate after games complete
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with picks_col2:
+        st.markdown("""
+        <div style="
+            background: rgba(15, 20, 35, 0.6);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+            min-height: 320px;
+            text-align: center;
+        ">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; margin-bottom: 1.2rem;">
+                <span style="font-size: 1.2rem;">📊</span>
+                <h3 style="color: #e2e8f0; margin: 0; font-size: 1rem; font-weight: 600;">Win/Loss Ratio</h3>
+            </div>
+            
+            <!-- Placeholder donut chart -->
+            <div style="
+                width: 150px;
+                height: 150px;
+                border-radius: 50%;
+                background: conic-gradient(
+                    #10b981 0deg 0deg,
+                    #ef4444 0deg 0deg,
+                    rgba(107, 114, 128, 0.3) 0deg 360deg
+                );
+                margin: 1rem auto;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 0 20px rgba(102, 126, 234, 0.1);
+            ">
+                <div style="
+                    width: 100px;
+                    height: 100px;
+                    border-radius: 50%;
+                    background: rgba(15, 20, 35, 1);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-direction: column;
+                ">
+                    <p style="color: #fff; font-size: 1.5rem; margin: 0; font-weight: 700;">—</p>
+                    <p style="color: #6b7280; font-size: 0.7rem; margin: 0;">W-L</p>
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: center; gap: 1.5rem; margin-top: 1rem;">
+                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                    <div style="width: 10px; height: 10px; border-radius: 50%; background: #10b981;"></div>
+                    <span style="color: #a0aec0; font-size: 0.8rem;">Wins</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                    <div style="width: 10px; height: 10px; border-radius: 50%; background: #ef4444;"></div>
+                    <span style="color: #a0aec0; font-size: 0.8rem;">Losses</span>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== PERFORMANCE GRAPH PLACEHOLDER ==========
+    st.markdown("""
+    <p style="color: #667eea; font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">📈 7-DAY PERFORMANCE TREND</p>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div style="
+        background: rgba(15, 20, 35, 0.6);
+        border: 1px solid rgba(102, 126, 234, 0.2);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    ">
+        <div style="
+            height: 200px;
+            background: linear-gradient(180deg, rgba(102, 126, 234, 0.1) 0%, rgba(15, 20, 35, 0.6) 100%);
+            border: 1px dashed rgba(102, 126, 234, 0.3);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        ">
+            <!-- Fake grid lines -->
+            <div style="position: absolute; top: 25%; left: 0; right: 0; height: 1px; background: rgba(102, 126, 234, 0.1);"></div>
+            <div style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: rgba(102, 126, 234, 0.1);"></div>
+            <div style="position: absolute; top: 75%; left: 0; right: 0; height: 1px; background: rgba(102, 126, 234, 0.1);"></div>
+            
+            <div style="text-align: center;">
+                <span style="font-size: 2rem;">📉</span>
+                <p style="color: #6b7280; font-size: 0.9rem; margin: 0.5rem 0 0 0;">Performance chart will appear here</p>
+                <p style="color: #4b5563; font-size: 0.8rem; margin: 0.3rem 0 0 0;">Data populates after first picks are graded</p>
+            </div>
+        </div>
+        
+        <!-- X-axis labels -->
+        <div style="display: flex; justify-content: space-between; margin-top: 0.8rem; padding: 0 1rem;">
+            <span style="color: #4b5563; font-size: 0.7rem;">Mon</span>
+            <span style="color: #4b5563; font-size: 0.7rem;">Tue</span>
+            <span style="color: #4b5563; font-size: 0.7rem;">Wed</span>
+            <span style="color: #4b5563; font-size: 0.7rem;">Thu</span>
+            <span style="color: #4b5563; font-size: 0.7rem;">Fri</span>
+            <span style="color: #4b5563; font-size: 0.7rem;">Sat</span>
+            <span style="color: #4b5563; font-size: 0.7rem;">Sun</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # ========== CATEGORY BREAKDOWN ==========
+    st.markdown("""
+    <p style="color: #667eea; font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">🎰 PERFORMANCE BY BET TYPE</p>
+    """, unsafe_allow_html=True)
+    
+    cat_col1, cat_col2, cat_col3, cat_col4 = st.columns(4)
+    
+    with cat_col1:
+        st.markdown("""
+        <div style="
+            background: rgba(15, 20, 35, 0.6);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+        ">
+            <span style="font-size: 1.5rem;">📊</span>
+            <h4 style="color: #e2e8f0; margin: 0.5rem 0; font-size: 0.95rem;">Spreads</h4>
+            <p style="color: #667eea; font-size: 1.5rem; margin: 0; font-weight: 700;">—%</p>
+            <p style="color: #4b5563; font-size: 0.75rem; margin: 0.3rem 0 0 0;">0-0 Record</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with cat_col2:
+        st.markdown("""
+        <div style="
+            background: rgba(15, 20, 35, 0.6);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+        ">
+            <span style="font-size: 1.5rem;">💵</span>
+            <h4 style="color: #e2e8f0; margin: 0.5rem 0; font-size: 0.95rem;">Moneylines</h4>
+            <p style="color: #10b981; font-size: 1.5rem; margin: 0; font-weight: 700;">—%</p>
+            <p style="color: #4b5563; font-size: 0.75rem; margin: 0.3rem 0 0 0;">0-0 Record</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with cat_col3:
+        st.markdown("""
+        <div style="
+            background: rgba(15, 20, 35, 0.6);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+        ">
+            <span style="font-size: 1.5rem;">🎰</span>
+            <h4 style="color: #e2e8f0; margin: 0.5rem 0; font-size: 0.95rem;">Totals</h4>
+            <p style="color: #fbbf24; font-size: 1.5rem; margin: 0; font-weight: 700;">—%</p>
+            <p style="color: #4b5563; font-size: 0.75rem; margin: 0.3rem 0 0 0;">0-0 Record</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with cat_col4:
+        st.markdown("""
+        <div style="
+            background: rgba(15, 20, 35, 0.6);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+        ">
+            <span style="font-size: 1.5rem;">⭐</span>
+            <h4 style="color: #e2e8f0; margin: 0.5rem 0; font-size: 0.95rem;">Props</h4>
+            <p style="color: #a78bfa; font-size: 1.5rem; margin: 0; font-weight: 700;">—%</p>
+            <p style="color: #4b5563; font-size: 0.75rem; margin: 0.3rem 0 0 0;">0-0 Record</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== DAILY SUMMARY & ALGO NOTES ==========
+    summary_col, notes_col = st.columns([1, 1])
+    
+    with summary_col:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            min-height: 200px;
+        ">
+            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
+                <span style="font-size: 1.2rem;">📝</span>
+                <h3 style="color: #10b981; margin: 0; font-size: 1rem; font-weight: 600;">Daily Summary</h3>
+            </div>
+            
+            <div style="
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 8px;
+                padding: 1rem;
+                border-left: 3px solid #10b981;
+            ">
+                <p style="color: #a0aec0; font-size: 0.9rem; margin: 0; line-height: 1.6;">
+                    Today's summary will appear here after games are graded. This section will include:
+                </p>
+                <ul style="color: #6b7280; font-size: 0.85rem; margin: 0.8rem 0 0 1rem; padding: 0; line-height: 1.8;">
+                    <li>Overall performance recap</li>
+                    <li>Best and worst picks</li>
+                    <li>Key insights from today's slate</li>
+                    <li>Trends observed</li>
+                </ul>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with notes_col:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(118, 75, 162, 0.1) 0%, rgba(118, 75, 162, 0.05) 100%);
+            border: 1px solid rgba(118, 75, 162, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            min-height: 200px;
+        ">
+            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
+                <span style="font-size: 1.2rem;">🧠</span>
+                <h3 style="color: #a78bfa; margin: 0; font-size: 1rem; font-weight: 600;">Algo Notes</h3>
+                <span style="
+                    background: rgba(167, 139, 250, 0.2);
+                    color: #a78bfa;
+                    padding: 0.15rem 0.5rem;
+                    border-radius: 4px;
+                    font-size: 0.65rem;
+                    font-weight: 600;
+                ">VIP</span>
+            </div>
+            
+            <div style="
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 8px;
+                padding: 1rem;
+                border-left: 3px solid #a78bfa;
+            ">
+                <p style="color: #a0aec0; font-size: 0.9rem; margin: 0; line-height: 1.6;">
+                    Algorithm insights will appear here. This section will include:
+                </p>
+                <ul style="color: #6b7280; font-size: 0.85rem; margin: 0.8rem 0 0 1rem; padding: 0; line-height: 1.8;">
+                    <li>Model confidence analysis</li>
+                    <li>Edge detection notes</li>
+                    <li>Factors that influenced picks</li>
+                    <li>Adjustments for tomorrow</li>
+                </ul>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== HISTORICAL PERFORMANCE TRACKER ==========
+    st.markdown("""
+    <p style="color: #667eea; font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">📅 MONTHLY PERFORMANCE CALENDAR</p>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div style="
+        background: rgba(15, 20, 35, 0.6);
+        border: 1px solid rgba(102, 126, 234, 0.2);
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+    ">
+        <div style="
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        ">
+            <span style="color: #6b7280; font-size: 0.75rem; font-weight: 600;">Sun</span>
+            <span style="color: #6b7280; font-size: 0.75rem; font-weight: 600;">Mon</span>
+            <span style="color: #6b7280; font-size: 0.75rem; font-weight: 600;">Tue</span>
+            <span style="color: #6b7280; font-size: 0.75rem; font-weight: 600;">Wed</span>
+            <span style="color: #6b7280; font-size: 0.75rem; font-weight: 600;">Thu</span>
+            <span style="color: #6b7280; font-size: 0.75rem; font-weight: 600;">Fri</span>
+            <span style="color: #6b7280; font-size: 0.75rem; font-weight: 600;">Sat</span>
+        </div>
+        
+        <div style="
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 0.5rem;
+        ">
+            <!-- Placeholder calendar days -->
+            <div style="background: rgba(107, 114, 128, 0.1); border-radius: 6px; padding: 0.8rem; color: #4b5563; font-size: 0.8rem;">—</div>
+            <div style="background: rgba(107, 114, 128, 0.1); border-radius: 6px; padding: 0.8rem; color: #4b5563; font-size: 0.8rem;">—</div>
+            <div style="background: rgba(107, 114, 128, 0.1); border-radius: 6px; padding: 0.8rem; color: #4b5563; font-size: 0.8rem;">—</div>
+            <div style="background: rgba(107, 114, 128, 0.1); border-radius: 6px; padding: 0.8rem; color: #4b5563; font-size: 0.8rem;">—</div>
+            <div style="background: rgba(107, 114, 128, 0.1); border-radius: 6px; padding: 0.8rem; color: #4b5563; font-size: 0.8rem;">—</div>
+            <div style="background: rgba(107, 114, 128, 0.1); border-radius: 6px; padding: 0.8rem; color: #4b5563; font-size: 0.8rem;">—</div>
+            <div style="background: rgba(107, 114, 128, 0.1); border-radius: 6px; padding: 0.8rem; color: #4b5563; font-size: 0.8rem;">—</div>
+        </div>
+        
+        <p style="color: #4b5563; font-size: 0.8rem; margin: 1rem 0 0 0; font-style: italic;">
+            Calendar will show daily W/L with color coding once data is available
+        </p>
+        
+        <div style="display: flex; justify-content: center; gap: 2rem; margin-top: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                <div style="width: 12px; height: 12px; border-radius: 3px; background: #10b981;"></div>
+                <span style="color: #6b7280; font-size: 0.75rem;">Winning Day</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                <div style="width: 12px; height: 12px; border-radius: 3px; background: #ef4444;"></div>
+                <span style="color: #6b7280; font-size: 0.75rem;">Losing Day</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                <div style="width: 12px; height: 12px; border-radius: 3px; background: #6b7280;"></div>
+                <span style="color: #6b7280; font-size: 0.75rem;">No Picks</span>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== FOOTER STATUS ==========
+    st.markdown("""
+    <div style="
+        background: rgba(15, 20, 35, 0.4);
+        border: 1px dashed rgba(102, 126, 234, 0.2);
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+    ">
+        <span style="font-size: 1.5rem;">🚀</span>
+        <p style="color: #6b7280; font-size: 0.95rem; margin: 0.8rem 0 0 0;">
+            Full performance tracking activates once picks are graded
+        </p>
+        <p style="color: #4b5563; font-size: 0.85rem; margin: 0.5rem 0 0 0;">
+            This dashboard will automatically populate with real-time results, trends, and analytics
+        </p>
+    </div>
+    """, unsafe_allow_html=True)

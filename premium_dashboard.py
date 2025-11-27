@@ -616,19 +616,560 @@ with tab4:
         st.dataframe(hot_teams, use_container_width=True, hide_index=True)
 
 with tab5:
-    st.markdown("## 💰 Bankroll Manager")
+    # ========== HEADER ==========
+    st.markdown("""
+    <div style="text-align: center; padding: 1rem 0 0.5rem 0;">
+        <h1 style="margin-bottom: 0.2rem;">💰 Bankroll Manager — Financial Control Suite</h1>
+        <p style="color: #a0aec0; font-size: 1rem; margin-bottom: 0.5rem;">Institutional-grade bankroll allocation for disciplined bettors.</p>
+        <div style="height: 3px; background: linear-gradient(90deg, #667eea 0%, #D4AF37 100%); border-radius: 2px; max-width: 500px; margin: 0 auto;"></div>
+    </div>
+    """, unsafe_allow_html=True)
     
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== BANKROLL INPUT MODULE ==========
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, rgba(212, 175, 55, 0.08) 0%, rgba(102, 126, 234, 0.08) 100%);
+        border: 1px solid rgba(212, 175, 55, 0.3);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 0 25px rgba(212, 175, 55, 0.1);
+    ">
+        <p style="color: #D4AF37; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">🧮 BANKROLL CONFIGURATION</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Row 1: Starting and Current Bankroll
     col1, col2 = st.columns(2)
     
     with col1:
-        starting_bankroll = st.number_input("Starting Bankroll ($)", value=10000, step=100)
-        risk_percentage = st.slider("Max Risk Per Bet (%)", 1, 5, 2)
+        st.markdown("""
+        <p style="color: #e2e8f0; font-size: 0.85rem; margin-bottom: 0.3rem;">Starting Bankroll ($)</p>
+        """, unsafe_allow_html=True)
+        starting_bankroll = st.number_input(
+            "",
+            min_value=0,
+            value=10000,
+            step=100,
+            key="bankroll_starting",
+            label_visibility="collapsed"
+        )
     
     with col2:
-        current_bankroll = st.number_input("Current Bankroll ($)", value=11250, step=100)
-        roi = ((current_bankroll - starting_bankroll) / starting_bankroll) * 100
-        st.metric("ROI", f"{roi:.1f}%", delta=f"+${current_bankroll - starting_bankroll}")
-
+        st.markdown("""
+        <p style="color: #e2e8f0; font-size: 0.85rem; margin-bottom: 0.3rem;">Current Bankroll ($)</p>
+        """, unsafe_allow_html=True)
+        current_bankroll = st.number_input(
+            "",
+            min_value=0,
+            value=11250,
+            step=100,
+            key="bankroll_current",
+            label_visibility="collapsed"
+        )
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Row 2: Risk Method and Max Risk
+    col3, col4 = st.columns(2)
+    
+    with col3:
+        st.markdown("""
+        <p style="color: #e2e8f0; font-size: 0.85rem; margin-bottom: 0.3rem;">Risk Method</p>
+        """, unsafe_allow_html=True)
+        risk_method = st.selectbox(
+            "",
+            ["Percentage (%)", "Units", "Flat Dollar ($)"],
+            key="bankroll_risk_method",
+            label_visibility="collapsed"
+        )
+    
+    with col4:
+        st.markdown("""
+        <p style="color: #e2e8f0; font-size: 0.85rem; margin-bottom: 0.3rem;">Max Risk Per Bet</p>
+        """, unsafe_allow_html=True)
+        
+        if risk_method == "Percentage (%)":
+            max_risk = st.slider("", 1, 10, 2, key="bankroll_max_risk_pct", label_visibility="collapsed")
+            st.markdown(f"""
+            <p style="color: #D4AF37; font-size: 0.8rem;">Selected: {max_risk}% of bankroll</p>
+            """, unsafe_allow_html=True)
+        elif risk_method == "Units":
+            max_risk_units = st.number_input("", min_value=0.5, max_value=10.0, value=1.0, step=0.5, key="bankroll_max_risk_units", label_visibility="collapsed")
+            st.markdown(f"""
+            <p style="color: #D4AF37; font-size: 0.8rem;">Selected: {max_risk_units} units</p>
+            """, unsafe_allow_html=True)
+        else:
+            max_risk_dollar = st.number_input("", min_value=10, max_value=1000, value=100, step=10, key="bankroll_max_risk_dollar", label_visibility="collapsed")
+            st.markdown(f"""
+            <p style="color: #D4AF37; font-size: 0.8rem;">Selected: ${max_risk_dollar} per bet</p>
+            """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Borrower Risk Size (Collapsible)
+    with st.expander("💳 Borrowed Capital Settings (Optional)"):
+        st.markdown("""
+        <div style="
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        ">
+        """, unsafe_allow_html=True)
+        
+        bcol1, bcol2 = st.columns(2)
+        with bcol1:
+            st.number_input("Borrowed Capital ($)", min_value=0, value=0, step=100, key="borrowed_capital")
+        with bcol2:
+            st.slider("Risk Tolerance on Borrowed (%)", 0, 5, 1, key="borrowed_risk_tolerance")
+        
+        st.markdown("""
+        <p style="color: #718096; font-size: 0.8rem; font-style: italic; margin-top: 0.5rem;">
+            Use only if you operate with leveraged or borrowed bankroll. Higher risk on borrowed funds is not recommended.
+        </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== UNIT SIZE OUTPUT ==========
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(102, 126, 234, 0.2) 100%);
+        border: 2px solid rgba(212, 175, 55, 0.5);
+        border-radius: 16px;
+        padding: 2rem;
+        text-align: center;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 0 30px rgba(212, 175, 55, 0.15);
+    ">
+        <h2 style="color: #D4AF37; margin-bottom: 0.5rem; font-size: 1.8rem;">Your Unit Size</h2>
+        <h1 style="color: #e2e8f0; font-size: 3rem; margin: 0.5rem 0;">$—</h1>
+        <p style="color: #a0aec0; font-size: 0.9rem;">(Calculated visually based on your inputs)</p>
+        <p style="color: #718096; font-size: 0.8rem; margin-top: 0.5rem;">Updated automatically as you adjust risk and bankroll.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # ========== PROFESSIONAL SUMMARY PANEL ==========
+    st.markdown("""
+    <p style="color: #D4AF37; font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem;">📊 PERFORMANCE METRICS</p>
+    """, unsafe_allow_html=True)
+    
+    metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+    
+    with metric_col1:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.1);
+        ">
+            <p style="color: #a0aec0; font-size: 0.8rem; margin-bottom: 0.3rem;">ROI</p>
+            <h2 style="color: #10b981; margin: 0; font-size: 1.8rem;">12.5%</h2>
+            <p style="color: #10b981; font-size: 0.75rem; margin-top: 0.3rem;">↑ +2.3% this week</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with metric_col2:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(212, 175, 55, 0.05) 100%);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.1);
+        ">
+            <p style="color: #a0aec0; font-size: 0.8rem; margin-bottom: 0.3rem;">Total Profit</p>
+            <h2 style="color: #D4AF37; margin: 0; font-size: 1.8rem;">+$1,250</h2>
+            <p style="color: #D4AF37; font-size: 0.75rem; margin-top: 0.3rem;">↑ Lifetime gains</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with metric_col3:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(102, 126, 234, 0.05) 100%);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.1);
+        ">
+            <p style="color: #a0aec0; font-size: 0.8rem; margin-bottom: 0.3rem;">Yield</p>
+            <h2 style="color: #667eea; margin: 0; font-size: 1.8rem;">—</h2>
+            <p style="color: #667eea; font-size: 0.75rem; margin-top: 0.3rem;">Coming Soon</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with metric_col4:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(251, 191, 36, 0.05) 100%);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(251, 191, 36, 0.1);
+        ">
+            <p style="color: #a0aec0; font-size: 0.8rem; margin-bottom: 0.3rem;">Risk Rating</p>
+            <h2 style="color: #fbbf24; margin: 0; font-size: 1.4rem;">Moderate</h2>
+            <p style="color: #fbbf24; font-size: 0.75rem; margin-top: 0.3rem;">Balanced approach</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== PERFORMANCE VISUALIZATION SECTION ==========
+    st.markdown("""
+    <p style="color: #D4AF37; font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem;">📈 PERFORMANCE VISUALIZATION</p>
+    """, unsafe_allow_html=True)
+    
+    viz_col1, viz_col2 = st.columns(2)
+    
+    with viz_col1:
+        st.markdown("""
+        <div style="
+            background: rgba(15, 20, 35, 0.6);
+            border: 1px dashed rgba(16, 185, 129, 0.4);
+            border-radius: 12px;
+            padding: 1.5rem;
+            min-height: 220px;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.08);
+        ">
+            <h4 style="color: #10b981; margin-bottom: 0.5rem; font-size: 1rem;">📈 Equity Curve</h4>
+            <p style="color: #4a5568; font-size: 0.8rem;">(Chart Coming Soon)</p>
+            <div style="
+                width: 100%;
+                height: 140px;
+                border: 1px solid rgba(16, 185, 129, 0.2);
+                border-radius: 8px;
+                margin-top: 1rem;
+                background: rgba(0, 0, 0, 0.3);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            ">
+                <p style="color: #4a5568; font-size: 0.75rem;">Equity visualization placeholder</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with viz_col2:
+        st.markdown("""
+        <div style="
+            background: rgba(15, 20, 35, 0.6);
+            border: 1px dashed rgba(239, 68, 68, 0.4);
+            border-radius: 12px;
+            padding: 1.5rem;
+            min-height: 220px;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.08);
+        ">
+            <h4 style="color: #ef4444; margin-bottom: 0.5rem; font-size: 1rem;">📉 Drawdown Curve</h4>
+            <p style="color: #4a5568; font-size: 0.8rem;">(Chart Coming Soon)</p>
+            <div style="
+                width: 100%;
+                height: 140px;
+                border: 1px solid rgba(239, 68, 68, 0.2);
+                border-radius: 8px;
+                margin-top: 1rem;
+                background: rgba(0, 0, 0, 0.3);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            ">
+                <p style="color: #4a5568; font-size: 0.75rem;">Drawdown visualization placeholder</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Risk Allocation Pie Chart
+    st.markdown("""
+    <div style="
+        background: rgba(15, 20, 35, 0.6);
+        border: 1px dashed rgba(212, 175, 55, 0.4);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 0 15px rgba(212, 175, 55, 0.08);
+        text-align: center;
+    ">
+        <h4 style="color: #D4AF37; margin-bottom: 0.5rem; font-size: 1rem;">🥧 Risk Allocation Breakdown</h4>
+        <p style="color: #4a5568; font-size: 0.8rem;">(Pie Chart Coming Soon)</p>
+        <div style="
+            width: 200px;
+            height: 200px;
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            border-radius: 50%;
+            margin: 1rem auto;
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        ">
+            <p style="color: #4a5568; font-size: 0.75rem;">Allocation chart</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # ========== ADVANCED BETTING ANALYTICS MODULE ==========
+    st.markdown("""
+    <p style="color: #D4AF37; font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem;">🧠 ADVANCED BETTING ANALYTICS</p>
+    """, unsafe_allow_html=True)
+    
+    adv_col1, adv_col2 = st.columns(2)
+    
+    with adv_col1:
+        # Kelly Criterion Guidance
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(102, 126, 234, 0.05) 100%);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 12px;
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.1);
+        ">
+            <h5 style="color: #667eea; margin-bottom: 0.8rem; font-size: 0.95rem;">📐 Kelly Criterion Guidance</h5>
+            <div style="background: rgba(0,0,0,0.2); padding: 0.8rem; border-radius: 8px; margin-bottom: 0.5rem;">
+                <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Recommended % per bet:</p>
+                <p style="color: #e2e8f0; font-size: 1.1rem; margin: 0.3rem 0 0 0; font-weight: 600;">— (visual only)</p>
+            </div>
+            <div style="background: rgba(0,0,0,0.2); padding: 0.8rem; border-radius: 8px;">
+                <p style="color: #a0aec0; font-size: 0.85rem; margin-bottom: 0.5rem;">Risk Tiers:</p>
+                <div style="display: flex; gap: 0.5rem;">
+                    <span style="background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.75rem;">Conservative</span>
+                    <span style="background: rgba(251, 191, 36, 0.2); color: #fbbf24; padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.75rem;">Balanced</span>
+                    <span style="background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.75rem;">Aggressive</span>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Exposure Controls
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(118, 75, 162, 0.1) 0%, rgba(118, 75, 162, 0.05) 100%);
+            border: 1px solid rgba(118, 75, 162, 0.3);
+            border-radius: 12px;
+            padding: 1.2rem;
+            box-shadow: 0 4px 15px rgba(118, 75, 162, 0.1);
+        ">
+            <h5 style="color: #764ba2; margin-bottom: 0.8rem; font-size: 0.95rem;">🎚️ Exposure Controls</h5>
+            <div style="background: rgba(0,0,0,0.2); padding: 0.8rem; border-radius: 8px; margin-bottom: 0.5rem;">
+                <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Max Daily Exposure:</p>
+                <p style="color: #e2e8f0; font-size: 1.1rem; margin: 0.3rem 0 0 0; font-weight: 600;">—</p>
+            </div>
+            <div style="background: rgba(0,0,0,0.2); padding: 0.8rem; border-radius: 8px;">
+                <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Max Correlated Exposure:</p>
+                <p style="color: #e2e8f0; font-size: 1.1rem; margin: 0.3rem 0 0 0; font-weight: 600;">—</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with adv_col2:
+        # Volatility Index
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(251, 191, 36, 0.05) 100%);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            border-radius: 12px;
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(251, 191, 36, 0.1);
+        ">
+            <h5 style="color: #fbbf24; margin-bottom: 0.8rem; font-size: 0.95rem;">🌡️ Volatility Index</h5>
+            <div style="
+                width: 120px;
+                height: 120px;
+                border: 4px solid rgba(251, 191, 36, 0.4);
+                border-radius: 50%;
+                margin: 0 auto;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: rgba(0, 0, 0, 0.3);
+            ">
+                <div style="text-align: center;">
+                    <p style="color: #fbbf24; font-size: 1.8rem; margin: 0; font-weight: bold;">—</p>
+                    <p style="color: #a0aec0; font-size: 0.7rem; margin: 0;">VIX Score</p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Session Targets
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            padding: 1.2rem;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.1);
+        ">
+            <h5 style="color: #10b981; margin-bottom: 0.8rem; font-size: 0.95rem;">🎯 Session Targets</h5>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.number_input("Daily Profit Goal ($)", min_value=0, value=500, step=50, key="daily_profit_goal")
+        st.number_input("Stop Loss Limit ($)", min_value=0, value=200, step=25, key="stop_loss_limit")
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== BET LOGGING MODULE ==========
+    st.markdown("""
+    <p style="color: #D4AF37; font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem;">📓 BET LOGGING</p>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div style="
+        background: rgba(15, 20, 35, 0.6);
+        border: 1px solid rgba(102, 126, 234, 0.25);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    ">
+    """, unsafe_allow_html=True)
+    
+    log_col1, log_col2, log_col3 = st.columns(3)
+    
+    with log_col1:
+        st.selectbox("Bet Type", ["Spread", "Moneyline", "Total", "Player Prop", "Parlay", "Teaser"], key="bet_log_type")
+        st.number_input("Stake Size ($)", min_value=0, value=100, step=10, key="bet_log_stake")
+    
+    with log_col2:
+        st.text_input("Odds", placeholder="-110, +150, etc.", key="bet_log_odds")
+        st.selectbox("Result", ["Pending", "Win", "Loss", "Push", "Void"], key="bet_log_result")
+    
+    with log_col3:
+        st.text_area("Notes", placeholder="Add any notes about this bet...", height=118, key="bet_log_notes")
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    st.button("➕ Add Bet", key="add_bet_btn", use_container_width=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Bet History Table
+    st.markdown("""
+    <div style="
+        background: rgba(15, 20, 35, 0.5);
+        border: 1px solid rgba(102, 126, 234, 0.2);
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    ">
+        <h5 style="color: #e2e8f0; margin-bottom: 1rem; font-size: 0.95rem;">📋 Bet History</h5>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    bet_history_data = {
+        "Date": ["—", "—", "—"],
+        "Bet": ["Example Spread", "Example ML", "Example Prop"],
+        "Stake": ["$—", "$—", "$—"],
+        "Odds": ["—", "—", "—"],
+        "Result": ["—", "—", "—"],
+        "Profit/Loss": ["—", "—", "—"]
+    }
+    
+    st.dataframe(pd.DataFrame(bet_history_data), use_container_width=True, hide_index=True, height=150)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== STRATEGY PROFILES ==========
+    st.markdown("""
+    <p style="color: #D4AF37; font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem;">📚 STRATEGY PROFILES</p>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("🟢 Conservative Strategy"):
+        st.markdown("""
+        <div style="
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 3px solid #10b981;
+            padding: 1rem;
+            border-radius: 0 8px 8px 0;
+        ">
+            <p style="color: #e2e8f0; margin-bottom: 0.5rem;"><strong>Risk Level:</strong> Low (1-2% per bet)</p>
+            <p style="color: #a0aec0; margin-bottom: 0.5rem;">Best for: Long-term growth, protecting capital</p>
+            <p style="color: #718096; font-size: 0.85rem;">
+                This strategy focuses on capital preservation above all else. Recommended for new bettors 
+                or those recovering from a drawdown period. Emphasizes high-confidence plays only.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with st.expander("🟡 Balanced Strategy"):
+        st.markdown("""
+        <div style="
+            background: rgba(251, 191, 36, 0.1);
+            border-left: 3px solid #fbbf24;
+            padding: 1rem;
+            border-radius: 0 8px 8px 0;
+        ">
+            <p style="color: #e2e8f0; margin-bottom: 0.5rem;"><strong>Risk Level:</strong> Medium (2-4% per bet)</p>
+            <p style="color: #a0aec0; margin-bottom: 0.5rem;">Best for: Steady growth with controlled risk</p>
+            <p style="color: #718096; font-size: 0.85rem;">
+                The balanced approach offers a middle ground between growth and protection. 
+                Suitable for experienced bettors with a proven track record seeking consistent returns.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with st.expander("🔴 Aggressive Strategy"):
+        st.markdown("""
+        <div style="
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 3px solid #ef4444;
+            padding: 1rem;
+            border-radius: 0 8px 8px 0;
+        ">
+            <p style="color: #e2e8f0; margin-bottom: 0.5rem;"><strong>Risk Level:</strong> High (4-8% per bet)</p>
+            <p style="color: #a0aec0; margin-bottom: 0.5rem;">Best for: Rapid growth, high risk tolerance</p>
+            <p style="color: #718096; font-size: 0.85rem;">
+                This aggressive strategy is designed for experienced bettors with high conviction plays. 
+                Only recommended with a substantial edge and ability to withstand significant variance.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== RISK COMPLIANCE BOX ==========
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(251, 191, 36, 0.05) 100%);
+        border: 1px solid rgba(251, 191, 36, 0.4);
+        border-radius: 12px;
+        padding: 1.2rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        box-shadow: 0 4px 15px rgba(251, 191, 36, 0.1);
+    ">
+        <span style="font-size: 1.5rem;">⚠️</span>
+        <div>
+            <h5 style="color: #fbbf24; margin-bottom: 0.5rem; font-size: 0.95rem;">Risk Management Notice</h5>
+            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">
+                Good bankroll management is essential to long-term success. This tool helps you plan, track, 
+                and structure your approach responsibly. Never bet more than you can afford to lose, and always 
+                maintain discipline in your betting strategy.
+            </p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
 with tab6:
     st.markdown("## 📰 News & Injuries — Real-Time Updates")
     

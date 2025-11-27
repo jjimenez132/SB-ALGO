@@ -615,48 +615,346 @@ with tab1:
     st.markdown("<br>", unsafe_allow_html=True)
 
 with tab2:
-    st.markdown("## 🎲 Today's Games — Deep Analysis")
+    # Premium Header
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+        border: 1px solid rgba(102, 126, 234, 0.3);
+        border-radius: 16px;
+        padding: 1.5rem 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 0 30px rgba(102, 126, 234, 0.15);
+    ">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <span style="font-size: 2.5rem;">🎲</span>
+            <div>
+                <h1 style="margin: 0; color: #fff; font-size: 1.8rem; font-weight: 700;">Today's Games — Deep Analysis</h1>
+                <p style="margin: 0.3rem 0 0 0; color: #a0aec0; font-size: 0.95rem;">AI-Powered Breakdown • Real-Time Edge Detection</p>
+            </div>
+        </div>
+        <div style="height: 3px; background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #667eea 100%); border-radius: 2px; margin-top: 1rem;"></div>
+    </div>
+    """, unsafe_allow_html=True)
     
+    # Game loop - SAME LOGIC AS ORIGINAL (just visual changes)
     for i in range(3):
+        
+        # Premium Game Header
         with st.expander(f"🏀 Game {i+1}: Team A vs Team B — 7:00 PM ET", expanded=(i==0)):
+            
+            # ========== SECTION 6: KEY METRICS MINI-CARDS (NEW) ==========
+            st.markdown("""
+            <p style="color: #667eea; font-weight: 600; margin-bottom: 0.8rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">📊 Key Metrics</p>
+            """, unsafe_allow_html=True)
+            
+            metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+            
+            with metric_col1:
+                st.markdown("""
+                <div style="
+                    background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(102, 126, 234, 0.05) 100%);
+                    border: 1px solid rgba(102, 126, 234, 0.3);
+                    border-radius: 10px;
+                    padding: 0.8rem;
+                    text-align: center;
+                ">
+                    <p style="color: #6b7280; font-size: 0.7rem; margin: 0; text-transform: uppercase;">Pace Proj.</p>
+                    <p style="color: #667eea; font-size: 1.2rem; margin: 0.2rem 0 0 0; font-weight: 600;">—</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with metric_col2:
+                st.markdown("""
+                <div style="
+                    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+                    border: 1px solid rgba(16, 185, 129, 0.3);
+                    border-radius: 10px;
+                    padding: 0.8rem;
+                    text-align: center;
+                ">
+                    <p style="color: #6b7280; font-size: 0.7rem; margin: 0; text-transform: uppercase;">Off. Rating</p>
+                    <p style="color: #10b981; font-size: 1.2rem; margin: 0.2rem 0 0 0; font-weight: 600;">—</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with metric_col3:
+                st.markdown("""
+                <div style="
+                    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%);
+                    border: 1px solid rgba(239, 68, 68, 0.3);
+                    border-radius: 10px;
+                    padding: 0.8rem;
+                    text-align: center;
+                ">
+                    <p style="color: #6b7280; font-size: 0.7rem; margin: 0; text-transform: uppercase;">Def. Rating</p>
+                    <p style="color: #ef4444; font-size: 1.2rem; margin: 0.2rem 0 0 0; font-weight: 600;">—</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with metric_col4:
+                st.markdown("""
+                <div style="
+                    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(251, 191, 36, 0.05) 100%);
+                    border: 1px solid rgba(251, 191, 36, 0.3);
+                    border-radius: 10px;
+                    padding: 0.8rem;
+                    text-align: center;
+                ">
+                    <p style="color: #6b7280; font-size: 0.7rem; margin: 0; text-transform: uppercase;">Proj. Total</p>
+                    <p style="color: #fbbf24; font-size: 1.2rem; margin: 0.2rem 0 0 0; font-weight: 600;">—</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # ========== TWO COLUMN LAYOUT (SAME STRUCTURE AS ORIGINAL) ==========
             col1, col2 = st.columns([2, 1])
             
             with col1:
-                st.markdown("### 📊 Game Analysis")
+                # ========== SECTION 2: GAME ANALYSIS PANEL - REDESIGNED ==========
                 st.markdown("""
-                **Matchup Overview:**
-                - Team A: 15-8 (Home: 9-3)
-                - Team B: 12-11 (Away: 5-7)
+                <div style="
+                    background: linear-gradient(135deg, rgba(15, 20, 35, 0.8) 0%, rgba(15, 20, 35, 0.6) 100%);
+                    border: 1px solid rgba(102, 126, 234, 0.25);
+                    border-radius: 12px;
+                    padding: 1.5rem;
+                    margin-bottom: 1rem;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 0 0 15px rgba(102, 126, 234, 0.1);
+                ">
+                    <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
+                        <span style="font-size: 1.3rem;">📊</span>
+                        <h3 style="color: #e2e8f0; margin: 0; font-size: 1.1rem; font-weight: 600;">Game Analysis</h3>
+                    </div>
+                    
+                    <div style="
+                        background: rgba(0, 0, 0, 0.25);
+                        border-radius: 8px;
+                        padding: 1rem;
+                        margin-bottom: 0.8rem;
+                        border-left: 3px solid #667eea;
+                    ">
+                        <p style="color: #667eea; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem;">Matchup Overview</p>
+                        <div style="display: grid; gap: 0.4rem;">
+                            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">• Team A: 15-8 (Home: 9-3)</p>
+                            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">• Team B: 12-11 (Away: 5-7)</p>
+                        </div>
+                    </div>
+                    
+                    <div style="
+                        background: rgba(0, 0, 0, 0.25);
+                        border-radius: 8px;
+                        padding: 1rem;
+                        border-left: 3px solid #fbbf24;
+                    ">
+                        <p style="color: #fbbf24; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem;">Key Factors</p>
+                        <div style="display: grid; gap: 0.4rem;">
+                            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">• Team A on 3-game win streak</p>
+                            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">• Team B's star player questionable (ankle)</p>
+                            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">• Historical edge: Team A 7-2 L9 meetings</p>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                **Key Factors:**
-                - Team A on 3-game win streak
-                - Team B's star player questionable (ankle)
-                - Historical edge: Team A 7-2 L9 meetings
-                """)
+                # ========== SECTION 3: ALGORITHM RECOMMENDATION - PREMIUM REDESIGN ==========
+                st.markdown("""
+                <div style="
+                    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.05) 100%);
+                    border: 2px solid rgba(16, 185, 129, 0.4);
+                    border-radius: 12px;
+                    padding: 1.5rem;
+                    margin-bottom: 1rem;
+                    box-shadow: 0 0 25px rgba(16, 185, 129, 0.15);
+                    position: relative;
+                    overflow: hidden;
+                ">
+                    <div style="
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        height: 4px;
+                        background: linear-gradient(90deg, #10b981 0%, #34d399 50%, #10b981 100%);
+                    "></div>
+                    
+                    <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
+                        <span style="font-size: 1.3rem;">🎯</span>
+                        <h3 style="color: #10b981; margin: 0; font-size: 1.1rem; font-weight: 600;">Algorithm Recommendation</h3>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                        <div>
+                            <p style="color: #6b7280; font-size: 0.75rem; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Recommended Bet</p>
+                            <h2 style="color: #fff; margin: 0.3rem 0 0 0; font-size: 1.8rem; font-weight: 700;">Team A -4.5</h2>
+                        </div>
+                        <div style="
+                            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                            padding: 0.5rem 1.2rem;
+                            border-radius: 20px;
+                            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+                        ">
+                            <p style="color: #fff; font-size: 1rem; margin: 0; font-weight: 600;">85% Confidence</p>
+                        </div>
+                    </div>
+                    
+                    <div style="
+                        margin-top: 1rem;
+                        padding-top: 1rem;
+                        border-top: 1px solid rgba(16, 185, 129, 0.2);
+                        display: flex;
+                        gap: 2rem;
+                        flex-wrap: wrap;
+                    ">
+                        <div>
+                            <p style="color: #6b7280; font-size: 0.75rem; margin: 0;">Expected Value</p>
+                            <p style="color: #10b981; font-size: 1.1rem; margin: 0; font-weight: 600;">+11.2%</p>
+                        </div>
+                        <div>
+                            <p style="color: #6b7280; font-size: 0.75rem; margin: 0;">Kelly Bet</p>
+                            <p style="color: #e2e8f0; font-size: 1.1rem; margin: 0; font-weight: 600;">3.5% of bankroll</p>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                st.markdown("### 🎯 Algorithm Recommendation")
-                st.success("**BET: Team A -4.5** | Confidence: 85%")
-                st.markdown("Expected Value: +11.2% | Kelly Bet: 3.5% of bankroll")
+                # ========== SECTION 5: ALGO BREAKDOWN (NEW) ==========
+                st.markdown("""
+                <div style="
+                    background: linear-gradient(135deg, rgba(118, 75, 162, 0.15) 0%, rgba(102, 126, 234, 0.15) 100%);
+                    border: 1px solid rgba(118, 75, 162, 0.3);
+                    border-radius: 12px;
+                    padding: 1.5rem;
+                    box-shadow: 0 4px 20px rgba(118, 75, 162, 0.1);
+                ">
+                    <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
+                        <span style="font-size: 1.3rem;">📝</span>
+                        <h3 style="color: #a78bfa; margin: 0; font-size: 1.1rem; font-weight: 600;">Algorithm Breakdown</h3>
+                        <span style="
+                            background: rgba(167, 139, 250, 0.2);
+                            color: #a78bfa;
+                            padding: 0.2rem 0.6rem;
+                            border-radius: 4px;
+                            font-size: 0.7rem;
+                            font-weight: 600;
+                        ">VIP</span>
+                    </div>
+                    
+                    <div style="
+                        background: rgba(0, 0, 0, 0.25);
+                        border-radius: 8px;
+                        padding: 1.2rem;
+                        border-left: 3px solid #a78bfa;
+                    ">
+                        <p style="color: #a0aec0; font-size: 0.9rem; margin-bottom: 0.8rem; line-height: 1.6;">
+                            <strong style="color: #a78bfa;">Primary Edge:</strong> Team A's defensive efficiency ranks top-5 at home this season, 
+                            limiting opponents to 104.2 PPG. Combined with Team B's road struggles (5-7 away), 
+                            this creates a favorable spread opportunity.
+                        </p>
+                        <p style="color: #a0aec0; font-size: 0.9rem; margin-bottom: 0.8rem; line-height: 1.6;">
+                            <strong style="color: #a78bfa;">Injury Impact:</strong> Team B's starting PG is questionable, which historically 
+                            drops their offensive rating by 8.3 points per 100 possessions.
+                        </p>
+                        <p style="color: #718096; font-size: 0.85rem; margin: 0; font-style: italic;">
+                            Full detailed analysis available for VIP subscribers...
+                        </p>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
             
             with col2:
-                st.markdown("### 📈 Win Probability")
+                # ========== SECTION 4: WIN PROBABILITY GRAPH - COSMETIC UPGRADE ==========
+                st.markdown("""
+                <div style="
+                    background: linear-gradient(135deg, rgba(15, 20, 35, 0.8) 0%, rgba(15, 20, 35, 0.6) 100%);
+                    border: 1px solid rgba(102, 126, 234, 0.25);
+                    border-radius: 12px;
+                    padding: 1.5rem;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 0 0 15px rgba(102, 126, 234, 0.1);
+                ">
+                    <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
+                        <span style="font-size: 1.3rem;">📈</span>
+                        <h3 style="color: #e2e8f0; margin: 0; font-size: 1rem; font-weight: 600;">Win Probability</h3>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # SAME GAUGE LOGIC - just improved appearance
                 fig = go.Figure(go.Indicator(
                     mode = "gauge+number",
-                    value = 68,
+                    value = 68,  # SAME VALUE - UNCHANGED
                     domain = {'x': [0, 1], 'y': [0, 1]},
-                    title = {'text': "Team A Win %"},
+                    title = {'text': "Team A Win %", 'font': {'size': 14, 'color': '#a0aec0'}},
+                    number = {'font': {'size': 36, 'color': '#ffffff'}, 'suffix': '%'},
                     gauge = {
-                        'axis': {'range': [None, 100]},
-                        'bar': {'color': "#667eea"},
+                        'axis': {
+                            'range': [None, 100],
+                            'tickwidth': 1,
+                            'tickcolor': "#667eea",
+                            'tickfont': {'color': '#6b7280', 'size': 10}
+                        },
+                        'bar': {'color': "#667eea", 'thickness': 0.3},
+                        'bgcolor': "rgba(15, 20, 35, 0.8)",
+                        'borderwidth': 2,
+                        'bordercolor': "rgba(102, 126, 234, 0.3)",
                         'steps': [
-                            {'range': [0, 50], 'color': "lightgray"},
-                            {'range': [50, 100], 'color': "rgba(102, 126, 234, 0.3)"}
-                        ]
+                            {'range': [0, 40], 'color': "rgba(239, 68, 68, 0.2)"},
+                            {'range': [40, 60], 'color': "rgba(251, 191, 36, 0.2)"},
+                            {'range': [60, 100], 'color': "rgba(16, 185, 129, 0.2)"}
+                        ],
+                        'threshold': {
+                            'line': {'color': "#10b981", 'width': 3},
+                            'thickness': 0.8,
+                            'value': 68  # SAME VALUE - UNCHANGED
+                        }
                     }
                 ))
-                fig.update_layout(height=250, margin=dict(l=20, r=20, t=40, b=20))
+                
+                fig.update_layout(
+                    height=280,
+                    margin=dict(l=20, r=20, t=50, b=20),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font={'color': '#e2e8f0'}
+                )
+                
                 st.plotly_chart(fig, use_container_width=True, key=f"game_probability_{i}")
-
+                
+                # Quick stats below gauge
+                st.markdown("""
+                <div style="
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 0.5rem;
+                    margin-top: 0.5rem;
+                ">
+                    <div style="
+                        background: rgba(16, 185, 129, 0.1);
+                        border: 1px solid rgba(16, 185, 129, 0.2);
+                        border-radius: 8px;
+                        padding: 0.6rem;
+                        text-align: center;
+                    ">
+                        <p style="color: #6b7280; font-size: 0.65rem; margin: 0;">COVER %</p>
+                        <p style="color: #10b981; font-size: 1rem; margin: 0; font-weight: 600;">72%</p>
+                    </div>
+                    <div style="
+                        background: rgba(102, 126, 234, 0.1);
+                        border: 1px solid rgba(102, 126, 234, 0.2);
+                        border-radius: 8px;
+                        padding: 0.6rem;
+                        text-align: center;
+                    ">
+                        <p style="color: #6b7280; font-size: 0.65rem; margin: 0;">EDGE</p>
+                        <p style="color: #667eea; font-size: 1rem; margin: 0; font-weight: 600;">+4.2%</p>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Divider between games
+            st.markdown("""
+            <div style="height: 1px; background: linear-gradient(90deg, transparent 0%, rgba(102, 126, 234, 0.3) 50%, transparent 100%); margin: 1rem 0;"></div>
+            """, unsafe_allow_html=True)
+            
 with tab3:
     # ========== HEADER ==========
     st.markdown("""
@@ -1484,7 +1782,7 @@ with tab4:
     """, unsafe_allow_html=True)
     
     st.markdown("<br>", unsafe_allow_html=True)
-    
+
 with tab5:
     # ========== HEADER ==========
     st.markdown("""

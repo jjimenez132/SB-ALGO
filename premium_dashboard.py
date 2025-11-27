@@ -999,20 +999,492 @@ with tab3:
     st.markdown("<br>", unsafe_allow_html=True)
 
 with tab4:
-    st.markdown("## 📈 Trends & Patterns")
+    # ========== SECTION 1: HEADER ==========
+    st.markdown("""
+    <div style="text-align: center; padding: 1rem 0 0.5rem 0;">
+        <h1 style="margin-bottom: 0.2rem;">📈 Trends & Patterns</h1>
+        <p style="color: #a0aec0; font-size: 1rem; margin-bottom: 0.5rem;">Analyze team trends, player patterns, and prop-related performance indicators.</p>
+        <div style="height: 3px; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); border-radius: 2px; max-width: 400px; margin: 0 auto;"></div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    trend_type = st.selectbox("View Trends For:", ["Team Trends", "Player Trends", "Situational Edges"])
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== SECTION 2: TREND TYPE SELECTOR ==========
+    st.markdown("""
+    <div style="
+        background: rgba(102, 126, 234, 0.08);
+        border: 1px solid rgba(102, 126, 234, 0.25);
+        border-radius: 12px;
+        padding: 1.2rem 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 0 20px rgba(102, 126, 234, 0.1);
+    ">
+        <p style="color: #667eea; font-weight: 600; margin-bottom: 0.8rem; font-size: 0.9rem;">🎛️ SELECT TREND VIEW</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Same dropdown (UNCHANGED LOGIC)
+    trend_type = st.selectbox(
+        "View Trends For:",
+        ["Team Trends", "Player Trends", "Situational Edges"],
+        key="trends_selector",
+        label_visibility="collapsed"
+    )
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== CONDITIONAL CONTENT BASED ON SELECTION ==========
     
     if trend_type == "Team Trends":
-        st.markdown("### 🔥 Hot Teams (L10 Games)")
+        # ========== SECTION 3: HOT TEAMS ==========
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.1);
+        ">
+            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">🔥</span>
+                <h3 style="color: #e2e8f0; margin: 0; font-size: 1.2rem;">Hot Teams (Last 10 Games)</h3>
+            </div>
+            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Team performance indicators relevant for player props (form, ATS, margins).</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Same data (UNCHANGED)
         hot_teams = pd.DataFrame({
             "Team": ["Boston Celtics", "Oklahoma City", "Cleveland", "Denver"],
             "Record": ["9-1", "8-2", "8-2", "7-3"],
             "ATS": ["7-3", "6-4", "7-3", "5-5"],
             "Avg Margin": ["+12.3", "+8.7", "+9.2", "+6.5"]
         })
+        
         st.dataframe(hot_teams, use_container_width=True, hide_index=True)
-
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # ========== SECTION 6: TOTALS TRENDS ==========
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(79, 172, 254, 0.1) 100%);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.1);
+        ">
+            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">💥</span>
+                <h3 style="color: #e2e8f0; margin: 0; font-size: 1.2rem;">Totals Trends (Season)</h3>
+            </div>
+            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Useful for identifying high-scoring environments and pace-driven prop value.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Totals data
+        totals_data = pd.DataFrame({
+            "Team": ["Indiana Pacers", "Boston Celtics", "Atlanta Hawks", "Memphis Grizzlies", "Miami Heat", "New York Knicks"],
+            "Avg Total": ["235.2", "231.8", "229.4", "227.1", "208.3", "210.5"],
+            "Over %": ["68%", "62%", "58%", "55%", "38%", "42%"],
+            "Trend": ["🔥 Over Team", "🔥 Over Team", "📈 Trending Over", "📈 Trending Over", "❄️ Under Team", "❄️ Under Team"]
+        })
+        
+        st.dataframe(totals_data, use_container_width=True, hide_index=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # Cold Teams Section
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.1);
+        ">
+            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">❄️</span>
+                <h3 style="color: #e2e8f0; margin: 0; font-size: 1.2rem;">Cold Teams (Last 10 Games)</h3>
+            </div>
+            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Teams in a slump — fade opportunities and reduced prop ceilings.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        cold_teams = pd.DataFrame({
+            "Team": ["Detroit Pistons", "Washington Wizards", "Portland", "San Antonio"],
+            "Record": ["2-8", "3-7", "3-7", "4-6"],
+            "ATS": ["3-7", "4-6", "3-7", "4-6"],
+            "Avg Margin": ["-9.8", "-7.2", "-6.5", "-4.3"]
+        })
+        
+        st.dataframe(cold_teams, use_container_width=True, hide_index=True)
+    
+    elif trend_type == "Player Trends":
+        # ========== SECTION 7: PLAYER TRENDS ==========
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.1);
+        ">
+            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">👤</span>
+                <h3 style="color: #e2e8f0; margin: 0; font-size: 1.2rem;">Player Performance Trends</h3>
+            </div>
+            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Track hot and cold players across key stat categories for prop betting.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Player Trend Cards Grid
+        st.markdown("""
+        <p style="color: #667eea; font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem;">🔥 HOT PERFORMERS (Last 5-10 Games)</p>
+        """, unsafe_allow_html=True)
+        
+        ptr_col1, ptr_col2, ptr_col3, ptr_col4 = st.columns(4)
+        
+        with ptr_col1:
+            st.markdown("""
+            <div style="
+                background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%);
+                border: 1px solid rgba(239, 68, 68, 0.3);
+                border-radius: 12px;
+                padding: 1.2rem;
+                text-align: center;
+                min-height: 160px;
+                box-shadow: 0 4px 15px rgba(239, 68, 68, 0.1);
+            ">
+                <span style="font-size: 1.8rem;">🏀</span>
+                <h5 style="color: #ef4444; margin: 0.5rem 0 0.3rem 0; font-size: 0.95rem;">Hot Scorers</h5>
+                <p style="color: #a0aec0; font-size: 0.75rem; margin: 0;">Points leaders trending up</p>
+                <div style="
+                    background: rgba(0, 0, 0, 0.2);
+                    border-radius: 6px;
+                    padding: 0.6rem;
+                    margin-top: 0.8rem;
+                ">
+                    <p style="color: #718096; font-size: 0.7rem; font-style: italic; margin: 0;">(Data coming soon)</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with ptr_col2:
+            st.markdown("""
+            <div style="
+                background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+                border: 1px solid rgba(16, 185, 129, 0.3);
+                border-radius: 12px;
+                padding: 1.2rem;
+                text-align: center;
+                min-height: 160px;
+                box-shadow: 0 4px 15px rgba(16, 185, 129, 0.1);
+            ">
+                <span style="font-size: 1.8rem;">📊</span>
+                <h5 style="color: #10b981; margin: 0.5rem 0 0.3rem 0; font-size: 0.95rem;">Hot Rebounders</h5>
+                <p style="color: #a0aec0; font-size: 0.75rem; margin: 0;">Board leaders trending up</p>
+                <div style="
+                    background: rgba(0, 0, 0, 0.2);
+                    border-radius: 6px;
+                    padding: 0.6rem;
+                    margin-top: 0.8rem;
+                ">
+                    <p style="color: #718096; font-size: 0.7rem; font-style: italic; margin: 0;">(Data coming soon)</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with ptr_col3:
+            st.markdown("""
+            <div style="
+                background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(102, 126, 234, 0.05) 100%);
+                border: 1px solid rgba(102, 126, 234, 0.3);
+                border-radius: 12px;
+                padding: 1.2rem;
+                text-align: center;
+                min-height: 160px;
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.1);
+            ">
+                <span style="font-size: 1.8rem;">🎯</span>
+                <h5 style="color: #667eea; margin: 0.5rem 0 0.3rem 0; font-size: 0.95rem;">Hot Assisters</h5>
+                <p style="color: #a0aec0; font-size: 0.75rem; margin: 0;">Playmakers trending up</p>
+                <div style="
+                    background: rgba(0, 0, 0, 0.2);
+                    border-radius: 6px;
+                    padding: 0.6rem;
+                    margin-top: 0.8rem;
+                ">
+                    <p style="color: #718096; font-size: 0.7rem; font-style: italic; margin: 0;">(Data coming soon)</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with ptr_col4:
+            st.markdown("""
+            <div style="
+                background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(251, 191, 36, 0.05) 100%);
+                border: 1px solid rgba(251, 191, 36, 0.3);
+                border-radius: 12px;
+                padding: 1.2rem;
+                text-align: center;
+                min-height: 160px;
+                box-shadow: 0 4px 15px rgba(251, 191, 36, 0.1);
+            ">
+                <span style="font-size: 1.8rem;">🎯</span>
+                <h5 style="color: #fbbf24; margin: 0.5rem 0 0.3rem 0; font-size: 0.95rem;">Hot 3PT Shooters</h5>
+                <p style="color: #a0aec0; font-size: 0.75rem; margin: 0;">Snipers trending up</p>
+                <div style="
+                    background: rgba(0, 0, 0, 0.2);
+                    border-radius: 6px;
+                    padding: 0.6rem;
+                    margin-top: 0.8rem;
+                ">
+                    <p style="color: #718096; font-size: 0.7rem; font-style: italic; margin: 0;">(Data coming soon)</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # Cold Performers
+        st.markdown("""
+        <p style="color: #667eea; font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem;">❄️ COLD PERFORMERS (Fade Candidates)</p>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div style="
+            background: rgba(15, 20, 35, 0.5);
+            border: 1px dashed rgba(59, 130, 246, 0.4);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 1.5rem;
+        ">
+            <p style="color: #6b7280; font-size: 0.9rem; margin: 0;">Cold performer tracking coming soon...</p>
+            <p style="color: #4b5563; font-size: 0.8rem; margin-top: 0.5rem;">Identify players trending below their averages</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    else:  # Situational Edges
+        # ========== SITUATIONAL EDGES ==========
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(118, 75, 162, 0.1) 0%, rgba(212, 175, 55, 0.1) 100%);
+            border: 1px solid rgba(118, 75, 162, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 20px rgba(118, 75, 162, 0.1);
+        ">
+            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">🎲</span>
+                <h3 style="color: #e2e8f0; margin: 0; font-size: 1.2rem;">Situational Edges</h3>
+            </div>
+            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Contextual patterns that create betting value: rest, travel, back-to-backs, revenge.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        sit_col1, sit_col2 = st.columns(2)
+        
+        with sit_col1:
+            st.markdown("""
+            <div style="
+                background: rgba(15, 20, 35, 0.6);
+                border: 1px solid rgba(16, 185, 129, 0.3);
+                border-radius: 12px;
+                padding: 1.2rem;
+                margin-bottom: 1rem;
+            ">
+                <h5 style="color: #10b981; margin-bottom: 0.8rem; font-size: 0.95rem;">💤 Rest Advantage</h5>
+                <div style="background: rgba(0,0,0,0.2); padding: 0.8rem; border-radius: 8px;">
+                    <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Teams with 3+ days rest vs B2B opponents</p>
+                    <p style="color: #718096; font-size: 0.8rem; margin-top: 0.5rem; font-style: italic;">(Data coming soon)</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("""
+            <div style="
+                background: rgba(15, 20, 35, 0.6);
+                border: 1px solid rgba(251, 191, 36, 0.3);
+                border-radius: 12px;
+                padding: 1.2rem;
+            ">
+                <h5 style="color: #fbbf24; margin-bottom: 0.8rem; font-size: 0.95rem;">✈️ Travel Fatigue</h5>
+                <div style="background: rgba(0,0,0,0.2); padding: 0.8rem; border-radius: 8px;">
+                    <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Road teams on 4+ game trips</p>
+                    <p style="color: #718096; font-size: 0.8rem; margin-top: 0.5rem; font-style: italic;">(Data coming soon)</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with sit_col2:
+            st.markdown("""
+            <div style="
+                background: rgba(15, 20, 35, 0.6);
+                border: 1px solid rgba(239, 68, 68, 0.3);
+                border-radius: 12px;
+                padding: 1.2rem;
+                margin-bottom: 1rem;
+            ">
+                <h5 style="color: #ef4444; margin-bottom: 0.8rem; font-size: 0.95rem;">🔄 Back-to-Back Fades</h5>
+                <div style="background: rgba(0,0,0,0.2); padding: 0.8rem; border-radius: 8px;">
+                    <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Teams on second night of B2B</p>
+                    <p style="color: #718096; font-size: 0.8rem; margin-top: 0.5rem; font-style: italic;">(Data coming soon)</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("""
+            <div style="
+                background: rgba(15, 20, 35, 0.6);
+                border: 1px solid rgba(118, 75, 162, 0.3);
+                border-radius: 12px;
+                padding: 1.2rem;
+            ">
+                <h5 style="color: #764ba2; margin-bottom: 0.8rem; font-size: 0.95rem;">👊 Revenge Spots</h5>
+                <div style="background: rgba(0,0,0,0.2); padding: 0.8rem; border-radius: 8px;">
+                    <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Teams facing recent blowout losses</p>
+                    <p style="color: #718096; font-size: 0.8rem; margin-top: 0.5rem; font-style: italic;">(Data coming soon)</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== SECTION 8: ADVANCED PATTERNS ==========
+    st.markdown("""
+    <p style="color: #667eea; font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem;">🧠 ADVANCED PATTERNS</p>
+    """, unsafe_allow_html=True)
+    
+    adv_col1, adv_col2, adv_col3, adv_col4 = st.columns(4)
+    
+    with adv_col1:
+        st.markdown("""
+        <div style="
+            background: rgba(15, 20, 35, 0.5);
+            border: 1px dashed rgba(102, 126, 234, 0.4);
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        ">
+            <p style="color: #667eea; font-size: 0.85rem; margin: 0; font-weight: 500;">⚡ Pace Trends</p>
+            <p style="color: #4a5568; font-size: 0.7rem; margin-top: 0.3rem;">(Coming Soon)</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with adv_col2:
+        st.markdown("""
+        <div style="
+            background: rgba(15, 20, 35, 0.5);
+            border: 1px dashed rgba(118, 75, 162, 0.4);
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        ">
+            <p style="color: #764ba2; font-size: 0.85rem; margin: 0; font-weight: 500;">🛡️ Defensive Matchups</p>
+            <p style="color: #4a5568; font-size: 0.7rem; margin-top: 0.3rem;">(Coming Soon)</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with adv_col3:
+        st.markdown("""
+        <div style="
+            background: rgba(15, 20, 35, 0.5);
+            border: 1px dashed rgba(251, 191, 36, 0.4);
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        ">
+            <p style="color: #fbbf24; font-size: 0.85rem; margin: 0; font-weight: 500;">📈 High Usage Envs</p>
+            <p style="color: #4a5568; font-size: 0.7rem; margin-top: 0.3rem;">(Coming Soon)</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with adv_col4:
+        st.markdown("""
+        <div style="
+            background: rgba(15, 20, 35, 0.5);
+            border: 1px dashed rgba(16, 185, 129, 0.4);
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        ">
+            <p style="color: #10b981; font-size: 0.85rem; margin: 0; font-weight: 500;">⏱️ Minute Deltas</p>
+            <p style="color: #4a5568; font-size: 0.7rem; margin-top: 0.3rem;">(Coming Soon)</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== SECTION 9: TREND INSIGHTS ==========
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        border: 1px solid rgba(102, 126, 234, 0.25);
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.1);
+    ">
+        <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1rem;">
+            <span style="font-size: 1.3rem;">📝</span>
+            <h4 style="color: #e2e8f0; margin: 0; font-size: 1rem;">Trend Insights (Daily Summary)</h4>
+        </div>
+        <div style="
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 8px;
+            padding: 1.2rem;
+            border-left: 3px solid #667eea;
+        ">
+            <p style="color: #a0aec0; font-size: 0.9rem; margin-bottom: 0.8rem;">
+                This section will display algo-generated insights based on current trends.
+            </p>
+            <div style="display: grid; gap: 0.5rem;">
+                <p style="color: #718096; font-size: 0.85rem; margin: 0; font-style: italic;">
+                    • "Boston has covered 7 of last 10 — high-confidence spreads available."
+                </p>
+                <p style="color: #718096; font-size: 0.85rem; margin: 0; font-style: italic;">
+                    • "Indiana games going Over 68% of the time — pace-driven prop value."
+                </p>
+                <p style="color: #718096; font-size: 0.85rem; margin: 0; font-style: italic;">
+                    • "3 teams on B2B tonight — potential fade opportunities."
+                </p>
+            </div>
+            <p style="color: #4a5568; font-size: 0.8rem; margin-top: 1rem; text-align: center;">
+                Full insights coming soon...
+            </p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
 with tab5:
     # ========== HEADER ==========
     st.markdown("""

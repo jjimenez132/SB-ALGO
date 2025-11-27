@@ -954,7 +954,7 @@ with tab2:
             st.markdown("""
             <div style="height: 1px; background: linear-gradient(90deg, transparent 0%, rgba(102, 126, 234, 0.3) 50%, transparent 100%); margin: 1rem 0;"></div>
             """, unsafe_allow_html=True)
-            
+
 with tab3:
     # ========== HEADER ==========
     st.markdown("""
@@ -2339,8 +2339,28 @@ with tab5:
     st.markdown("<br>", unsafe_allow_html=True)
 
 with tab6:
-    st.markdown("## 📰 News & Injuries — Real-Time Updates")
+    # Premium Header (visual only)
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(251, 191, 36, 0.12) 100%);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 16px;
+        padding: 1.5rem 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 0 30px rgba(239, 68, 68, 0.1);
+    ">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <span style="font-size: 2.5rem;">📰</span>
+            <div>
+                <h1 style="margin: 0; color: #fff; font-size: 1.8rem; font-weight: 700;">News & Injuries — Real-Time Updates</h1>
+                <p style="margin: 0.3rem 0 0 0; color: #a0aec0; font-size: 0.95rem;">Live Injury Reports • Updated Hourly</p>
+            </div>
+        </div>
+        <div style="height: 3px; background: linear-gradient(90deg, #ef4444 0%, #fbbf24 50%, #ef4444 100%); border-radius: 2px; margin-top: 1rem;"></div>
+    </div>
+    """, unsafe_allow_html=True)
     
+    # ========== ORIGINAL LOGIC BELOW - UNCHANGED ==========
     if engine:
         try:
             # Try to get injuries - use simple query first
@@ -2354,31 +2374,140 @@ with tab6:
                 injuries_df = pd.read_sql(query, conn)
             
             if not injuries_df.empty:
-                st.markdown("### 🏥 Latest Injury Reports")
-                st.markdown(f"**Last updated:** {datetime.now().strftime('%B %d, %Y at %I:%M %p ET')} | **Total Reports:** {len(injuries_df)}")
-                st.markdown("---")
+                # Styled header section (replaces plain markdown)
+                st.markdown(f"""
+                <div style="
+                    background: rgba(15, 20, 35, 0.6);
+                    border: 1px solid rgba(239, 68, 68, 0.2);
+                    border-radius: 12px;
+                    padding: 1rem 1.5rem;
+                    margin-bottom: 1.5rem;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    flex-wrap: wrap;
+                    gap: 1rem;
+                ">
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <span style="font-size: 1.2rem;">🏥</span>
+                        <span style="color: #e2e8f0; font-size: 1.1rem; font-weight: 600;">Latest Injury Reports</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></div>
+                            <span style="color: #a0aec0; font-size: 0.85rem;">Last updated: {datetime.now().strftime('%B %d, %Y at %I:%M %p ET')}</span>
+                        </div>
+                        <div style="
+                            background: rgba(239, 68, 68, 0.15);
+                            border: 1px solid rgba(239, 68, 68, 0.3);
+                            padding: 0.3rem 0.8rem;
+                            border-radius: 20px;
+                        ">
+                            <span style="color: #ef4444; font-size: 0.85rem; font-weight: 600;">{len(injuries_df)} Reports</span>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
                 
+                # SAME LOOP - just with styled output
                 for idx, row in injuries_df.iterrows():
                     col1, col2 = st.columns([3, 1])
                     with col1:
+                        # SAME DATA EXTRACTION - UNCHANGED
                         player_name = row.get('player_name', row.get('name', 'Unknown Player'))
                         status = row.get('status', row.get('injury_status', 'Out'))
                         description = row.get('description', row.get('details', row.get('injury', 'No details available')))
                         
-                        st.markdown(f"**{player_name}** — {status}")
-                        st.markdown(f"_{description}_")
+                        # Determine status color (visual only)
+                        status_lower = str(status).lower()
+                        if 'out' in status_lower:
+                            status_color = '#ef4444'
+                            status_icon = '🔴'
+                        elif 'doubtful' in status_lower:
+                            status_color = '#f97316'
+                            status_icon = '🟠'
+                        elif 'questionable' in status_lower or 'day-to-day' in status_lower or 'dtd' in status_lower:
+                            status_color = '#fbbf24'
+                            status_icon = '🟡'
+                        elif 'probable' in status_lower:
+                            status_color = '#10b981'
+                            status_icon = '🟢'
+                        else:
+                            status_color = '#6b7280'
+                            status_icon = '⚪'
+                        
+                        # Styled player card (same data, better look)
+                        st.markdown(f"""
+                        <div style="
+                            background: linear-gradient(135deg, rgba(15, 20, 35, 0.7) 0%, rgba(15, 20, 35, 0.5) 100%);
+                            border: 1px solid rgba(102, 126, 234, 0.15);
+                            border-left: 3px solid {status_color};
+                            border-radius: 8px;
+                            padding: 0.8rem 1rem;
+                            margin-bottom: 0.3rem;
+                        ">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem;">
+                                <span style="color: #fff; font-size: 1rem; font-weight: 600;">{player_name}</span>
+                                <span style="color: #4b5563;">—</span>
+                                <span style="
+                                    display: inline-flex;
+                                    align-items: center;
+                                    gap: 0.3rem;
+                                    color: {status_color};
+                                    font-size: 0.85rem;
+                                    font-weight: 500;
+                                ">{status_icon} {status}</span>
+                            </div>
+                            <p style="color: #9ca3af; font-size: 0.85rem; margin: 0; font-style: italic; line-height: 1.4;">{description}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
                     with col2:
+                        # SAME LOGIC - UNCHANGED
                         updated = row.get('updated_at', row.get('date', ''))
                         if updated:
-                            st.markdown(f"🕐 {updated}")
-                    st.markdown("---")
+                            st.markdown(f"""
+                            <div style="text-align: right; padding-top: 0.8rem;">
+                                <span style="color: #4b5563; font-size: 0.75rem;">🕐 {updated}</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    
+                    # Subtle divider
+                    st.markdown("""
+                    <div style="height: 1px; background: linear-gradient(90deg, transparent 0%, rgba(107, 114, 128, 0.2) 50%, transparent 100%); margin: 0.3rem 0;"></div>
+                    """, unsafe_allow_html=True)
             else:
-                st.info("No recent injury reports found")
+                # SAME - just styled
+                st.markdown("""
+                <div style="
+                    background: rgba(59, 130, 246, 0.1);
+                    border: 1px solid rgba(59, 130, 246, 0.3);
+                    border-radius: 12px;
+                    padding: 2rem;
+                    text-align: center;
+                ">
+                    <span style="font-size: 2rem;">📋</span>
+                    <p style="color: #60a5fa; font-size: 1rem; margin: 1rem 0 0 0;">No recent injury reports found</p>
+                </div>
+                """, unsafe_allow_html=True)
                 
         except Exception as e:
+            # SAME - unchanged
             st.error(f"Error loading injuries: {str(e)}")
     else:
-        st.warning("Database connection required to view injury reports")
+        # SAME - just styled
+        st.markdown("""
+        <div style="
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+        ">
+            <span style="font-size: 2rem;">⚠️</span>
+            <p style="color: #fbbf24; font-size: 1rem; margin: 1rem 0 0 0;">Database connection required to view injury reports</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 with tab7:
     st.markdown("## 📁 Data Explorer — Historical Stats")

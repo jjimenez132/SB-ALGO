@@ -260,27 +260,345 @@ with tab2:
                 st.plotly_chart(fig, use_container_width=True, key=f"game_probability_{i}")
 
 with tab3:
-    st.markdown("## 🧠 Props Engine — Player Intelligence")
+    # ========== HEADER ==========
+    st.markdown("""
+    <div style="text-align: center; padding: 1rem 0 0.5rem 0;">
+        <h1 style="margin-bottom: 0.2rem;">🧠 Props Engine — Player Intelligence</h1>
+        <p style="color: #a0aec0; font-size: 1rem; margin-bottom: 0.5rem;">Advanced player prop exploration for research.</p>
+        <div style="height: 3px; background: linear-gradient(90deg, #667eea 0%, #4facfe 100%); border-radius: 2px; max-width: 400px; margin: 0 auto;"></div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    st.markdown("### 🔍 Search Player Props")
-    col1, col2 = st.columns([3, 1])
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== SEARCH CONTROLS SECTION ==========
+    st.markdown("""
+    <div style="
+        background: rgba(102, 126, 234, 0.08);
+        border: 1px solid rgba(102, 126, 234, 0.25);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 0 20px rgba(102, 126, 234, 0.1);
+    ">
+        <p style="color: #667eea; font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem;">🔍 SEARCH CONTROLS</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Dropdowns row
+    col1, col2, col3 = st.columns(3)
+    
     with col1:
-        player_search = st.text_input("Search player name", "")
+        st.selectbox(
+            "Select Team",
+            ["Choose team…", "LAL", "BOS", "GSW", "MIA", "DEN", "PHX", "DAL", "MIL"],
+            key="props_team_select"
+        )
+    
     with col2:
-        prop_type = st.selectbox("Prop Type", ["All", "Points", "Rebounds", "Assists", "3PT Made"])
+        st.selectbox(
+            "Select Player", 
+            ["Choose player…"],
+            key="props_player_select"
+        )
     
-    st.markdown("### ⭐ Top Player Prop Edges")
+    with col3:
+        st.selectbox(
+            "Prop Type",
+            ["All", "Points", "Rebounds", "Assists", "3PT", "PRA", "PR", "PA", "RA", "Blocks", "Steals", "Turnovers"],
+            key="props_type_select"
+        )
     
-    props_data = {
-        "Player": ["LeBron James", "Stephen Curry", "Nikola Jokic", "Luka Doncic"],
-        "Prop": ["Over 26.5 Pts", "Over 4.5 3PT", "Over 9.5 Reb", "Over 32.5 Pts"],
-        "Line": ["26.5", "4.5", "9.5", "32.5"],
-        "Hit Rate": ["68%", "71%", "65%", "63%"],
-        "Confidence": ["84%", "81%", "78%", "75%"],
-        "EV": ["+9.8%", "+8.2%", "+7.5%", "+6.3%"]
+    # Search bar below
+    st.text_input("Search Player Name", placeholder="Type any player…", key="props_player_search")
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== PLAYER SUMMARY PLACEHOLDER CARD ==========
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(79, 172, 254, 0.1) 100%);
+        border: 1px solid rgba(102, 126, 234, 0.3);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.15);
+    ">
+        <h3 style="color: #e2e8f0; margin-bottom: 1rem; font-size: 1.1rem;">📋 Player Overview</h3>
+        <div style="display: grid; gap: 0.8rem;">
+            <div style="
+                background: rgba(0, 0, 0, 0.2);
+                padding: 0.8rem 1rem;
+                border-radius: 8px;
+                border-left: 3px solid #667eea;
+            ">
+                <span style="color: #a0aec0;">Season Averages:</span>
+                <span style="color: #718096; font-style: italic;"> (data coming soon)</span>
+            </div>
+            <div style="
+                background: rgba(0, 0, 0, 0.2);
+                padding: 0.8rem 1rem;
+                border-radius: 8px;
+                border-left: 3px solid #4facfe;
+            ">
+                <span style="color: #a0aec0;">Recent Trends:</span>
+                <span style="color: #718096; font-style: italic;"> (data coming soon)</span>
+            </div>
+            <div style="
+                background: rgba(0, 0, 0, 0.2);
+                padding: 0.8rem 1rem;
+                border-radius: 8px;
+                border-left: 3px solid #764ba2;
+            ">
+                <span style="color: #a0aec0;">Matchup Insights:</span>
+                <span style="color: #718096; font-style: italic;"> (data coming soon)</span>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # ========== TOP PLAYER PROP EDGES TABLE ==========
+    st.markdown("""
+    <div style="
+        background: rgba(15, 20, 35, 0.6);
+        border: 1px solid rgba(102, 126, 234, 0.2);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    ">
+        <h3 style="color: #e2e8f0; margin-bottom: 1rem; font-size: 1.1rem;">⭐ Top Player Prop Edges</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Placeholder table data
+    props_table_data = {
+        "Player": ["Example Player", "Example Player", "Example Player", "Example Player"],
+        "Prop": ["Over 25.5 Points", "Over 8.5 Rebounds", "Over 6.5 Assists", "Over 2.5 3PT"],
+        "Line": ["—", "—", "—", "—"],
+        "Hit Rate": ["—", "—", "—", "—"],
+        "Confidence": ["—", "—", "—", "—"],
+        "EV": ["—", "—", "—", "—"]
     }
     
-    st.dataframe(pd.DataFrame(props_data), use_container_width=True, hide_index=True)
+    props_df = pd.DataFrame(props_table_data)
+    
+    # Custom CSS for table styling
+    st.markdown("""
+    <style>
+        .props-table-container .stDataFrame {
+            background: rgba(15, 20, 35, 0.8);
+            border-radius: 8px;
+        }
+        .props-table-container .stDataFrame [data-testid="stDataFrameResizable"] {
+            background: linear-gradient(180deg, rgba(102, 126, 234, 0.15) 0%, rgba(15, 20, 35, 0.6) 100%);
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.dataframe(
+        props_df,
+        use_container_width=True,
+        hide_index=True,
+        height=200
+    )
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== ANALYTICS PLACEHOLDER SECTION ==========
+    col_left, col_right = st.columns(2)
+    
+    with col_left:
+        st.markdown("""
+        <div style="
+            background: rgba(15, 20, 35, 0.5);
+            border: 1px dashed rgba(102, 126, 234, 0.4);
+            border-radius: 12px;
+            padding: 1.5rem;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.08);
+        ">
+            <h4 style="color: #667eea; margin-bottom: 0.5rem;">📈 Trend Graph</h4>
+            <p style="color: #4a5568; font-size: 0.85rem; text-align: center;">(Coming Soon)</p>
+            <div style="
+                width: 80%;
+                height: 80px;
+                border: 1px solid rgba(102, 126, 234, 0.2);
+                border-radius: 8px;
+                margin-top: 1rem;
+                background: rgba(0, 0, 0, 0.2);
+            "></div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_right:
+        st.markdown("""
+        <div style="
+            background: rgba(15, 20, 35, 0.5);
+            border: 1px dashed rgba(79, 172, 254, 0.4);
+            border-radius: 12px;
+            padding: 1.5rem;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 15px rgba(79, 172, 254, 0.08);
+        ">
+            <h4 style="color: #4facfe; margin-bottom: 0.5rem;">📊 Distribution</h4>
+            <p style="color: #4a5568; font-size: 0.85rem; text-align: center;">(Coming Soon)</p>
+            <div style="
+                width: 80%;
+                height: 80px;
+                border: 1px solid rgba(79, 172, 254, 0.2);
+                border-radius: 8px;
+                margin-top: 1rem;
+                background: rgba(0, 0, 0, 0.2);
+            "></div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Matchup Breakdown - centered below
+    st.markdown("""
+    <div style="
+        background: rgba(15, 20, 35, 0.5);
+        border: 1px dashed rgba(118, 75, 162, 0.4);
+        border-radius: 12px;
+        padding: 2rem;
+        min-height: 150px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 15px rgba(118, 75, 162, 0.08);
+        margin-bottom: 1.5rem;
+    ">
+        <h4 style="color: #764ba2; margin-bottom: 0.5rem;">🎯 Matchup Breakdown</h4>
+        <p style="color: #4a5568; font-size: 0.85rem; text-align: center;">(Coming Soon)</p>
+        <div style="
+            width: 90%;
+            height: 60px;
+            border: 1px solid rgba(118, 75, 162, 0.2);
+            border-radius: 8px;
+            margin-top: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+        "></div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # ========== PROP BREAKDOWN MINI CARDS ==========
+    st.markdown("""
+    <p style="color: #667eea; font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem;">🧩 PROP BREAKDOWNS</p>
+    """, unsafe_allow_html=True)
+    
+    card_col1, card_col2, card_col3, card_col4 = st.columns(4)
+    
+    with card_col1:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(102, 126, 234, 0.05) 100%);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 10px;
+            padding: 1.2rem;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.1);
+            transition: all 0.3s ease;
+        ">
+            <h5 style="color: #667eea; margin-bottom: 0.3rem; font-size: 0.9rem;">🏀 Points</h5>
+            <p style="color: #4a5568; font-size: 0.75rem; margin: 0;">Breakdown</p>
+            <p style="color: #718096; font-size: 0.7rem; font-style: italic; margin-top: 0.5rem;">(Coming Soon)</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with card_col2:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(79, 172, 254, 0.15) 0%, rgba(79, 172, 254, 0.05) 100%);
+            border: 1px solid rgba(79, 172, 254, 0.3);
+            border-radius: 10px;
+            padding: 1.2rem;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(79, 172, 254, 0.1);
+            transition: all 0.3s ease;
+        ">
+            <h5 style="color: #4facfe; margin-bottom: 0.3rem; font-size: 0.9rem;">📊 Rebounds</h5>
+            <p style="color: #4a5568; font-size: 0.75rem; margin: 0;">Breakdown</p>
+            <p style="color: #718096; font-size: 0.7rem; font-style: italic; margin-top: 0.5rem;">(Coming Soon)</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with card_col3:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(118, 75, 162, 0.15) 0%, rgba(118, 75, 162, 0.05) 100%);
+            border: 1px solid rgba(118, 75, 162, 0.3);
+            border-radius: 10px;
+            padding: 1.2rem;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(118, 75, 162, 0.1);
+            transition: all 0.3s ease;
+        ">
+            <h5 style="color: #764ba2; margin-bottom: 0.3rem; font-size: 0.9rem;">🎯 Assists</h5>
+            <p style="color: #4a5568; font-size: 0.75rem; margin: 0;">Breakdown</p>
+            <p style="color: #718096; font-size: 0.7rem; font-style: italic; margin-top: 0.5rem;">(Coming Soon)</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with card_col4:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 10px;
+            padding: 1.2rem;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.1);
+            transition: all 0.3s ease;
+        ">
+            <h5 style="color: #10b981; margin-bottom: 0.3rem; font-size: 0.9rem;">🎯 3PT</h5>
+            <p style="color: #4a5568; font-size: 0.75rem; margin: 0;">Breakdown</p>
+            <p style="color: #718096; font-size: 0.7rem; font-style: italic; margin-top: 0.5rem;">(Coming Soon)</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ========== STATMUSE-STYLE TEXT STATEMENTS ==========
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        border: 1px solid rgba(102, 126, 234, 0.25);
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.1);
+    ">
+        <h4 style="color: #e2e8f0; margin-bottom: 1rem; font-size: 1rem;">🪄 Automated Insights</h4>
+        <div style="
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 8px;
+            padding: 1rem;
+            border-left: 3px solid #667eea;
+        ">
+            <p style="color: #a0aec0; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                This section will display automated insights.
+            </p>
+            <p style="color: #718096; font-size: 0.85rem; font-style: italic; margin-bottom: 0.5rem;">
+                Examples: "Player has hit this prop in X of last Y games."
+            </p>
+            <p style="color: #4a5568; font-size: 0.8rem; margin: 0;">
+                Coming Soon.
+            </p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
 
 with tab4:
     st.markdown("## 📈 Trends & Patterns")

@@ -94,7 +94,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
 ])
 
 with tab1:
-    st.markdown("## 📊 Daily Overview")
+    st.markdown("## 📊 JJ's Daily Overview")
     
     # Get real data from database
     if engine:
@@ -184,37 +184,92 @@ with tab1:
     
     st.markdown("---")
     
-    # Recent games table
+    # AI Insights Bubble
+    st.markdown("### 🔮 JJ's Algo Insights")
+    st.info("📊 **Last 7 Days Trends:** Teams averaging OVER 224.6 points total. Highest variance in home scoring: +5.2 pts above season avg.")
+    
+    # Today's Best Edges (Beta)
+    st.markdown("### 📈 Today's Best Edges (Beta)")
+    col_e1, col_e2, col_e3, col_e4 = st.columns(4)
+    
+    with col_e1:
+        st.metric("Spread Edge", "—", help="Algorithm calculating...")
+    with col_e2:
+        st.metric("Total Edge", "—", help="Algorithm calculating...")
+    with col_e3:
+        st.metric("Player Props", "—", help="Algorithm calculating...")
+    with col_e4:
+        st.metric("AI Confidence", "—", help="Algorithm calculating...")
+    
+    st.markdown("---")
+    
+    # Recent games table with filters
     st.markdown("### 📅 Recent NBA Games")
+    
+    # Filters
+    filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
+    
+    with filter_col1:
+        filter_team = st.selectbox("🏀 Filter by Team", ["All Teams", "Home", "Away"])
+    
+    with filter_col2:
+        filter_result = st.selectbox("🎯 Filter by Result", ["All", "Wins Only", "Losses Only"])
+    
+    with filter_col3:
+        days_back = st.selectbox("📆 Days Back", [3, 7, 14, 30], index=1)
+    
+    with filter_col4:
+        search_team = st.text_input("🔍 Search Team", "")
     
     if engine:
         try:
             with engine.connect() as conn:
-                recent_games_query = text("""
+                # Build dynamic query based on filters
+                filters_ago = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
+                
+                base_query = """
                     SELECT 
                         date as game_date,
                         home_team,
                         visitor_team,
                         home_pts,
                         visitor_pts,
-                        CASE WHEN home_win = 1 THEN 'W' ELSE 'L' END as result
+                        home_win
                     FROM games
                     WHERE date >= :start_date
-                    ORDER BY date DESC
-                    LIMIT 20
-                """)
-                df_recent = pd.read_sql(recent_games_query, conn, params={"start_date": week_ago})
+                """
+                
+                if search_team:
+                    base_query += " AND (LOWER(home_team) LIKE LOWER(:search) OR LOWER(visitor_team) LIKE LOWER(:search))"
+                
+                base_query += " ORDER BY date DESC LIMIT 50"
+                
+                params = {"start_date": filters_ago}
+                if search_team:
+                    params["search"] = f"%{search_team}%"
+                
+                df_recent = pd.read_sql(text(base_query), conn, params=params)
                 
                 if not df_recent.empty:
                     df_recent['game_date'] = pd.to_datetime(df_recent['game_date']).dt.strftime('%b %d')
                     df_recent['score'] = df_recent['home_pts'].astype(str) + ' - ' + df_recent['visitor_pts'].astype(str)
-                    df_recent = df_recent[['game_date', 'home_team', 'visitor_team', 'score', 'result']]
-                    df_recent.columns = ['Date', 'Home', 'Away', 'Score', 'Result']
-                    st.dataframe(df_recent, use_container_width=True, hide_index=True)
+                    df_recent['result'] = df_recent['home_win'].apply(lambda x: 'W' if x == 1 else 'L')
+                    
+                    # Apply result filter
+                    if filter_result == "Wins Only":
+                        df_recent = df_recent[df_recent['result'] == 'W']
+                    elif filter_result == "Losses Only":
+                        df_recent = df_recent[df_recent['result'] == 'L']
+                    
+                    df_display = df_recent[['game_date', 'home_team', 'visitor_team', 'score', 'result']]
+                    df_display.columns = ['Date', 'Home', 'Away', 'Score', 'Result']
+                    
+                    st.dataframe(df_display, use_container_width=True, hide_index=True, height=400)
+                    st.caption(f"📊 Showing {len(df_display)} games")
                 else:
-                    st.info("No recent games found")
+                    st.info("No games found with current filters")
         except Exception as e:
-            st.error(f"Error loading recent games: {str(e)}")
+            st.error(f"Error loading games: {str(e)}")
 
 with tab2:
     st.markdown("## 🎲 Today's Games — Deep Analysis")

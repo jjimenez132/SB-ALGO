@@ -1,0 +1,58 @@
+# ========================================
+# 🚀 INSTRUCCIONES PARA ACTIVAR DATA LIVE
+# ========================================
+
+# PASO 1: Abre tu premium_dashboard.py
+
+# PASO 2: DESPUÉS de la función get_dashboard_metrics() (línea ~40)
+#         y ANTES de "# Page config", pega el contenido de:
+#         → data_functions.py
+
+# PASO 3: Reemplaza TODO el bloque "with tab2:" con el contenido de:
+#         → tab2_live_data.py
+
+# PASO 4: Reemplaza TODO el bloque "with tab4:" con el contenido de:
+#         → tab4_live_data.py
+
+# PASO 5: Guarda y haz deploy:
+#         cd ~/SB-ALGO
+#         git add .
+#         git commit -m "Connect live data to tabs"
+#         git push origin main
+
+# ========================================
+# QUÉ SE ACTIVA:
+# ========================================
+
+# ✅ TAB 2 (Today's Games):
+#    - Muestra los 10 games reales de hoy (2025-11-28)
+#    - Home/Away team records reales (últimos 30 días)
+#    - Rest days y B2B status reales
+#    - Total points y season averages reales
+#    - Win probability calculada de records reales
+
+# ✅ TAB 4 (Trends):
+#    - Hot Teams: Top 5 equipos por win% (últimos 30 días)
+#    - Cold Teams: Bottom 5 equipos por win% (últimos 30 días)  
+#    - Totals Trends: Equipos ordenados por avg total points
+#    - B2B y Rest Advantage detection para games de hoy
+
+# ✅ TAB 1 (Dashboard):
+#    - YA FUNCIONA (get_dashboard_metrics conectado)
+
+# ✅ TAB 6 (Injuries):
+#    - YA FUNCIONA (115 injuries de tu DB)
+
+# ✅ TAB 7 (Data Explorer):
+#    - YA FUNCIONA (games + player_boxscores)
+
+# ========================================
+# LO QUE QUEDA COMO PLACEHOLDER (para después):
+# ========================================
+
+# - Tab 3 (Props Engine): Necesita odds/lines data
+# - Tab 5 (Bankroll): Es input del usuario, no DB
+# - Tab 8 (Daily Reports): Necesita picks history table
+# - Tab 9 (Settings): Es configuración, no data
+
+# ========================================

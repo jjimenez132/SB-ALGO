@@ -714,7 +714,16 @@ with tab2:
                 
                 with m4:
                     if is_final:
-                        total_pts = int(game['total_points'])
+                        home_pts = int(game['home_pts']) if game['home_pts'] is not None else 0
+                        visitor_pts = int(game['visitor_pts']) if game['visitor_pts'] is not None else 0
+                        raw_total = game.get('total_points')
+                        if raw_total is None:
+                            total_pts = home_pts + visitor_pts
+                        else:
+                            try:
+                                total_pts = int(raw_total)
+                            except (TypeError, ValueError):
+                                total_pts = home_pts + visitor_pts
                         over_under = "OVER" if total_pts > avg_total else "UNDER"
                         color = "#10b981" if over_under == "OVER" else "#ef4444"
                         st.markdown(f"""

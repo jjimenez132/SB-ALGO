@@ -713,30 +713,17 @@ with tab2:
                     """, unsafe_allow_html=True)
                 
                 with m4:
-    if is_final:
-        # Si total_points viene None, lo calculamos como home_pts + visitor_pts
-        if game['total_points'] is not None:
-            total_pts = int(game['total_points'])
-        else:
-            total_pts = int(game['home_pts'] or 0) + int(game['visitor_pts'] or 0)
-
-        over_under = "OVER" if total_pts > avg_total else "UNDER"
-        color = "#10b981" if over_under == "OVER" else "#ef4444"
-
-        st.markdown(f"""
-        <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 10px; padding: 0.8rem; text-align: center;">
-            <p style="color: #6b7280; font-size: 0.7rem; margin: 0;">TOTAL PTS</p>
-            <p style="color: {color}; font-size: 1.2rem; margin: 0.2rem 0 0 0; font-weight: 600;">{total_pts} ({over_under})</p>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown("""
-        <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 10px; padding: 0.8rem; text-align: center;">
-            <p style="color: #6b7280; font-size: 0.7rem; margin: 0;">TOTAL PTS</p>
-            <p style="color: #ef4444; font-size: 1.2rem; margin: 0.2rem 0 0 0; font-weight: 600;">TBD</p>
-        </div>
-        """, unsafe_allow_html=True)
-
+                    if is_final:
+                        total_pts = int(game['total_points'])
+                        over_under = "OVER" if total_pts > avg_total else "UNDER"
+                        color = "#10b981" if over_under == "OVER" else "#ef4444"
+                        st.markdown(f"""
+                        <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 10px; padding: 0.8rem; text-align: center;">
+                            <p style="color: #6b7280; font-size: 0.7rem; margin: 0;">TOTAL PTS</p>
+                            <p style="color: {color}; font-size: 1.2rem; margin: 0.2rem 0 0 0; font-weight: 600;">{total_pts} ({over_under})</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
                         st.markdown("""
                         <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 10px; padding: 0.8rem; text-align: center;">
                             <p style="color: #6b7280; font-size: 0.7rem; margin: 0;">TOTAL PTS</p>

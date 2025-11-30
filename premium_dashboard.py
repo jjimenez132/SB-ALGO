@@ -1660,6 +1660,7 @@ with tab6:
     else:
         st.warning("Database connection required")
 
+with tab7:
     st.markdown("## 📂 Data Explorer")
     
     SEASONS = ["2025-26", "2024-25", "2023-24", "2022-23", "2021-22"]

@@ -1660,7 +1660,6 @@ with tab6:
     else:
         st.warning("Database connection required")
 
-:
     st.markdown("## 📂 Data Explorer")
     
     SEASONS = ["2025-26", "2024-25", "2023-24", "2022-23", "2021-22"]
@@ -1753,7 +1752,7 @@ with tab6:
         
         with col_team:
             selected_player_team = st.selectbox("🏀 Select Team", ["-- Select Team --"] + player_teams_list, key="player_team_select")
-            
+
         players_list = []
         if selected_player_team != "-- Select Team --" and engine:
             start_date, end_date = get_season_dates(selected_season)

@@ -1666,7 +1666,7 @@ with tab6:
     
     col1, col2 = st.columns(2)
     with col1:
-       with tab7 selected_season = st.selectbox("Season", SEASONS, key="explorer_season")
+       selected_season = st.selectbox("Season", SEASONS, key="explorer_season")
     with col2:
         stat_type = st.selectbox("Stat Type", ["Game Results", "Player Stats"], key="explorer_stat_type")
     

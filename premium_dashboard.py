@@ -1598,7 +1598,7 @@ with tab5:
     """, unsafe_allow_html=True)
     
     st.markdown("<br>", unsafe_allow_html=True)
-    
+
 with tab6:
     st.markdown("""
     <div style="
@@ -1660,14 +1660,14 @@ with tab6:
     else:
         st.warning("Database connection required")
 
-with tab7:
+:
     st.markdown("## 📂 Data Explorer")
     
     SEASONS = ["2025-26", "2024-25", "2023-24", "2022-23", "2021-22"]
     
     col1, col2 = st.columns(2)
     with col1:
-        selected_season = st.selectbox("Season", SEASONS, key="explorer_season")
+       with tab7 selected_season = st.selectbox("Season", SEASONS, key="explorer_season")
     with col2:
         stat_type = st.selectbox("Stat Type", ["Game Results", "Player Stats"], key="explorer_stat_type")
     
@@ -1677,19 +1677,11 @@ with tab7:
         end_date = f"{start_year + 1}-07-31"
         return start_date, end_date
     
-    teams_list = ["All Teams"]
-    if engine:
-        try:
-            with engine.connect() as conn:
-                result = conn.execute(text("""
-                    SELECT DISTINCT home_team 
-                    FROM games 
-                    WHERE home_team IS NOT NULL
-                    ORDER BY home_team
-                """))
-                teams_list = ["All Teams"] + [row[0] for row in result.fetchall()]
-        except Exception:
-            pass
+    # Current 30 NBA teams
+    NBA_TEAMS = ["ATL", "BOS", "BKN", "CHA", "CHI", "CLE", "DAL", "DEN", "DET", "GSW",
+                 "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", "MIN", "NOP", "NYK",
+                 "OKC", "ORL", "PHI", "PHX", "POR", "SAC", "SAS", "TOR", "UTA", "WAS"]
+    teams_list = ["All Teams"] + NBA_TEAMS
     
     if stat_type == "Game Results":
         selected_team = st.selectbox("🏀 Select Team", teams_list, key="explorer_team")
@@ -1751,25 +1743,17 @@ with tab7:
     else:
         st.markdown("---")
         
-        player_teams_list = []
-        if engine:
-            try:
-                with engine.connect() as conn:
-                    result = conn.execute(text("""
-                        SELECT DISTINCT team_abbreviation 
-                        FROM player_boxscores 
-                        WHERE team_abbreviation IS NOT NULL
-                        ORDER BY team_abbreviation
-                    """))
-                    player_teams_list = [row[0] for row in result.fetchall()]
-            except Exception:
-                pass
+        # Current 30 NBA teams for player stats
+        NBA_TEAMS_PLAYERS = ["ATL", "BOS", "BKN", "CHA", "CHI", "CLE", "DAL", "DEN", "DET", "GSW",
+                            "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", "MIN", "NOP", "NYK",
+                            "OKC", "ORL", "PHI", "PHX", "POR", "SAC", "SAS", "TOR", "UTA", "WAS"]
+        player_teams_list = NBA_TEAMS_PLAYERS
         
         col_team, col_player = st.columns(2)
         
         with col_team:
             selected_player_team = st.selectbox("🏀 Select Team", ["-- Select Team --"] + player_teams_list, key="player_team_select")
-        
+            
         players_list = []
         if selected_player_team != "-- Select Team --" and engine:
             start_date, end_date = get_season_dates(selected_season)

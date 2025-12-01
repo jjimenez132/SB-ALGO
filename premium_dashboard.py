@@ -7,6 +7,7 @@ import pytz
 import os
 from sqlalchemy import create_engine, text
 import numpy as np
+from algo_engine import AlgoEngine
 
 # ========== TIMEZONE FIX ==========
 def get_eastern_date():
@@ -47,12 +48,23 @@ def get_dashboard_metrics(engine):
             result = conn.execute(injuries_query).fetchone()
             metrics['active_injuries'] = result[0] if result else 0
             
-            # Calculate edges (if games today > 0, show 7, else 0)
+            # Calculate edges using real algo
             if metrics['games_today'] > 0:
-                metrics['edges_found'] = 7
-                metrics['system_confidence'] = 82
-                metrics['best_play'] = 'LAL -3.5'
-                metrics['best_play_conf'] = 87
+                try:
+                    algo = AlgoEngine()
+                    picks = algo.generate_picks(today)
+                    spread_picks = [p for p in picks if p['spread_pick']]
+                    total_picks = [p for p in picks if p['total_pick']]
+                    metrics['edges_found'] = len(spread_picks) + len(total_picks)
+                    if picks:
+                        avg_conf = sum(p['best_confidence'] for p in picks) / len(picks)
+                        metrics['system_confidence'] = int(avg_conf)
+                        best = max(picks, key=lambda x: x['best_edge'])
+                        metrics['best_play'] = best['best_pick'] or '—'
+                        metrics['best_play_conf'] = best['best_confidence']
+                except Exception as e:
+                    print(f"Algo error: {e}")
+                    metrics['edges_found'] = 0
             
     except Exception as e:
         print(f"Dashboard metrics error: {e}")
@@ -413,16 +425,45 @@ with tab1:
         <div style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 1rem; margin-bottom: 1rem;">
         """, unsafe_allow_html=True)
         
-        games_data = {
-            "Time": ["7:00 PM", "7:30 PM", "8:00 PM", "10:00 PM"],
-            "Matchup": ["LAL vs BOS", "MIA vs PHX", "DEN vs GSW", "LAC vs DAL"],
-            "Edge Type": ["Spread", "Moneyline", "Total", "Spread"],
-            "Recommendation": ["LAL -3.5", "PHX ML", "Under 228.5", "LAC +2.5"],
-            "Confidence": ["87%", "82%", "79%", "76%"],
-            "Expected Value": ["+12.3%", "+8.7%", "+7.2%", "+6.1%"]
-        }
-        df = pd.DataFrame(games_data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        # Get real picks from algo
+        try:
+            algo = AlgoEngine()
+            today = get_eastern_date()
+            picks = algo.generate_picks(today)
+            
+            if picks:
+                # Filter to only picks with edges
+                actionable_picks = [p for p in picks if p['spread_pick'] or p['total_pick']]
+                actionable_picks.sort(key=lambda x: x['best_edge'], reverse=True)
+                
+                picks_data = []
+                for p in actionable_picks[:6]:  # Top 6 picks
+                    if p['spread_pick']:
+                        picks_data.append({
+                            "Matchup": p['matchup'],
+                            "Type": "Spread",
+                            "Pick": p['spread_pick'],
+                            "Edge": f"{p['spread_edge']} pts",
+                            "Confidence": f"{p['spread_confidence']}%"
+                        })
+                    if p['total_pick']:
+                        picks_data.append({
+                            "Matchup": p['matchup'],
+                            "Type": "Total",
+                            "Pick": p['total_pick'],
+                            "Edge": f"{p['total_edge']} pts", 
+                            "Confidence": f"{p['total_confidence']}%"
+                        })
+                
+                if picks_data:
+                    df = pd.DataFrame(picks_data[:8])  # Limit to 8 rows
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No edges found above threshold")
+            else:
+                st.info("Generating picks...")
+        except Exception as e:
+            st.error(f"Error loading picks: {e}")
         
         st.markdown("</div>", unsafe_allow_html=True)
     else:

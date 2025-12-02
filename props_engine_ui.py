@@ -92,7 +92,7 @@ def calculate_edge_tier(spread, books_count):
 
 def format_odds(odds):
     """Format American odds with + sign for positive"""
-    if odds is None:
+    if odds is None or pd.isna(odds):
         return "-"
     odds = int(odds)
     return f"+{odds}" if odds > 0 else str(odds)

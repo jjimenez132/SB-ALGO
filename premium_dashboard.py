@@ -462,7 +462,7 @@ with tab1:
                 else:
                     st.info("No edges found above threshold")
             else:
-                st.info("Generating picks...")
+                st.warning("⚠️ No betting odds available for today. Odds are fetched daily at 5 AM ET.")
         except Exception as e:
             st.error(f"Error loading picks: {e}")
         

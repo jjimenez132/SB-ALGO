@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+from props_engine_ui import render_props_engine
 from datetime import datetime, timedelta
 import pytz
 import os
@@ -906,87 +907,7 @@ with tab2:
 
 # ========== TAB 3: PROPS ENGINE (PLACEHOLDER) ==========
 with tab3:
-    st.markdown("""
-    <div style="text-align: center; padding: 1rem 0 0.5rem 0;">
-        <h1 style="margin-bottom: 0.2rem;">🧠 Props Engine — Player Intelligence</h1>
-        <p style="color: #a0aec0; font-size: 1rem;">Live player props from 11 sportsbooks</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    if engine:
-        try:
-            today = get_eastern_date()
-            
-            with engine.connect() as conn:
-                result = conn.execute(text("""
-                    SELECT COUNT(*), COUNT(DISTINCT player_name), COUNT(DISTINCT sportsbook)
-                    FROM player_props WHERE game_date = :today
-                """), {"today": today}).fetchone()
-                
-                total_props = result[0] if result else 0
-                total_players = result[1] if result else 0
-                total_books = result[2] if result else 0
-            
-            if total_props > 0:
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Total Props", f"{total_props:,}")
-                with col2:
-                    st.metric("Players", total_players)
-                with col3:
-                    st.metric("Sportsbooks", total_books)
-                
-                st.markdown("---")
-                
-                market_options = ["Points", "Rebounds", "Assists", "Threes", "PRA"]
-                selected_market = st.selectbox("Select Prop Type", market_options)
-                
-                market_map = {
-                    "Points": "player_points",
-                    "Rebounds": "player_rebounds",
-                    "Assists": "player_assists",
-                    "Threes": "player_threes",
-                    "PRA": "player_points_rebounds_assists"
-                }
-                market_filter = market_map.get(selected_market, "player_points")
-                
-                with engine.connect() as conn:
-                    query = text("""
-                        SELECT player_name,
-                               MIN(line) as min_line, MAX(line) as max_line,
-                               ROUND(AVG(line)::numeric, 1) as avg_line,
-                               COUNT(DISTINCT sportsbook) as books,
-                               home_team || ' vs ' || away_team as game
-                        FROM player_props
-                        WHERE game_date = :today AND market = :market
-                        GROUP BY player_name, home_team, away_team
-                        ORDER BY player_name
-                    """)
-                    props_df = pd.read_sql(query, conn, params={"today": today, "market": market_filter})
-                
-                if not props_df.empty:
-                    props_df['spread'] = props_df['max_line'] - props_df['min_line']
-                    props_df.columns = ['Player', 'Min', 'Max', 'Avg', 'Books', 'Game', 'Spread']
-                    
-                    st.markdown(f"### {selected_market} Lines")
-                    st.dataframe(props_df[['Player', 'Min', 'Max', 'Avg', 'Spread', 'Books', 'Game']], 
-                                use_container_width=True, hide_index=True)
-                    
-                    st.markdown("### 🎯 Biggest Line Differences")
-                    big_diff = props_df[props_df['Spread'] >= 2].sort_values('Spread', ascending=False).head(5)
-                    if not big_diff.empty:
-                        for _, row in big_diff.iterrows():
-                            st.success(f"**{row['Player']}**: {row['Min']} to {row['Max']} ({row['Spread']} pt spread)")
-                    else:
-                        st.info("No major line differences")
-                else:
-                    st.warning("No props for this market")
-            else:
-                st.info("No props loaded. Run player_props.py to fetch.")
-        except Exception as e:
-            st.error(f"Error: {e}")
-    else:
-        st.warning("Database connection required")
+    render_props_engine(engine)
 
 # ========== TAB 4: TRENDS & PATTERNS ==========
 with tab4:

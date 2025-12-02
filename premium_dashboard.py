@@ -462,7 +462,7 @@ with tab1:
                 else:
                     st.info("No edges found above threshold")
             else:
-                st.info("Generating picks...")
+                st.warning("⚠️ No betting odds for today yet. Check Props Engine tab for 3,000+ player props!")
         except Exception as e:
             st.error(f"Error loading picks: {e}")
         

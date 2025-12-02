@@ -545,7 +545,7 @@ with tab1:
         ">
             <p style="color: #a0aec0; font-size: 0.8rem; margin-bottom: 0.3rem; text-transform: uppercase;">🎯 Edges Found</p>
             <h1 style="color: #fff; margin: 0.3rem 0; font-size: 2.5rem; font-weight: 700;">{edges}</h1>
-            <p style='color: {"#6b7280" if edges == 0 else "#10b981"}; font-size: 0.8rem; margin: 0;'>{"⏸️ No games" if edges == 0 else "↑ +2 vs avg"}</p>
+            <p style='color: {"#6b7280" if edges == 0 else "#10b981"}; font-size: 0.8rem; margin: 0;'>{"📊 Check Props" if edges == 0 else "↑ +2 vs avg"}</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -563,7 +563,7 @@ with tab1:
         ">
             <p style="color: #a0aec0; font-size: 0.8rem; margin-bottom: 0.3rem; text-transform: uppercase;">📈 Confidence</p>
             <h1 style="color: #fff; margin: 0.3rem 0; font-size: 2.5rem; font-weight: 700;">{confidence if confidence > 0 else "—"}{"%" if confidence > 0 else ""}</h1>
-            <p style='color: {"#6b7280" if confidence == 0 else "#10b981"}; font-size: 0.8rem; margin: 0;'>{"⏸️ Standby" if confidence == 0 else "↑ +15%"}</p>
+            <p style='color: {"#6b7280" if confidence == 0 else "#10b981"}; font-size: 0.8rem; margin: 0;'>{"📊 Props Ready" if confidence == 0 else "↑ +15%"}</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -581,7 +581,7 @@ with tab1:
         ">
             <p style="color: #a0aec0; font-size: 0.8rem; margin-bottom: 0.3rem; text-transform: uppercase;">⭐ Best Play</p>
             <h1 style="color: #fff; margin: 0.3rem 0; font-size: 2rem; font-weight: 700;">{best_play}</h1>
-            <p style='color: {"#6b7280" if best_play == "—" else "#10b981"}; font-size: 0.8rem; margin: 0;'>{"⏸️ No picks" if best_play == "—" else f"↑ {dashboard_data['best_play_conf']}%"}</p>
+            <p style='color: {"#6b7280" if best_play == "—" else "#10b981"}; font-size: 0.8rem; margin: 0;'>{"📊 3K+ Props" if best_play == "—" else f"↑ {dashboard_data['best_play_conf']}%"}</p>
         </div>
         """, unsafe_allow_html=True)
     

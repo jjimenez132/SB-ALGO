@@ -106,7 +106,12 @@ def get_todays_games(engine):
                     'home_is_b2b': row[9] or False,
                     'visitor_is_b2b': row[10] or False,
                     'season_avg_total': row[11] or 220,
-                    'total_points': row[12]
+                    'total_points': row[12],
+                    'current_home_score': row[13] or 0,
+                    'current_away_score': row[14] or 0,
+                    'quarter': row[15] or '',
+                    'time_remaining': row[16] or '',
+                    'game_status': row[17] or 'Scheduled'
                 })
             return games
     except Exception as e:
@@ -707,16 +712,69 @@ with tab2:
             visitor = game['visitor_team']
             start_time = game['start_time']
             
-            # Check if game is final
-            is_final = game['home_pts'] is not None and game['visitor_pts'] is not None
+            # Check game status
+            game_status = game.get('game_status', 'Scheduled')
+            is_final = game['home_pts'] is not None and game['home_pts'] > 0
+            is_live = game_status and game_status.lower() not in ['scheduled', 'not started yet', ''] and not is_final
+            
+            current_home = game.get('current_home_score', 0) or 0
+            current_away = game.get('current_away_score', 0) or 0
+            quarter = game.get('quarter', '')
+            time_remaining = game.get('time_remaining', '')
             
             if is_final:
                 score_display = f"FINAL: {visitor} {int(game['visitor_pts'])} - {home} {int(game['home_pts'])}"
                 winner = home if game['home_win'] else visitor
+                status_color = "#10b981"
+            elif is_live:
+                score_display = f"🔴 LIVE: {visitor} {current_away} - {home} {current_home} | {quarter} {time_remaining}"
+                winner = None
+                status_color = "#ef4444"
             else:
                 score_display = f"🕐 {start_time}"
+                winner = None
+                status_color = "#fbbf24"
             
             with st.expander(f"🏀 {visitor} @ {home} — {score_display}", expanded=(i==0)):
+                
+                # Live Score Card (only show if game is live or final)
+                if is_live or is_final:
+                    if is_live:
+                        live_bg = "linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.05) 100%)"
+                        live_border = "rgba(239, 68, 68, 0.5)"
+                        status_text = f"🔴 LIVE — {quarter} {time_remaining}"
+                        home_score_show = current_home
+                        away_score_show = current_away
+                    else:
+                        live_bg = "linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.05) 100%)"
+                        live_border = "rgba(16, 185, 129, 0.5)"
+                        status_text = "✅ FINAL"
+                        home_score_show = int(game['home_pts'])
+                        away_score_show = int(game['visitor_pts'])
+                    
+                    st.markdown(f"""
+                    <div style="
+                        background: {live_bg};
+                        border: 2px solid {live_border};
+                        border-radius: 16px;
+                        padding: 1.5rem;
+                        margin-bottom: 1.5rem;
+                        text-align: center;
+                    ">
+                        <p style="color: #a0aec0; font-size: 0.85rem; margin: 0 0 0.5rem 0;">{status_text}</p>
+                        <div style="display: flex; justify-content: center; align-items: center; gap: 2rem;">
+                            <div style="text-align: center;">
+                                <p style="color: #fff; font-size: 2.5rem; font-weight: 700; margin: 0;">{away_score_show}</p>
+                                <p style="color: #a0aec0; font-size: 1rem; margin: 0.3rem 0 0 0;">{visitor}</p>
+                            </div>
+                            <div style="color: #667eea; font-size: 1.5rem; font-weight: 600;">VS</div>
+                            <div style="text-align: center;">
+                                <p style="color: #fff; font-size: 2.5rem; font-weight: 700; margin: 0;">{home_score_show}</p>
+                                <p style="color: #a0aec0; font-size: 1rem; margin: 0.3rem 0 0 0;">{home}</p>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
                 
                 # Key Metrics
                 st.markdown("""

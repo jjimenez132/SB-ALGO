@@ -1695,6 +1695,57 @@ with tab6:
     else:
         st.warning("Database connection required")
 
+    # ========== NEWS SECTION ==========
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.12) 0%, rgba(168, 85, 247, 0.12) 100%);
+        border: 1px solid rgba(102, 126, 234, 0.3);
+        border-radius: 16px;
+        padding: 1.5rem 2rem;
+        margin-bottom: 1.5rem;
+    ">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <span style="font-size: 2rem;">📰</span>
+            <div>
+                <h2 style="margin: 0; color: #fff; font-size: 1.4rem;">Top Headlines</h2>
+                <p style="margin: 0.3rem 0 0 0; color: #a0aec0;">Latest NBA News • Updated Hourly</p>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if engine:
+        try:
+            news_query = text("SELECT title, link, source, published_at FROM nba_news ORDER BY fetched_at DESC LIMIT 15")
+            with engine.connect() as conn:
+                news_df = pd.read_sql(news_query, conn)
+            
+            if not news_df.empty:
+                for idx, row in news_df.iterrows():
+                    title = row.get('title', 'No title')
+                    link = row.get('link', '#')
+                    source = row.get('source', 'Unknown')
+                    
+                    st.markdown(f"""
+                    <div style="
+                        background: rgba(15, 20, 35, 0.7);
+                        border-left: 3px solid #667eea;
+                        border-radius: 8px;
+                        padding: 0.8rem 1rem;
+                        margin-bottom: 0.5rem;
+                    ">
+                        <a href="{link}" target="_blank" style="color: #fff; font-weight: 600; text-decoration: none;">{title}</a>
+                        <p style="color: #9ca3af; font-size: 0.8rem; margin: 0.3rem 0 0 0;">Source: {source}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.info("No news available yet. News will appear after the first hourly fetch.")
+        except Exception as e:
+            st.error(f"Error loading news: {e}")
+
+
 with tab7:
     st.markdown("## 📂 Data Explorer")
     

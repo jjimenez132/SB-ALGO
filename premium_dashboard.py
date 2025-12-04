@@ -128,14 +128,14 @@ def get_recent_team_record(engine, team, days=30):
         today = get_eastern_date()
         query = text("""
             SELECT 
-                SUM(CASE WHEN (home_team = :team AND home_win = true) OR 
-                             (visitor_team = :team AND home_win = false) THEN 1 ELSE 0 END) as wins,
-                SUM(CASE WHEN (home_team = :team AND home_win = false) OR 
-                             (visitor_team = :team AND home_win = true) THEN 1 ELSE 0 END) as losses,
-                SUM(CASE WHEN home_team = :team AND home_win = true THEN 1 ELSE 0 END) as home_wins,
-                SUM(CASE WHEN home_team = :team AND home_win = false THEN 1 ELSE 0 END) as home_losses,
-                SUM(CASE WHEN visitor_team = :team AND home_win = false THEN 1 ELSE 0 END) as away_wins,
-                SUM(CASE WHEN visitor_team = :team AND home_win = true THEN 1 ELSE 0 END) as away_losses
+                SUM(CASE WHEN (home_team = :team AND home_win = 1) OR 
+                             (visitor_team = :team AND home_win = 0) THEN 1 ELSE 0 END) as wins,
+                SUM(CASE WHEN (home_team = :team AND home_win = 0) OR 
+                             (visitor_team = :team AND home_win = 1) THEN 1 ELSE 0 END) as losses,
+                SUM(CASE WHEN home_team = :team AND home_win = 1 THEN 1 ELSE 0 END) as home_wins,
+                SUM(CASE WHEN home_team = :team AND home_win = 0 THEN 1 ELSE 0 END) as home_losses,
+                SUM(CASE WHEN visitor_team = :team AND home_win = 0 THEN 1 ELSE 0 END) as away_wins,
+                SUM(CASE WHEN visitor_team = :team AND home_win = 1 THEN 1 ELSE 0 END) as away_losses
             FROM games
             WHERE date >= :start_date AND date < :today
             AND (home_team = :team OR visitor_team = :team)
@@ -176,7 +176,7 @@ def get_hot_teams(engine, limit=5):
         query = text("""
             WITH team_games AS (
                 SELECT home_team as team, 
-                       CASE WHEN home_win = true THEN 1 ELSE 0 END as win,
+                       CASE WHEN home_win = 1 THEN 1 ELSE 0 END as win,
                        home_pts - visitor_pts as margin
                 FROM games 
                 WHERE date >= :start_date AND date < :today AND home_win IS NOT NULL
@@ -184,7 +184,7 @@ def get_hot_teams(engine, limit=5):
                 UNION ALL
                 
                 SELECT visitor_team as team,
-                       CASE WHEN home_win = false THEN 1 ELSE 0 END as win,
+                       CASE WHEN home_win = 0 THEN 1 ELSE 0 END as win,
                        visitor_pts - home_pts as margin
                 FROM games 
                 WHERE date >= :start_date AND date < :today AND home_win IS NOT NULL
@@ -225,7 +225,7 @@ def get_cold_teams(engine, limit=5):
         query = text("""
             WITH team_games AS (
                 SELECT home_team as team, 
-                       CASE WHEN home_win = true THEN 1 ELSE 0 END as win,
+                       CASE WHEN home_win = 1 THEN 1 ELSE 0 END as win,
                        home_pts - visitor_pts as margin
                 FROM games 
                 WHERE date >= :start_date AND date < :today AND home_win IS NOT NULL
@@ -233,7 +233,7 @@ def get_cold_teams(engine, limit=5):
                 UNION ALL
                 
                 SELECT visitor_team as team,
-                       CASE WHEN home_win = false THEN 1 ELSE 0 END as win,
+                       CASE WHEN home_win = 0 THEN 1 ELSE 0 END as win,
                        visitor_pts - home_pts as margin
                 FROM games 
                 WHERE date >= :start_date AND date < :today AND home_win IS NOT NULL

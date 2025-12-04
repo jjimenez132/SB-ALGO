@@ -83,7 +83,8 @@ def get_todays_games(engine):
             SELECT 
                 date, home_team, visitor_team, home_pts, visitor_pts,
                 start_time, home_win, home_days_rest, visitor_days_rest,
-                home_is_b2b, visitor_is_b2b, season_avg_total, total_points
+                home_is_b2b, visitor_is_b2b, season_avg_total, total_points,
+                current_home_score, current_away_score, quarter, time_remaining, game_status
             FROM games 
             WHERE date = :today
             ORDER BY start_time

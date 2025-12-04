@@ -19,6 +19,56 @@ HEADERS = {
     "x-rapidapi-host": "tank01-fantasy-stats.p.rapidapi.com",
     "x-rapidapi-key": API_KEY
 }
+# Team name normalization - maps Tank01 abbreviations to DB abbreviations
+TEAM_NORMALIZE = {
+    'SA': 'SAS',
+    'NY': 'NYK', 
+    'GS': 'GSW',
+    'PHO': 'PHX',
+    'NO': 'NOP',
+    'WSH': 'WAS',
+    'UTAH': 'UTA',
+    # Full names (in case they appear)
+    'Bucks': 'MIL',
+    'Clippers': 'LAC',
+    'Heat': 'MIA',
+    'Hornets': 'CHA',
+    'Pacers': 'IND',
+    'Suns': 'PHX',
+    'Timberwolves': 'MIN',
+    'Warriors': 'GSW',
+    'Magic': 'ORL',
+    'Hawks': 'ATL',
+    'Celtics': 'BOS',
+    'Nets': 'BKN',
+    'Bulls': 'CHI',
+    'Cavaliers': 'CLE',
+    'Mavericks': 'DAL',
+    'Nuggets': 'DEN',
+    'Pistons': 'DET',
+    'Rockets': 'HOU',
+    'Lakers': 'LAL',
+    'Grizzlies': 'MEM',
+    'Pelicans': 'NOP',
+    'Knicks': 'NYK',
+    'Thunder': 'OKC',
+    '76ers': 'PHI',
+    'Sixers': 'PHI',
+    'Trail Blazers': 'POR',
+    'Blazers': 'POR',
+    'Kings': 'SAC',
+    'Spurs': 'SAS',
+    'Raptors': 'TOR',
+    'Jazz': 'UTA',
+    'Wizards': 'WAS'
+}
+
+def normalize_team(team):
+    """Convert any team name/abbrev to standard DB format"""
+    if not team:
+        return team
+    return TEAM_NORMALIZE.get(team, team)
+
 
 def ensure_live_columns(engine):
     with engine.connect() as conn:
@@ -56,8 +106,8 @@ def fetch_live_scoreboard(game_date):
     return response.json().get('body', {})
 
 def update_game_live_data(engine, game_data, game_date_obj):
-    home_team = game_data.get('home')
-    away_team = game_data.get('away')
+    home_team = normalize_team(game_data.get('home'))
+    away_team = normalize_team(game_data.get('away'))
     home_score = game_data.get('homePts', 0) or 0
     away_score = game_data.get('awayPts', 0) or 0
     # gameClock can be a string or dict depending on game state

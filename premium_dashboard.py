@@ -876,13 +876,61 @@ with tab2:
                     """
                     st.markdown(analysis_html, unsafe_allow_html=True)
                     
-                    # Algorithm Recommendation
+                    # Algorithm Recommendation - USE REAL PREDICTOR
+                    from math_engine import GamePredictor
+                    predictor = GamePredictor(engine)
+                    
+                    # Get betting odds for this game
+                    spread_line = None
+                    total_line = None
+                    try:
+                        with engine.connect() as conn:
+                            odds_result = conn.execute(text("""
+                                SELECT home_spread, total FROM betting_odds 
+                                WHERE game_date = :gd AND home_team = :home
+                                LIMIT 1
+                            """), {"gd": game['date'], "home": home}).fetchone()
+                            if odds_result:
+                                spread_line = float(odds_result[0]) if odds_result[0] else None
+                                total_line = float(odds_result[1]) if odds_result[1] else None
+                    except:
+                        pass
+                    
+                    # Run prediction
+                    analysis = predictor.analyze_game(home, visitor, spread_line, total_line)
+                    spread_pred = analysis['spread']
+                    total_pred = analysis['total']
+                    picks = analysis.get('picks', [])
+                    
                     if is_final:
                         rec_text = f"✅ {winner} won"
                         rec_color = "#10b981"
+                        rec_details = ""
                     else:
-                        rec_text = "Analysis processing..."
-                        rec_color = "#fbbf24"
+                        # Build recommendation text
+                        rec_parts = []
+                        for pick in picks:
+                            rec_parts.append(f"{pick['pick']} ({pick['edge']:.1f} edge)")
+                        
+                        if rec_parts:
+                            rec_text = " | ".join(rec_parts[:2])
+                            rec_color = "#10b981"
+                        else:
+                            rec_text = "No strong edge detected"
+                            rec_color = "#fbbf24"
+                        
+                        rec_details = f"""
+                        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0 0 0.5rem 0;">📊 Algo Analysis:</p>
+                            <p style="color: #e2e8f0; font-size: 0.9rem; margin: 0;">
+                                Spread: <strong>{spread_pred['predicted_spread']:+.1f}</strong> (Line: {spread_line or 'N/A'}) | 
+                                Total: <strong>{total_pred['predicted_total']:.0f}</strong> (Line: {total_line or 'N/A'})
+                            </p>
+                            <p style="color: #6b7280; font-size: 0.8rem; margin: 0.3rem 0 0 0;">
+                                Confidence: {spread_pred['confidence']:.0f}% | {home} Net: {spread_pred.get('home_net', 0):+.1f} | {visitor} Net: {spread_pred.get('away_net', 0):+.1f}
+                            </p>
+                        </div>
+                        """
                     
                     st.markdown(f"""
                     <div style="
@@ -895,7 +943,8 @@ with tab2:
                             <span style="font-size: 1.3rem;">🎯</span>
                             <h3 style="color: #10b981; margin: 0; font-size: 1.1rem;">Algorithm Recommendation</h3>
                         </div>
-                        <h2 style="color: #fff; margin: 0; font-size: 1.5rem;">{rec_text}</h2>
+                        <h2 style="color: #fff; margin: 0; font-size: 1.3rem;">{rec_text}</h2>
+                        {rec_details if not is_final else ""}
                     </div>
                     """, unsafe_allow_html=True)
                 

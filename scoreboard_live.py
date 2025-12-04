@@ -60,8 +60,14 @@ def update_game_live_data(engine, game_data, game_date_obj):
     away_team = game_data.get('away')
     home_score = game_data.get('homePts', 0) or 0
     away_score = game_data.get('awayPts', 0) or 0
-    quarter = game_data.get('gameClock', {}).get('quarter') or game_data.get('currentPeriod', '')
-    time_remaining = game_data.get('gameClock', {}).get('timeRemaining') or game_data.get('gameTime', '')
+    # gameClock can be a string or dict depending on game state
+    game_clock = game_data.get('gameClock', '')
+    if isinstance(game_clock, dict):
+        quarter = game_clock.get('quarter', '') or game_data.get('currentPeriod', '')
+        time_remaining = game_clock.get('timeRemaining', '') or game_data.get('gameTime', '')
+    else:
+        quarter = game_data.get('currentPeriod', '')
+        time_remaining = game_data.get('gameTime', '')
     game_status = game_data.get('gameStatus') or game_data.get('gameStatusCode', '')
     
     if not home_team or not away_team:
@@ -69,12 +75,12 @@ def update_game_live_data(engine, game_data, game_date_obj):
     
     with engine.connect() as conn:
         result = conn.execute(text("""
-            SELECT id, home_pts FROM games 
+            SELECT home_pts FROM games 
             WHERE date = :game_date AND home_team = :home AND visitor_team = :away
         """), {"game_date": game_date_obj, "home": home_team, "away": away_team}).fetchone()
         
         if result:
-            if result[1] and result[1] > 0 and str(game_status).lower() == 'final':
+            if result[0] and result[0] > 0 and str(game_status).lower() == 'final':
                 print(f"   ⏭️ {away_team} @ {home_team}: Already final, skipping")
                 return False
             
@@ -139,7 +145,8 @@ def main():
         return
     
     if isinstance(scoreboard, dict):
-        games = list(scoreboard.values()) if scoreboard else []
+        # scoreboard is {game_id: game_data}
+        games = list(scoreboard.values())
     elif isinstance(scoreboard, list):
         games = scoreboard
     else:
@@ -150,12 +157,14 @@ def main():
     
     games_updated = 0
     for game in games:
-        if isinstance(game, dict):
-            try:
-                if update_game_live_data(engine, game, today_date):
-                    games_updated += 1
-            except Exception as e:
-                print(f"   ❌ Error: {e}")
+        if not isinstance(game, dict):
+            print(f"   ⚠️ Skipping non-dict game: {type(game)}")
+            continue
+        try:
+            if update_game_live_data(engine, game, today_date):
+                games_updated += 1
+        except Exception as e:
+            print(f"   ❌ Error processing {game.get('away', '?')} @ {game.get('home', '?')}: {e}")
     
     print(f"\n{'='*60}")
     print(f"✅ COMPLETE: {games_updated} games updated")

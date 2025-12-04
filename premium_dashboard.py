@@ -432,45 +432,51 @@ with tab1:
         <div style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 1rem; margin-bottom: 1rem;">
         """, unsafe_allow_html=True)
         
-        # Get real picks from algo
+        # Get picks from ALGO BRAIN
         try:
-            algo = AlgoEngine()
-            today = get_eastern_date()
-            picks = algo.generate_picks(today)
+            from algo_brain import analyze_games, analyze_props
             
-            if picks:
-                # Filter to only picks with edges
-                actionable_picks = [p for p in picks if p['spread_pick'] or p['total_pick']]
-                actionable_picks.sort(key=lambda x: x['best_edge'], reverse=True)
+            game_edges = analyze_games()
+            prop_edges = analyze_props()
+            
+            col_games, col_props = st.columns(2)
+            
+            with col_games:
+                st.markdown("""
+                <p style="color: #10b981; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem;">🏀 TOP GAME BETS</p>
+                """, unsafe_allow_html=True)
                 
-                picks_data = []
-                for p in actionable_picks[:6]:  # Top 6 picks
-                    if p['spread_pick']:
-                        picks_data.append({
-                            "Matchup": p['matchup'],
-                            "Type": "Spread",
-                            "Pick": p['spread_pick'],
-                            "Edge": f"{p['spread_edge']} pts",
-                            "Confidence": f"{p['spread_confidence']}%"
-                        })
-                    if p['total_pick']:
-                        picks_data.append({
-                            "Matchup": p['matchup'],
-                            "Type": "Total",
-                            "Pick": p['total_pick'],
-                            "Edge": f"{p['total_edge']} pts", 
-                            "Confidence": f"{p['total_confidence']}%"
-                        })
-                
-                if picks_data:
-                    df = pd.DataFrame(picks_data[:8])  # Limit to 8 rows
-                    st.dataframe(df, use_container_width=True, hide_index=True)
+                if game_edges:
+                    for edge in game_edges[:4]:
+                        units = "2u" if edge['edge'] >= 7 else "1u" if edge['edge'] >= 4 else "0.5u"
+                        st.markdown(f"""
+                        <div style="background: rgba(16, 185, 129, 0.1); border-left: 3px solid #10b981; padding: 0.5rem 0.8rem; margin-bottom: 0.4rem; border-radius: 0 6px 6px 0;">
+                            <p style="color: #fff; font-size: 0.9rem; margin: 0; font-weight: 600;">{edge['pick']}</p>
+                            <p style="color: #6b7280; font-size: 0.75rem; margin: 0;">{edge['game']} • {edge['edge']:.1f} pts • {units}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
                 else:
-                    st.info("No edges found above threshold")
-            else:
-                st.warning("⚠️ No betting odds for today yet. Check Props Engine tab for 3,000+ player props!")
+                    st.markdown("<p style='color: #6b7280; font-size: 0.85rem;'>No game edges found</p>", unsafe_allow_html=True)
+            
+            with col_props:
+                st.markdown("""
+                <p style="color: #fbbf24; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem;">🎯 TOP PROP BETS</p>
+                """, unsafe_allow_html=True)
+                
+                if prop_edges:
+                    for edge in prop_edges[:4]:
+                        units = "1.5u" if edge['edge'] >= 25 else "1u"
+                        st.markdown(f"""
+                        <div style="background: rgba(251, 191, 36, 0.1); border-left: 3px solid #fbbf24; padding: 0.5rem 0.8rem; margin-bottom: 0.4rem; border-radius: 0 6px 6px 0;">
+                            <p style="color: #fff; font-size: 0.9rem; margin: 0; font-weight: 600;">{edge['player']}: {edge['pick']}</p>
+                            <p style="color: #6b7280; font-size: 0.75rem; margin: 0;">{edge['subtype'].replace('player_', '')} • {edge['edge']:.0f}% edge • {units}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.markdown("<p style='color: #6b7280; font-size: 0.85rem;'>No prop edges found</p>", unsafe_allow_html=True)
+                    
         except Exception as e:
-            st.error(f"Error loading picks: {e}")
+            st.warning(f"Algo brain loading... {e}")
         
         st.markdown("</div>", unsafe_allow_html=True)
     else:
@@ -671,6 +677,70 @@ with tab2:
         <div style="height: 3px; background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #667eea 100%); border-radius: 2px; margin-top: 1rem;"></div>
     </div>
     """, unsafe_allow_html=True)
+    
+    # ========== TOP GAME BETS FROM ALGO BRAIN ==========
+    try:
+        from algo_brain import analyze_games
+        game_edges = analyze_games()
+        
+        if game_edges:
+            st.markdown("""
+            <div style="
+                background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+                border: 2px solid rgba(16, 185, 129, 0.4);
+                border-radius: 16px;
+                padding: 1.5rem;
+                margin-bottom: 2rem;
+            ">
+                <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1rem;">
+                    <span style="font-size: 1.5rem;">🔥</span>
+                    <h2 style="color: #10b981; margin: 0; font-size: 1.3rem;">Top Game Bets — Algo Picks</h2>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Display top 6 game edges
+            for edge in game_edges[:6]:
+                edge_val = edge['edge']
+                if edge_val >= 7:
+                    units = "2u"
+                    unit_color = "#ef4444"
+                elif edge_val >= 4:
+                    units = "1u"
+                    unit_color = "#fbbf24"
+                else:
+                    units = "0.5u"
+                    unit_color = "#10b981"
+                
+                st.markdown(f"""
+                <div style="
+                    background: rgba(0,0,0,0.3);
+                    border-radius: 10px;
+                    padding: 1rem;
+                    margin-bottom: 0.5rem;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                ">
+                    <div>
+                        <p style="color: #a0aec0; font-size: 0.8rem; margin: 0;">{edge['game']}</p>
+                        <p style="color: #fff; font-size: 1.1rem; font-weight: 600; margin: 0.2rem 0 0 0;">{edge['pick']}</p>
+                    </div>
+                    <div style="display: flex; gap: 1rem; align-items: center;">
+                        <div style="text-align: center;">
+                            <p style="color: #6b7280; font-size: 0.7rem; margin: 0;">EDGE</p>
+                            <p style="color: #10b981; font-size: 1rem; font-weight: 600; margin: 0;">{edge_val:.1f} pts</p>
+                        </div>
+                        <div style="text-align: center;">
+                            <p style="color: #6b7280; font-size: 0.7rem; margin: 0;">SIZE</p>
+                            <p style="color: {unit_color}; font-size: 1rem; font-weight: 600; margin: 0;">{units}</p>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+    except Exception as e:
+        pass  # Silently fail if algo_brain not available
     
     # Get real games
     todays_games = get_todays_games(engine)

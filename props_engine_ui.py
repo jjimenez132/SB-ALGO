@@ -396,7 +396,7 @@ def render_props_engine(engine):
     screenshot_mode = st.session_state.screenshot_mode
     
     # =========================================================================
-    # SECTION 2: TOP ALGO PICKS
+    # SECTION 2: TOP ALGO PICKS (FROM ALGO BRAIN)
     # =========================================================================
     st.markdown("""
         <h3 style="color: #4ade80; font-family: 'Courier New', monospace; margin-bottom: 1rem;">
@@ -404,20 +404,77 @@ def render_props_engine(engine):
         </h3>
     """, unsafe_allow_html=True)
     
-    # Filter for actionable picks
-    actionable = summary_df[
-        (summary_df["confidence"] >= 72) & 
-        (summary_df["algo_rec"] != "PASS") &
-        (summary_df["spread"] >= 1.5)
-    ].nlargest(6, "confidence")
-    
-    if actionable.empty:
-        actionable = summary_df.nlargest(6, "spread")
-    
-    pick_cols = st.columns(3)
-    for idx, (_, pick) in enumerate(actionable.iterrows()):
-        with pick_cols[idx % 3]:
-            render_pick_card(pick, books_df)
+    # Get real picks from algo_brain
+    try:
+        from algo_brain import analyze_props
+        prop_edges = analyze_props()
+        
+        if prop_edges:
+            pick_cols = st.columns(3)
+            for idx, edge in enumerate(prop_edges[:6]):
+                with pick_cols[idx % 3]:
+                    edge_val = edge['edge']
+                    units = "1.5u" if edge_val >= 25 else "1u" if edge_val >= 15 else "0.5u"
+                    
+                    if edge_val >= 30:
+                        border_color = "#ef4444"
+                        conf_label = "🔥 HIGH"
+                    elif edge_val >= 20:
+                        border_color = "#fbbf24"
+                        conf_label = "✅ GOOD"
+                    else:
+                        border_color = "#10b981"
+                        conf_label = "📊 EDGE"
+                    
+                    market_clean = edge.get('subtype', '').replace('player_', '').upper()
+                    
+                    st.markdown(f"""
+                    <div style="
+                        background: linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%);
+                        border: 2px solid {border_color};
+                        border-radius: 12px;
+                        padding: 1rem;
+                        margin-bottom: 0.8rem;
+                    ">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span style="color: {border_color}; font-size: 0.75rem; font-weight: 600;">{conf_label}</span>
+                            <span style="color: #6b7280; font-size: 0.7rem;">{market_clean}</span>
+                        </div>
+                        <p style="color: #fff; font-size: 1rem; font-weight: 600; margin: 0 0 0.3rem 0;">{edge['player']}</p>
+                        <p style="color: #4ade80; font-size: 1.2rem; font-weight: 700; margin: 0 0 0.5rem 0;">{edge['pick']}</p>
+                        <div style="display: flex; justify-content: space-between;">
+                            <div>
+                                <p style="color: #6b7280; font-size: 0.65rem; margin: 0;">EDGE</p>
+                                <p style="color: #fff; font-size: 0.9rem; margin: 0;">{edge_val:.0f}%</p>
+                            </div>
+                            <div>
+                                <p style="color: #6b7280; font-size: 0.65rem; margin: 0;">PROJ</p>
+                                <p style="color: #fff; font-size: 0.9rem; margin: 0;">{edge.get('projected', 'N/A')}</p>
+                            </div>
+                            <div>
+                                <p style="color: #6b7280; font-size: 0.65rem; margin: 0;">SIZE</p>
+                                <p style="color: {border_color}; font-size: 0.9rem; font-weight: 600; margin: 0;">{units}</p>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.info("No prop edges found above threshold")
+    except Exception as e:
+        # Fallback to old method if algo_brain fails
+        actionable = summary_df[
+            (summary_df["confidence"] >= 72) & 
+            (summary_df["algo_rec"] != "PASS") &
+            (summary_df["spread"] >= 1.5)
+        ].nlargest(6, "confidence")
+        
+        if actionable.empty:
+            actionable = summary_df.nlargest(6, "spread")
+        
+        pick_cols = st.columns(3)
+        for idx, (_, pick) in enumerate(actionable.iterrows()):
+            with pick_cols[idx % 3]:
+                render_pick_card(pick, books_df)
     
     st.markdown("---")
     

@@ -119,3 +119,10 @@ def fetch_and_store_odds():
 
 if __name__ == "__main__":
     fetch_and_store_odds()
+
+# Trigger algo brain after data update
+try:
+    from algo_brain import analyze_and_alert
+    analyze_and_alert()
+except Exception as e:
+    print(f"Brain error: {e}")

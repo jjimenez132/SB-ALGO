@@ -118,4 +118,4 @@ def fetch_and_store_odds():
     print(f"{'='*60}")
 
 if __name__ == "__main__":
-    fetch_betting_odds()
+    fetch_and_store_odds()

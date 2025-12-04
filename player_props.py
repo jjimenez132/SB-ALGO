@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, text
 from datetime import datetime
 import os
 
-ODDS_API_KEY = "f5c273adfb5cfcc8890985b55585fb66"
+ODDS_API_KEY = "3c83e92d7f098e9624c89f28f0becb4d"
 DATABASE_URL = os.environ.get('DATABASE_URL', 
     "postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db?sslmode=require")
 

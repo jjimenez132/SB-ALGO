@@ -876,7 +876,7 @@ with tab2:
                     """
                     st.markdown(analysis_html, unsafe_allow_html=True)
                     
-                    # Algorithm Recommendation - USE REAL PREDICTOR
+                    # Algorithm Recommendation - FULL ANALYSIS
                     from math_engine import GamePredictor
                     predictor = GamePredictor(engine)
                     
@@ -902,51 +902,129 @@ with tab2:
                     total_pred = analysis['total']
                     picks = analysis.get('picks', [])
                     
-                    if is_final:
-                        rec_text = f"✅ {winner} won"
-                        rec_color = "#10b981"
-                        rec_details = ""
-                    else:
-                        # Build recommendation text
-                        rec_parts = []
-                        for pick in picks:
-                            rec_parts.append(f"{pick['pick']} ({pick['edge']:.1f} edge)")
-                        
-                        if rec_parts:
-                            rec_text = " | ".join(rec_parts[:2])
-                            rec_color = "#10b981"
-                        else:
-                            rec_text = "No strong edge detected"
-                            rec_color = "#fbbf24"
-                        
-                        rec_details = f"""
-                        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
-                            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0 0 0.5rem 0;">📊 Algo Analysis:</p>
-                            <p style="color: #e2e8f0; font-size: 0.9rem; margin: 0;">
-                                Spread: <strong>{spread_pred['predicted_spread']:+.1f}</strong> (Line: {spread_line or 'N/A'}) | 
-                                Total: <strong>{total_pred['predicted_total']:.0f}</strong> (Line: {total_line or 'N/A'})
-                            </p>
-                            <p style="color: #6b7280; font-size: 0.8rem; margin: 0.3rem 0 0 0;">
-                                Confidence: {spread_pred['confidence']:.0f}% | {home} Net: {spread_pred.get('home_net', 0):+.1f} | {visitor} Net: {spread_pred.get('away_net', 0):+.1f}
-                            </p>
-                        </div>
-                        """
+                    # Get values for display
+                    algo_spread = spread_pred['predicted_spread']
+                    algo_total = total_pred['predicted_total']
+                    confidence = spread_pred['confidence']
+                    home_net = spread_pred.get('home_net', 0)
+                    away_net = spread_pred.get('away_net', 0)
+                    home_form = spread_pred.get('home_form', 0)
+                    away_form = spread_pred.get('away_form', 0)
                     
-                    st.markdown(f"""
-                    <div style="
-                        background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.05) 100%);
-                        border: 2px solid rgba(16, 185, 129, 0.4);
-                        border-radius: 12px;
-                        padding: 1.5rem;
-                    ">
-                        <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
-                            <span style="font-size: 1.3rem;">🎯</span>
-                            <h3 style="color: #10b981; margin: 0; font-size: 1.1rem;">Algorithm Recommendation</h3>
+                    if is_final:
+                        # Show final result
+                        st.markdown(f"""
+                        <div style="
+                            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.05) 100%);
+                            border: 2px solid rgba(16, 185, 129, 0.4);
+                            border-radius: 12px;
+                            padding: 1.5rem;
+                        ">
+                            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem;">
+                                <span style="font-size: 1.3rem;">🎯</span>
+                                <h3 style="color: #10b981; margin: 0; font-size: 1.1rem;">Final Result</h3>
+                            </div>
+                            <h2 style="color: #fff; margin: 0; font-size: 1.5rem;">✅ {winner} won</h2>
                         </div>
-                        <h2 style="color: #fff; margin: 0; font-size: 1.3rem;">{rec_text}</h2>
-                        {rec_details if not is_final else ""}
-                    </div>
-                    """, unsafe_allow_html=True)
+                        """, unsafe_allow_html=True)
+                    else:
+                        # Build picks display
+                        if picks:
+                            primary_pick = picks[0]
+                            pick_text = primary_pick['pick']
+                            pick_edge = primary_pick['edge']
+                            pick_conf = primary_pick['confidence']
+                            pick_color = "#10b981" if pick_edge >= 5 else "#fbbf24"
+                            
+                            # Unit sizing based on edge
+                            if pick_edge >= 7:
+                                units = "2.0 Units (High Edge)"
+                                unit_color = "#ef4444"
+                            elif pick_edge >= 4:
+                                units = "1.0 Unit (Standard)"
+                                unit_color = "#fbbf24"
+                            else:
+                                units = "0.5 Units (Small Edge)"
+                                unit_color = "#10b981"
+                        else:
+                            pick_text = "No strong edge"
+                            pick_edge = 0
+                            pick_conf = 0
+                            pick_color = "#6b7280"
+                            units = "PASS"
+                            unit_color = "#6b7280"
+                        
+                        st.markdown(f"""
+                        <div style="
+                            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+                            border: 2px solid rgba(16, 185, 129, 0.4);
+                            border-radius: 12px;
+                            padding: 1.5rem;
+                        ">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                                    <span style="font-size: 1.3rem;">🎯</span>
+                                    <h3 style="color: #10b981; margin: 0; font-size: 1.1rem;">Algorithm Recommendation</h3>
+                                </div>
+                                <span style="background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem;">
+                                    {confidence:.0f}% Confidence
+                                </span>
+                            </div>
+                            
+                            <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 1.2rem; margin-bottom: 1rem;">
+                                <p style="color: #6b7280; font-size: 0.75rem; margin: 0 0 0.3rem 0; text-transform: uppercase;">Primary Pick</p>
+                                <h2 style="color: {pick_color}; margin: 0; font-size: 1.6rem; font-weight: 700;">{pick_text}</h2>
+                                <div style="display: flex; gap: 1.5rem; margin-top: 0.8rem;">
+                                    <div>
+                                        <p style="color: #6b7280; font-size: 0.7rem; margin: 0;">EDGE</p>
+                                        <p style="color: #fff; font-size: 1.1rem; margin: 0; font-weight: 600;">{pick_edge:.1f} pts</p>
+                                    </div>
+                                    <div>
+                                        <p style="color: #6b7280; font-size: 0.7rem; margin: 0;">SUGGESTED</p>
+                                        <p style="color: {unit_color}; font-size: 1.1rem; margin: 0; font-weight: 600;">{units}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-bottom: 1rem;">
+                                <div style="background: rgba(102, 126, 234, 0.1); border-radius: 8px; padding: 0.8rem; border-left: 3px solid #667eea;">
+                                    <p style="color: #667eea; font-size: 0.75rem; margin: 0 0 0.3rem 0; font-weight: 600;">SPREAD ANALYSIS</p>
+                                    <p style="color: #fff; font-size: 1rem; margin: 0;">Algo: <strong>{algo_spread:+.1f}</strong></p>
+                                    <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Line: {spread_line or 'N/A'}</p>
+                                </div>
+                                <div style="background: rgba(251, 191, 36, 0.1); border-radius: 8px; padding: 0.8rem; border-left: 3px solid #fbbf24;">
+                                    <p style="color: #fbbf24; font-size: 0.75rem; margin: 0 0 0.3rem 0; font-weight: 600;">TOTAL ANALYSIS</p>
+                                    <p style="color: #fff; font-size: 1rem; margin: 0;">Algo: <strong>{algo_total:.0f}</strong></p>
+                                    <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Line: {total_line or 'N/A'}</p>
+                                </div>
+                            </div>
+                            
+                            <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 1rem;">
+                                <p style="color: #a0aec0; font-size: 0.75rem; margin: 0 0 0.5rem 0; font-weight: 600;">📊 FACTORS CONSIDERED</p>
+                                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; text-align: center;">
+                                    <div>
+                                        <p style="color: #6b7280; font-size: 0.65rem; margin: 0;">NET RTG</p>
+                                        <p style="color: #fff; font-size: 0.9rem; margin: 0;">{home} {home_net:+.1f}</p>
+                                    </div>
+                                    <div>
+                                        <p style="color: #6b7280; font-size: 0.65rem; margin: 0;">NET RTG</p>
+                                        <p style="color: #fff; font-size: 0.9rem; margin: 0;">{visitor} {away_net:+.1f}</p>
+                                    </div>
+                                    <div>
+                                        <p style="color: #6b7280; font-size: 0.65rem; margin: 0;">FORM</p>
+                                        <p style="color: #fff; font-size: 0.9rem; margin: 0;">{home} {home_form:+.1f}</p>
+                                    </div>
+                                    <div>
+                                        <p style="color: #6b7280; font-size: 0.65rem; margin: 0;">FORM</p>
+                                        <p style="color: #fff; font-size: 0.9rem; margin: 0;">{visitor} {away_form:+.1f}</p>
+                                    </div>
+                                </div>
+                                <p style="color: #4b5563; font-size: 0.7rem; margin: 0.8rem 0 0 0; text-align: center;">
+                                    + H2H History • Rest Days • Home Court Advantage • Pace Factor
+                                </p>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
                 
                 with col2:
                     # Win Probability Gauge

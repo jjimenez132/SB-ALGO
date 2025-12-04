@@ -954,77 +954,50 @@ with tab2:
                             units = "PASS"
                             unit_color = "#6b7280"
                         
-                        st.markdown(f"""
-                        <div style="
-                            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
-                            border: 2px solid rgba(16, 185, 129, 0.4);
-                            border-radius: 12px;
-                            padding: 1.5rem;
-                        ">
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-                                <div style="display: flex; align-items: center; gap: 0.6rem;">
-                                    <span style="font-size: 1.3rem;">🎯</span>
-                                    <h3 style="color: #10b981; margin: 0; font-size: 1.1rem;">Algorithm Recommendation</h3>
-                                </div>
-                                <span style="background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem;">
-                                    {confidence:.0f}% Confidence
-                                </span>
-                            </div>
-                            
-                            <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 1.2rem; margin-bottom: 1rem;">
-                                <p style="color: #6b7280; font-size: 0.75rem; margin: 0 0 0.3rem 0; text-transform: uppercase;">Primary Pick</p>
-                                <h2 style="color: {pick_color}; margin: 0; font-size: 1.6rem; font-weight: 700;">{pick_text}</h2>
-                                <div style="display: flex; gap: 1.5rem; margin-top: 0.8rem;">
-                                    <div>
-                                        <p style="color: #6b7280; font-size: 0.7rem; margin: 0;">EDGE</p>
-                                        <p style="color: #fff; font-size: 1.1rem; margin: 0; font-weight: 600;">{pick_edge:.1f} pts</p>
-                                    </div>
-                                    <div>
-                                        <p style="color: #6b7280; font-size: 0.7rem; margin: 0;">SUGGESTED</p>
-                                        <p style="color: {unit_color}; font-size: 1.1rem; margin: 0; font-weight: 600;">{units}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-bottom: 1rem;">
-                                <div style="background: rgba(102, 126, 234, 0.1); border-radius: 8px; padding: 0.8rem; border-left: 3px solid #667eea;">
-                                    <p style="color: #667eea; font-size: 0.75rem; margin: 0 0 0.3rem 0; font-weight: 600;">SPREAD ANALYSIS</p>
-                                    <p style="color: #fff; font-size: 1rem; margin: 0;">Algo: <strong>{algo_spread:+.1f}</strong></p>
-                                    <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Line: {spread_line or 'N/A'}</p>
-                                </div>
-                                <div style="background: rgba(251, 191, 36, 0.1); border-radius: 8px; padding: 0.8rem; border-left: 3px solid #fbbf24;">
-                                    <p style="color: #fbbf24; font-size: 0.75rem; margin: 0 0 0.3rem 0; font-weight: 600;">TOTAL ANALYSIS</p>
-                                    <p style="color: #fff; font-size: 1rem; margin: 0;">Algo: <strong>{algo_total:.0f}</strong></p>
-                                    <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Line: {total_line or 'N/A'}</p>
-                                </div>
-                            </div>
-                            
-                            <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 1rem;">
-                                <p style="color: #a0aec0; font-size: 0.75rem; margin: 0 0 0.5rem 0; font-weight: 600;">📊 FACTORS CONSIDERED</p>
-                                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; text-align: center;">
-                                    <div>
-                                        <p style="color: #6b7280; font-size: 0.65rem; margin: 0;">NET RTG</p>
-                                        <p style="color: #fff; font-size: 0.9rem; margin: 0;">{home} {home_net:+.1f}</p>
-                                    </div>
-                                    <div>
-                                        <p style="color: #6b7280; font-size: 0.65rem; margin: 0;">NET RTG</p>
-                                        <p style="color: #fff; font-size: 0.9rem; margin: 0;">{visitor} {away_net:+.1f}</p>
-                                    </div>
-                                    <div>
-                                        <p style="color: #6b7280; font-size: 0.65rem; margin: 0;">FORM</p>
-                                        <p style="color: #fff; font-size: 0.9rem; margin: 0;">{home} {home_form:+.1f}</p>
-                                    </div>
-                                    <div>
-                                        <p style="color: #6b7280; font-size: 0.65rem; margin: 0;">FORM</p>
-                                        <p style="color: #fff; font-size: 0.9rem; margin: 0;">{visitor} {away_form:+.1f}</p>
-                                    </div>
-                                </div>
-                                <p style="color: #4b5563; font-size: 0.7rem; margin: 0.8rem 0 0 0; text-align: center;">
-                                    + H2H History • Rest Days • Home Court Advantage • Pace Factor
-                                </p>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        # Build HTML parts separately to avoid rendering issues
+                        spread_line_display = spread_line if spread_line else 'N/A'
+                        total_line_display = total_line if total_line else 'N/A'
+                        
+                        algo_html = f"""<div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%); border: 2px solid rgba(16, 185, 129, 0.4); border-radius: 12px; padding: 1.5rem;">
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+<div style="display: flex; align-items: center; gap: 0.6rem;">
+<span style="font-size: 1.3rem;">🎯</span>
+<h3 style="color: #10b981; margin: 0; font-size: 1.1rem;">Algorithm Recommendation</h3>
+</div>
+<span style="background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem;">{confidence:.0f}% Confidence</span>
+</div>
+<div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 1.2rem; margin-bottom: 1rem;">
+<p style="color: #6b7280; font-size: 0.75rem; margin: 0 0 0.3rem 0; text-transform: uppercase;">Primary Pick</p>
+<h2 style="color: {pick_color}; margin: 0; font-size: 1.6rem; font-weight: 700;">{pick_text}</h2>
+<div style="display: flex; gap: 1.5rem; margin-top: 0.8rem;">
+<div><p style="color: #6b7280; font-size: 0.7rem; margin: 0;">EDGE</p><p style="color: #fff; font-size: 1.1rem; margin: 0; font-weight: 600;">{pick_edge:.1f} pts</p></div>
+<div><p style="color: #6b7280; font-size: 0.7rem; margin: 0;">SUGGESTED</p><p style="color: {unit_color}; font-size: 1.1rem; margin: 0; font-weight: 600;">{units}</p></div>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-bottom: 1rem;">
+<div style="background: rgba(102, 126, 234, 0.1); border-radius: 8px; padding: 0.8rem; border-left: 3px solid #667eea;">
+<p style="color: #667eea; font-size: 0.75rem; margin: 0 0 0.3rem 0; font-weight: 600;">SPREAD ANALYSIS</p>
+<p style="color: #fff; font-size: 1rem; margin: 0;">Algo: <strong>{algo_spread:+.1f}</strong></p>
+<p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Line: {spread_line_display}</p>
+</div>
+<div style="background: rgba(251, 191, 36, 0.1); border-radius: 8px; padding: 0.8rem; border-left: 3px solid #fbbf24;">
+<p style="color: #fbbf24; font-size: 0.75rem; margin: 0 0 0.3rem 0; font-weight: 600;">TOTAL ANALYSIS</p>
+<p style="color: #fff; font-size: 1rem; margin: 0;">Algo: <strong>{algo_total:.0f}</strong></p>
+<p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Line: {total_line_display}</p>
+</div>
+</div>
+<div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 1rem;">
+<p style="color: #a0aec0; font-size: 0.75rem; margin: 0 0 0.5rem 0; font-weight: 600;">📊 FACTORS CONSIDERED</p>
+<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; text-align: center;">
+<div><p style="color: #6b7280; font-size: 0.65rem; margin: 0;">NET RTG</p><p style="color: #fff; font-size: 0.9rem; margin: 0;">{home} {home_net:+.1f}</p></div>
+<div><p style="color: #6b7280; font-size: 0.65rem; margin: 0;">NET RTG</p><p style="color: #fff; font-size: 0.9rem; margin: 0;">{visitor} {away_net:+.1f}</p></div>
+<div><p style="color: #6b7280; font-size: 0.65rem; margin: 0;">FORM</p><p style="color: #fff; font-size: 0.9rem; margin: 0;">{home} {home_form:+.1f}</p></div>
+<div><p style="color: #6b7280; font-size: 0.65rem; margin: 0;">FORM</p><p style="color: #fff; font-size: 0.9rem; margin: 0;">{visitor} {away_form:+.1f}</p></div>
+</div>
+<p style="color: #4b5563; font-size: 0.7rem; margin: 0.8rem 0 0 0; text-align: center;">+ H2H History • Rest Days • Home Court Advantage • Pace Factor</p>
+</div>
+</div>"""
+                        st.markdown(algo_html, unsafe_allow_html=True)
                 
                 with col2:
                     # Win Probability Gauge

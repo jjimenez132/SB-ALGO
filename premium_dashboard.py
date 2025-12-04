@@ -851,33 +851,30 @@ with tab2:
                     home_record = get_recent_team_record(engine, home)
                     visitor_record = get_recent_team_record(engine, visitor)
                     
-                    st.markdown(f"""
-                    <div style="
-                        background: rgba(15, 20, 35, 0.8);
-                        border: 1px solid rgba(102, 126, 234, 0.25);
-                        border-radius: 12px;
-                        padding: 1.5rem;
-                        margin-bottom: 1rem;
-                    ">
+                    # Game Analysis - Matchup Overview
+                    home_b2b = " (B2B)" if game['home_is_b2b'] else ""
+                    visitor_b2b = " (B2B)" if game['visitor_is_b2b'] else ""
+                    
+                    analysis_html = f"""
+                    <div style="background: rgba(15, 20, 35, 0.8); border: 1px solid rgba(102, 126, 234, 0.25); border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem;">
                         <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
                             <span style="font-size: 1.3rem;">📊</span>
                             <h3 style="color: #e2e8f0; margin: 0; font-size: 1.1rem;">Game Analysis</h3>
                         </div>
-                        
                         <div style="background: rgba(0,0,0,0.25); border-radius: 8px; padding: 1rem; margin-bottom: 0.8rem; border-left: 3px solid #667eea;">
                             <p style="color: #667eea; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem;">Matchup Overview</p>
                             <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">• {home}: {home_record['wins']}-{home_record['losses']} (Home: {home_record['home_record']})</p>
                             <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">• {visitor}: {visitor_record['wins']}-{visitor_record['losses']} (Away: {visitor_record['away_record']})</p>
                         </div>
-                        
                         <div style="background: rgba(0,0,0,0.25); border-radius: 8px; padding: 1rem; border-left: 3px solid #fbbf24;">
                             <p style="color: #fbbf24; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem;">Key Factors</p>
-                            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">• {home} has {rest_home} days rest{" (B2B)" if game['home_is_b2b'] else ""}</p>
-                            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">• {visitor} has {rest_away} days rest{" (B2B)" if game['visitor_is_b2b'] else ""}</p>
+                            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">• {home} has {rest_home} days rest{home_b2b}</p>
+                            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">• {visitor} has {rest_away} days rest{visitor_b2b}</p>
                             <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">• Season avg total: {avg_total:.1f} pts</p>
                         </div>
                     </div>
-                    """, unsafe_allow_html=True)
+                    """
+                    st.markdown(analysis_html, unsafe_allow_html=True)
                     
                     # Algorithm Recommendation
                     if is_final:

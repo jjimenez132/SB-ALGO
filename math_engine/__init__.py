@@ -9,6 +9,8 @@ from .edge_calculator import EdgeCalculator
 from .trend_analyzer import TrendAnalyzer
 from .matchup_analyzer import MatchupAnalyzer
 from .confidence_engine import ConfidenceEngine
+from .game_predictor import GamePredictor, GameBettingMemory
+from .props_memory import PropsMemory
 
 __all__ = [
     'PlayerProjections',
@@ -16,5 +18,8 @@ __all__ = [
     'EdgeCalculator',
     'TrendAnalyzer',
     'MatchupAnalyzer',
-    'ConfidenceEngine'
+    'ConfidenceEngine',
+    'GamePredictor',
+    'GameBettingMemory',
+    'PropsMemory'
 ]

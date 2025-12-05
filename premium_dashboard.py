@@ -1149,14 +1149,130 @@ with tab4:
     
     trend_type = st.selectbox(
         "View Trends For:",
-        ["Team Trends", "Player Trends", "Situational Edges"],
+        ["Algo Performance", "Team Trends", "Player Trends", "Situational Edges"],
         key="trends_selector",
         label_visibility="collapsed"
     )
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    if trend_type == "Team Trends":
+    if trend_type == "Algo Performance":
+        # ========== ALGO PERFORMANCE SECTION ==========
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+            border: 2px solid rgba(102, 126, 234, 0.4);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        ">
+            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">🧠</span>
+                <h3 style="color: #667eea; margin: 0; font-size: 1.3rem;">Algo Brain Status</h3>
+            </div>
+            <p style="color: #a0aec0; font-size: 0.85rem; margin: 0;">Real-time algorithm performance and insights</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        try:
+            from algo_brain import analyze_games, analyze_props
+            from math_engine import GameBettingMemory, PropsMemory
+            
+            # Get current edges
+            game_edges = analyze_games()
+            prop_edges = analyze_props()
+            
+            # Display current status
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.markdown(f"""
+                <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 10px; padding: 1rem; text-align: center;">
+                    <p style="color: #6b7280; font-size: 0.75rem; margin: 0;">GAME EDGES</p>
+                    <p style="color: #10b981; font-size: 2rem; font-weight: 700; margin: 0;">{len(game_edges)}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown(f"""
+                <div style="background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 10px; padding: 1rem; text-align: center;">
+                    <p style="color: #6b7280; font-size: 0.75rem; margin: 0;">PROP EDGES</p>
+                    <p style="color: #fbbf24; font-size: 2rem; font-weight: 700; margin: 0;">{len(prop_edges)}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col3:
+                top_game_edge = max([e['edge'] for e in game_edges]) if game_edges else 0
+                st.markdown(f"""
+                <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 10px; padding: 1rem; text-align: center;">
+                    <p style="color: #6b7280; font-size: 0.75rem; margin: 0;">TOP GAME EDGE</p>
+                    <p style="color: #ef4444; font-size: 2rem; font-weight: 700; margin: 0;">{top_game_edge:.1f}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col4:
+                top_prop_edge = max([e['edge'] for e in prop_edges]) if prop_edges else 0
+                st.markdown(f"""
+                <div style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 10px; padding: 1rem; text-align: center;">
+                    <p style="color: #6b7280; font-size: 0.75rem; margin: 0;">TOP PROP EDGE</p>
+                    <p style="color: #a855f7; font-size: 2rem; font-weight: 700; margin: 0;">{top_prop_edge:.0f}%</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Today's Best Picks
+            st.markdown("""
+            <div style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem;">
+                <p style="color: #10b981; font-weight: 600; font-size: 1rem; margin-bottom: 1rem;">🔥 TODAY'S BEST GAME BETS</p>
+            """, unsafe_allow_html=True)
+            
+            if game_edges:
+                for edge in game_edges[:5]:
+                    units = "2u" if edge['edge'] >= 7 else "1u" if edge['edge'] >= 4 else "0.5u"
+                    st.markdown(f"""
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <div>
+                            <p style="color: #fff; font-size: 0.95rem; margin: 0; font-weight: 500;">{edge['pick']}</p>
+                            <p style="color: #6b7280; font-size: 0.8rem; margin: 0;">{edge['game']}</p>
+                        </div>
+                        <div style="display: flex; gap: 1rem;">
+                            <span style="color: #10b981; font-weight: 600;">{edge['edge']:.1f} pts</span>
+                            <span style="color: #fbbf24; font-weight: 600;">{units}</span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            st.markdown("""
+            <div style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 1.5rem;">
+                <p style="color: #fbbf24; font-weight: 600; font-size: 1rem; margin-bottom: 1rem;">🎯 TODAY'S BEST PROP BETS</p>
+            """, unsafe_allow_html=True)
+            
+            if prop_edges:
+                for edge in prop_edges[:5]:
+                    units = "1.5u" if edge['edge'] >= 25 else "1u"
+                    market = edge.get('subtype', '').replace('player_', '')
+                    st.markdown(f"""
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <div>
+                            <p style="color: #fff; font-size: 0.95rem; margin: 0; font-weight: 500;">{edge['player']}: {edge['pick']}</p>
+                            <p style="color: #6b7280; font-size: 0.8rem; margin: 0;">{market}</p>
+                        </div>
+                        <div style="display: flex; gap: 1rem;">
+                            <span style="color: #fbbf24; font-weight: 600;">{edge['edge']:.0f}%</span>
+                            <span style="color: #10b981; font-weight: 600;">{units}</span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+        except Exception as e:
+            st.error(f"Error loading algo data: {e}")
+    
+    elif trend_type == "Team Trends":
         # HOT TEAMS - LIVE DATA
         st.markdown("""
         <div style="
@@ -1290,7 +1406,86 @@ with tab4:
             st.info("No games today to analyze for situational edges")
     
     else:  # Player Trends
-        st.info("🚧 Player Trends coming soon - requires player performance analysis")
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%);
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        ">
+            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">⭐</span>
+                <h3 style="color: #e2e8f0; margin: 0; font-size: 1.2rem;">Top Performers (Last 10 Games)</h3>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        try:
+            with engine.connect() as conn:
+                # Top scorers
+                scorers = conn.execute(text("""
+                    SELECT player_name, team_abbreviation,
+                           ROUND(AVG(pts)::numeric, 1) as ppg,
+                           ROUND(AVG(reb)::numeric, 1) as rpg,
+                           ROUND(AVG(ast)::numeric, 1) as apg,
+                           COUNT(*) as games
+                    FROM player_boxscores
+                    WHERE game_date >= CURRENT_DATE - INTERVAL '15 days'
+                    GROUP BY player_name, team_abbreviation
+                    HAVING COUNT(*) >= 3
+                    ORDER BY AVG(pts) DESC
+                    LIMIT 10
+                """)).fetchall()
+                
+                if scorers:
+                    df = pd.DataFrame(scorers, columns=['Player', 'Team', 'PPG', 'RPG', 'APG', 'Games'])
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No player data available")
+                    
+        except Exception as e:
+            st.error(f"Error loading player trends: {e}")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # Hot props performers
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(34, 197, 94, 0.1) 100%);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        ">
+            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">📈</span>
+                <h3 style="color: #e2e8f0; margin: 0; font-size: 1.2rem;">Trending Up (Beating Projections)</h3>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        try:
+            with engine.connect() as conn:
+                trending = conn.execute(text("""
+                    SELECT player_name, team_abbreviation,
+                           ROUND(AVG(pts)::numeric, 1) as recent_ppg,
+                           COUNT(*) as games
+                    FROM player_boxscores
+                    WHERE game_date >= CURRENT_DATE - INTERVAL '7 days'
+                    GROUP BY player_name, team_abbreviation
+                    HAVING COUNT(*) >= 2 AND AVG(pts) > 20
+                    ORDER BY AVG(pts) DESC
+                    LIMIT 8
+                """)).fetchall()
+                
+                if trending:
+                    df = pd.DataFrame(trending, columns=['Player', 'Team', 'Recent PPG', 'Games'])
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No trending data available")
+        except Exception as e:
+            st.error(f"Error: {e}")
     
     st.markdown("<br>", unsafe_allow_html=True)
     

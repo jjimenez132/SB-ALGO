@@ -59,7 +59,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Database connection
+# Database connection - CACHED (no changes to functionality)
 @st.cache_resource
 def get_db_engine():
     """Connect to PostgreSQL database"""
@@ -81,8 +81,10 @@ def get_db_engine():
         st.error(f"⚠️ Database Error: {str(e)}")
         return None
 
-def get_dashboard_metrics(engine):
-    """Get REAL metrics from database"""
+# OPTIMIZED: Dashboard metrics now cached for 5 minutes
+@st.cache_data(ttl=300)
+def get_dashboard_metrics(_engine):
+    """Get REAL metrics from database - CACHED for 5 minutes"""
     metrics = {
         'games_today': 0,
         'active_injuries': 0,
@@ -92,11 +94,11 @@ def get_dashboard_metrics(engine):
         'best_play_conf': 0
     }
     
-    if not engine:
+    if not _engine:
         return metrics
     
     try:
-        with engine.connect() as conn:
+        with _engine.connect() as conn:
             # Games today
             today = datetime.now().strftime('%Y-%m-%d')
             result = conn.execute(text("SELECT COUNT(*) FROM games WHERE date = :today"), {"today": today}).fetchone()
@@ -116,6 +118,84 @@ def get_dashboard_metrics(engine):
         print(f"Metrics error: {e}")
     
     return metrics
+
+# OPTIMIZED: Teams list cached for 10 minutes
+@st.cache_data(ttl=600)
+def get_teams_list(_engine):
+    """Get list of teams from database - CACHED"""
+    if not _engine:
+        return ["All Teams"]
+    
+    try:
+        with _engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT DISTINCT home_team 
+                FROM games 
+                WHERE home_team IS NOT NULL
+                ORDER BY home_team
+            """))
+            return ["All Teams"] + [row[0] for row in result.fetchall()]
+    except:
+        return ["All Teams"]
+
+# OPTIMIZED: Player teams list cached for 10 minutes
+@st.cache_data(ttl=600)
+def get_player_teams_list(_engine):
+    """Get list of player teams - CACHED"""
+    if not _engine:
+        return []
+    
+    try:
+        with _engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT DISTINCT team_abbreviation 
+                FROM player_boxscores 
+                WHERE team_abbreviation IS NOT NULL
+                ORDER BY team_abbreviation
+            """))
+            return [row[0] for row in result.fetchall()]
+    except:
+        return []
+
+# OPTIMIZED: Players by team cached for 10 minutes
+@st.cache_data(ttl=600)
+def get_players_by_team(_engine, team, start_date, end_date):
+    """Get players for a specific team - CACHED"""
+    if not _engine or not team or team == "-- Select Team --":
+        return []
+    
+    try:
+        with _engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT DISTINCT player_name 
+                FROM player_boxscores 
+                WHERE team_abbreviation = :team
+                AND game_date >= :start_date AND game_date <= :end_date
+                ORDER BY player_name
+            """), {"team": team, "start_date": start_date, "end_date": end_date})
+            return [row[0] for row in result.fetchall()]
+    except:
+        return []
+
+# OPTIMIZED: Injuries cached for 3 minutes (more frequent updates for injuries)
+@st.cache_data(ttl=180)
+def get_injuries(_engine):
+    """Get injury data - CACHED for 3 minutes"""
+    if not _engine:
+        return pd.DataFrame()
+    
+    try:
+        query = text("""
+            SELECT * 
+            FROM injuries 
+            LIMIT 115
+        """)
+        
+        with _engine.connect() as conn:
+            return pd.read_sql(query, conn)
+    except Exception as e:
+        print(f"Error loading injuries: {e}")
+        return pd.DataFrame()
 
 # Initialize
 engine = get_db_engine()
@@ -144,7 +224,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
 with tab1:
     st.markdown("## 📊 JJ's Daily Overview")
     
-    # Get REAL data
+    # Get REAL data - NOW CACHED
     data = get_dashboard_metrics(engine)
     
     # Metrics - ENHANCED
@@ -241,7 +321,7 @@ with tab1:
         }
         st.dataframe(pd.DataFrame(picks), use_container_width=True, hide_index=True)
 
-# ALL OTHER TABS - YOUR EXACT CODE
+# ALL OTHER TABS - EXACT CODE
 with tab2:
     st.markdown("## 🎲 Today's Games — Deep Analysis")
     
@@ -337,21 +417,14 @@ with tab5:
         roi = ((current_bankroll - starting_bankroll) / starting_bankroll) * 100
         st.metric("ROI", f"{roi:.1f}%", delta=f"+${current_bankroll - starting_bankroll}")
 
-# YOUR EXACT INJURIES CODE - NOT TOUCHING IT
+# OPTIMIZED: Injuries tab now uses cached function
 with tab6:
     st.markdown("## 📰 News & Injuries — Real-Time Updates")
     
     if engine:
         try:
-            # Try to get injuries - use simple query first
-            query = text("""
-                SELECT * 
-                FROM injuries 
-                LIMIT 115
-            """)
-            
-            with engine.connect() as conn:
-                injuries_df = pd.read_sql(query, conn)
+            # Load injuries using cached function - MUCH FASTER
+            injuries_df = get_injuries(engine)
             
             if not injuries_df.empty:
                 st.markdown("### 🏥 Latest Injury Reports")
@@ -380,7 +453,7 @@ with tab6:
     else:
         st.warning("Database connection required to view injury reports")
 
-# YOUR EXACT DATA EXPLORER CODE
+# OPTIMIZED: Data Explorer with cached team/player lists
 with tab7:
     st.markdown("## 📁 Data Explorer — Historical Stats")
     st.markdown("### 🔍 Query Historical Data")
@@ -401,19 +474,8 @@ with tab7:
         end_date = f"{start_year + 1}-07-31"
         return start_date, end_date
     
-    teams_list = ["All Teams"]
-    if engine:
-        try:
-            with engine.connect() as conn:
-                result = conn.execute(text("""
-                    SELECT DISTINCT home_team 
-                    FROM games 
-                    WHERE home_team IS NOT NULL
-                    ORDER BY home_team
-                """))
-                teams_list = ["All Teams"] + [row[0] for row in result.fetchall()]
-        except:
-            pass
+    # Use cached teams list - FASTER
+    teams_list = get_teams_list(engine)
     
     if stat_type == "Game Results":
         selected_team = st.selectbox("🏀 Select Team", teams_list, key="explorer_team")
@@ -475,40 +537,19 @@ with tab7:
     else:
         st.markdown("---")
         
-        player_teams_list = []
-        if engine:
-            try:
-                with engine.connect() as conn:
-                    result = conn.execute(text("""
-                        SELECT DISTINCT team_abbreviation 
-                        FROM player_boxscores 
-                        WHERE team_abbreviation IS NOT NULL
-                        ORDER BY team_abbreviation
-                    """))
-                    player_teams_list = [row[0] for row in result.fetchall()]
-            except:
-                pass
+        # Use cached player teams list - FASTER
+        player_teams_list = get_player_teams_list(engine)
         
         col_team, col_player = st.columns(2)
         
         with col_team:
             selected_player_team = st.selectbox("🏀 Select Team", ["-- Select Team --"] + player_teams_list, key="player_team_select")
         
+        # Use cached players by team - FASTER
         players_list = []
         if selected_player_team != "-- Select Team --" and engine:
             start_date, end_date = get_season_dates(selected_season)
-            try:
-                with engine.connect() as conn:
-                    result = conn.execute(text("""
-                        SELECT DISTINCT player_name 
-                        FROM player_boxscores 
-                        WHERE team_abbreviation = :team
-                        AND game_date >= :start_date AND game_date <= :end_date
-                        ORDER BY player_name
-                    """), {"team": selected_player_team, "start_date": start_date, "end_date": end_date})
-                    players_list = [row[0] for row in result.fetchall()]
-            except:
-                pass
+            players_list = get_players_by_team(engine, selected_player_team, start_date, end_date)
         
         with col_player:
             if players_list:

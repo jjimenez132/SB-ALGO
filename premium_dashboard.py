@@ -2397,8 +2397,306 @@ with tab7:
                     st.error(f"❌ Error loading data: {str(e)}")
 
 with tab8:
-    st.markdown("## 📊 Daily Reports")
-    st.info("📊 Performance tracking activates once picks are graded")
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+        border: 1px solid rgba(102, 126, 234, 0.3);
+        border-radius: 16px;
+        padding: 1.5rem 2rem;
+        margin-bottom: 2rem;
+    ">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <span style="font-size: 2.5rem;">📊</span>
+            <div>
+                <h1 style="margin: 0; color: #fff; font-size: 1.8rem;">Daily Reports — Algo Performance</h1>
+                <p style="margin: 0.3rem 0 0 0; color: #a0aec0;">Track win rates, ROI, and algorithm insights</p>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    try:
+        from math_engine import GameBettingMemory, PropsMemory
+        
+        game_memory = GameBettingMemory(engine)
+        props_memory = PropsMemory(engine)
+        
+        # ========== TIME PERIOD SELECTOR ==========
+        period = st.selectbox("Select Period", ["Last 7 Days", "Last 30 Days", "Last 60 Days", "All Time"], key="report_period")
+        days_map = {"Last 7 Days": 7, "Last 30 Days": 30, "Last 60 Days": 60, "All Time": 365}
+        days = days_map[period]
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # ========== GAME BETTING PERFORMANCE ==========
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+            border: 2px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        ">
+            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">🏀</span>
+                <h3 style="color: #10b981; margin: 0; font-size: 1.2rem;">Game Betting Performance</h3>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        game_stats = game_memory.get_performance_stats(days=days)
+        
+        if game_stats.get('by_type'):
+            # Summary metrics
+            col1, col2, col3, col4 = st.columns(4)
+            
+            total_bets = sum(d['total'] for d in game_stats['by_type'].values())
+            total_wins = sum(d['wins'] for d in game_stats['by_type'].values())
+            total_profit = sum(d['units_profit'] for d in game_stats['by_type'].values())
+            overall_wr = (total_wins / total_bets * 100) if total_bets > 0 else 0
+            
+            with col1:
+                st.metric("Total Bets", total_bets)
+            with col2:
+                st.metric("Win Rate", f"{overall_wr:.1f}%")
+            with col3:
+                st.metric("Units Profit", f"{total_profit:+.1f}u")
+            with col4:
+                roi = (total_profit / total_bets * 100) if total_bets > 0 else 0
+                st.metric("ROI", f"{roi:+.1f}%")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # By bet type
+            st.markdown("**Performance by Bet Type:**")
+            
+            type_data = []
+            for pred_type, data in game_stats['by_type'].items():
+                type_data.append({
+                    'Type': pred_type,
+                    'Bets': data['total'],
+                    'Wins': data['wins'],
+                    'Losses': data['losses'],
+                    'Win %': f"{data['win_rate']}%",
+                    'Units': f"{data['units_profit']:+.1f}",
+                    'Avg Edge': f"{data['avg_edge']:.1f}"
+                })
+            
+            if type_data:
+                st.dataframe(pd.DataFrame(type_data), use_container_width=True, hide_index=True)
+            
+            # By edge tier
+            if game_stats.get('by_edge'):
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("**Performance by Edge Size:**")
+                
+                edge_data = []
+                for item in game_stats['by_edge']:
+                    edge_data.append({
+                        'Type': item['type'],
+                        'Edge Tier': item['tier'],
+                        'Bets': item['total'],
+                        'Wins': item['wins'],
+                        'Win %': f"{item['win_rate']}%",
+                        'Units': f"{item['units_profit']:+.1f}"
+                    })
+                
+                if edge_data:
+                    st.dataframe(pd.DataFrame(edge_data), use_container_width=True, hide_index=True)
+        else:
+            st.info("No game betting data yet. Predictions will be graded after games complete.")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # ========== PROPS BETTING PERFORMANCE ==========
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(251, 191, 36, 0.05) 100%);
+            border: 2px solid rgba(251, 191, 36, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        ">
+            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">🎯</span>
+                <h3 style="color: #fbbf24; margin: 0; font-size: 1.2rem;">Props Betting Performance</h3>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        props_stats = props_memory.get_performance_stats(days=days)
+        
+        if props_stats.get('overall') and props_stats['overall']['total'] > 0:
+            overall = props_stats['overall']
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("Total Props", overall['total'])
+            with col2:
+                st.metric("Win Rate", f"{overall['win_rate']}%")
+            with col3:
+                st.metric("Units Profit", f"{overall['units_profit']:+.1f}u")
+            with col4:
+                st.metric("ROI", f"{overall['roi']:+.1f}%")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # By market
+            if props_stats.get('by_market'):
+                st.markdown("**Performance by Market:**")
+                
+                market_data = []
+                for item in props_stats['by_market']:
+                    market_clean = item['market'].replace('player_', '').title()
+                    market_data.append({
+                        'Market': market_clean,
+                        'Bets': item['total'],
+                        'Wins': item['wins'],
+                        'Win %': f"{item['win_rate']}%",
+                        'Units': f"{item['units_profit']:+.1f}",
+                        'Avg Edge': f"{item['avg_edge']:.0f}%"
+                    })
+                
+                if market_data:
+                    st.dataframe(pd.DataFrame(market_data), use_container_width=True, hide_index=True)
+            
+            # By edge tier
+            if props_stats.get('by_edge'):
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("**Performance by Edge Size:**")
+                
+                edge_data = []
+                for item in props_stats['by_edge']:
+                    edge_data.append({
+                        'Edge Tier': item['tier'],
+                        'Bets': item['total'],
+                        'Wins': item['wins'],
+                        'Win %': f"{item['win_rate']}%",
+                        'Units': f"{item['units_profit']:+.1f}"
+                    })
+                
+                if edge_data:
+                    st.dataframe(pd.DataFrame(edge_data), use_container_width=True, hide_index=True)
+        else:
+            st.info("No props betting data yet. Predictions will be graded after games complete.")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # ========== INSIGHTS ==========
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(168, 85, 247, 0.05) 100%);
+            border: 2px solid rgba(168, 85, 247, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        ">
+            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">💡</span>
+                <h3 style="color: #a855f7; margin: 0; font-size: 1.2rem;">Algorithm Insights</h3>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Game insights
+        game_insights = game_memory.get_insights()
+        prop_insights = props_memory.get_insights()
+        
+        if game_insights or prop_insights:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**🏀 Game Betting Insights:**")
+                for insight in game_insights[:5]:
+                    st.markdown(f"• {insight}")
+            
+            with col2:
+                st.markdown("**🎯 Props Betting Insights:**")
+                for insight in prop_insights[:5]:
+                    st.markdown(f"• {insight}")
+        else:
+            st.info("Insights will appear after 20+ graded picks")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # ========== RECENT PICKS ==========
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        ">
+            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">📋</span>
+                <h3 style="color: #3b82f6; margin: 0; font-size: 1.2rem;">Recent Graded Picks</h3>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        with engine.connect() as conn:
+            # Recent game picks
+            recent_games = conn.execute(text("""
+                SELECT game_date, home_team, away_team, prediction_type, pick, 
+                       edge, hit, units_result
+                FROM algo_game_predictions
+                WHERE graded_at IS NOT NULL
+                ORDER BY graded_at DESC
+                LIMIT 15
+            """)).fetchall()
+            
+            if recent_games:
+                st.markdown("**Recent Game Bets:**")
+                game_data = []
+                for row in recent_games:
+                    result = "✅" if row[6] else "❌"
+                    game_data.append({
+                        'Date': str(row[0]),
+                        'Game': f"{row[2]} @ {row[1]}",
+                        'Type': row[3],
+                        'Pick': row[4],
+                        'Edge': f"{row[5]:.1f}",
+                        'Result': result,
+                        'Units': f"{row[7]:+.1f}" if row[7] else "0"
+                    })
+                st.dataframe(pd.DataFrame(game_data), use_container_width=True, hide_index=True)
+            
+            # Recent prop picks
+            recent_props = conn.execute(text("""
+                SELECT game_date, player_name, market, pick, line,
+                       edge, hit, units_result
+                FROM algo_prop_predictions
+                WHERE graded_at IS NOT NULL
+                ORDER BY graded_at DESC
+                LIMIT 15
+            """)).fetchall()
+            
+            if recent_props:
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("**Recent Prop Bets:**")
+                prop_data = []
+                for row in recent_props:
+                    result = "✅" if row[6] else "❌"
+                    market_clean = row[2].replace('player_', '') if row[2] else ''
+                    prop_data.append({
+                        'Date': str(row[0]),
+                        'Player': row[1],
+                        'Market': market_clean,
+                        'Pick': f"{row[3]} {row[4]}",
+                        'Edge': f"{row[5]:.0f}%",
+                        'Result': result,
+                        'Units': f"{row[7]:+.1f}" if row[7] else "0"
+                    })
+                st.dataframe(pd.DataFrame(prop_data), use_container_width=True, hide_index=True)
+            
+            if not recent_games and not recent_props:
+                st.info("No graded picks yet. Check back after tomorrow's grading runs at 6 AM ET.")
+                
+    except Exception as e:
+        st.error(f"Error loading performance data: {e}")
+        st.info("Performance tracking will activate once picks are graded.")
 
 with tab9:
     st.markdown("## ⚙️ Settings")

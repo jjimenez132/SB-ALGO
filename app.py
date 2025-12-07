@@ -1,4 +1,5 @@
 import streamlit as st
+import os; print(f"API KEY EXISTS: {bool(os.getenv('ANTHROPIC_API_KEY'))}")
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px

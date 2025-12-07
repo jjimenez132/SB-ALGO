@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import os
 from sqlalchemy import create_engine, text
 import numpy as np
+from algo_ai import get_algo_ai
 
 # Page config
 st.set_page_config(
@@ -199,6 +200,7 @@ def get_injuries(_engine):
 
 # Initialize
 engine = get_db_engine()
+algo_ai = get_algo_ai()  # Initialize Claude AI
 
 # Header
 st.markdown("""
@@ -209,7 +211,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
     "🏠 Dashboard",
     "🎲 Today's Games", 
     "🧠 Props Engine",
@@ -218,6 +220,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
     "📰 News & Injuries",
     "📂 Data Explorer",
     "📊 Daily Reports",
+    "💬 AI Chat",
     "⚙️ Settings"
 ])
 
@@ -325,34 +328,81 @@ with tab1:
 with tab2:
     st.markdown("## 🎲 Today's Games — Deep Analysis")
     
-    for i in range(3):
-        with st.expander(f"🏀 Game {i+1}: Team A vs Team B — 7:00 PM ET", expanded=(i==0)):
+    # Sample games - replace with real data from your database
+    sample_games = [
+        {
+            'away_team': 'Lakers',
+            'home_team': 'Celtics',
+            'time': '7:00 PM ET',
+            'algo_pick': 'LAL -3.5',
+            'confidence': 85,
+            'ev': 11.2,
+            'key_factors': 'Lakers on 3-game win streak. Celtics missing key defender. LAL 7-2 in last 9 meetings. Home court advantage neutralized by superior road performance.',
+            'home_record': '15-8 (Home: 9-3)',
+            'away_record': '12-11 (Away: 5-7)',
+            'win_prob': 68
+        },
+        {
+            'away_team': 'Heat',
+            'home_team': 'Suns',
+            'time': '9:30 PM ET',
+            'algo_pick': 'PHX ML',
+            'confidence': 78,
+            'ev': 8.5,
+            'key_factors': 'Suns averaging 118 PPG at home. Heat on B2B road trip. Injuries to Miami backcourt creating defensive gaps.',
+            'home_record': '18-5 (Home: 11-1)',
+            'away_record': '13-10 (Away: 6-6)',
+            'win_prob': 64
+        },
+        {
+            'away_team': 'Nuggets',
+            'home_team': 'Warriors',
+            'time': '10:00 PM ET',
+            'algo_pick': 'Under 228.5',
+            'confidence': 72,
+            'ev': 6.8,
+            'key_factors': 'Both teams playing elite defense lately. Pace down in last 5 games. Weather conditions favoring under.',
+            'home_record': '16-7 (Home: 10-2)',
+            'away_record': '17-6 (Away: 8-4)',
+            'win_prob': 52
+        }
+    ]
+    
+    for i, game in enumerate(sample_games):
+        with st.expander(f"🏀 {game['away_team']} @ {game['home_team']} — {game['time']}", expanded=(i==0)):
             col1, col2 = st.columns([2, 1])
             
             with col1:
                 st.markdown("### 📊 Game Analysis")
-                st.markdown("""
+                st.markdown(f"""
                 **Matchup Overview:**
-                - Team A: 15-8 (Home: 9-3)
-                - Team B: 12-11 (Away: 5-7)
-                
-                **Key Factors:**
-                - Team A on 3-game win streak
-                - Team B's star player questionable (ankle)
-                - Historical edge: Team A 7-2 L9 meetings
+                - {game['home_team']}: {game['home_record']}
+                - {game['away_team']}: {game['away_record']}
                 """)
                 
                 st.markdown("### 🎯 Algorithm Recommendation")
-                st.success("**BET: Team A -4.5** | Confidence: 85%")
-                st.markdown("Expected Value: +11.2% | Kelly Bet: 3.5% of bankroll")
+                st.success(f"**BET: {game['algo_pick']}** | Confidence: {game['confidence']}%")
+                st.markdown(f"Expected Value: +{game['ev']}% | Kelly Bet: 3.5% of bankroll")
+                
+                # AI ANALYSIS - NEW
+                if algo_ai:
+                    with st.spinner("🤖 Generating AI analysis..."):
+                        try:
+                            analysis = algo_ai.analyze_game(game)
+                            st.markdown("### 🧠 AI Breakdown")
+                            st.markdown(f"_{analysis}_")
+                        except Exception as e:
+                            st.error(f"AI analysis unavailable: {str(e)}")
+                else:
+                    st.info("💡 AI analysis will appear here once API is configured")
             
             with col2:
                 st.markdown("### 📈 Win Probability")
                 fig = go.Figure(go.Indicator(
                     mode = "gauge+number",
-                    value = 68,
+                    value = game['win_prob'],
                     domain = {'x': [0, 1], 'y': [0, 1]},
-                    title = {'text': "Team A Win %"},
+                    title = {'text': f"{game['away_team']} Win %"},
                     gauge = {
                         'axis': {'range': [None, 100]},
                         'bar': {'color': "#667eea"},
@@ -676,6 +726,79 @@ with tab8:
     st.info("Report generation coming soon — will show daily picks, results, and performance metrics")
 
 with tab9:
+    st.markdown("## 💬 AI Chat — Talk to Your Algo")
+    st.markdown("### 🤖 Direct line to SB-ALGO's brain")
+    
+    if not algo_ai:
+        st.error("⚠️ AI not configured. Add ANTHROPIC_API_KEY to environment variables.")
+    else:
+        # Initialize chat history in session state
+        if "chat_history" not in st.session_state:
+            st.session_state.chat_history = []
+        
+        # Display chat history
+        for message in st.session_state.chat_history:
+            if message["role"] == "user":
+                st.markdown(f"**You:** {message['content']}")
+            else:
+                st.markdown(f"**🤖 SB-ALGO:** {message['content']}")
+            st.markdown("---")
+        
+        # Chat input
+        user_input = st.text_input("Ask the algo anything...", key="chat_input", placeholder="e.g., What's your best play today? Why do you like Lakers -3.5?")
+        
+        col1, col2 = st.columns([1, 5])
+        with col1:
+            send_button = st.button("Send", type="primary", use_container_width=True)
+        with col2:
+            if st.button("Clear Chat", use_container_width=True):
+                st.session_state.chat_history = []
+                st.rerun()
+        
+        if send_button and user_input:
+            # Add user message to history
+            st.session_state.chat_history.append({"role": "user", "content": user_input})
+            
+            # Get algo metrics for context
+            context = get_dashboard_metrics(engine)
+            context_str = f"""
+Current System Status:
+- Games Today: {context['games_today']}
+- Edges Found: {context['edges_found']}
+- System Confidence: {context['system_confidence']}%
+- Best Play: {context['best_play']}
+- Active Injuries: {context['active_injuries']}
+            """
+            
+            # Get AI response
+            with st.spinner("🤖 Thinking..."):
+                try:
+                    response = algo_ai.chat(user_input, context_str)
+                    st.session_state.chat_history.append({"role": "assistant", "content": response})
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
+        
+        # Suggested prompts
+        st.markdown("### 💡 Try asking:")
+        prompt_cols = st.columns(3)
+        
+        with prompt_cols[0]:
+            if st.button("What's your best play today?"):
+                st.session_state.chat_history.append({"role": "user", "content": "What's your best play today?"})
+                st.rerun()
+        
+        with prompt_cols[1]:
+            if st.button("Explain your confidence levels"):
+                st.session_state.chat_history.append({"role": "user", "content": "Explain your confidence levels"})
+                st.rerun()
+        
+        with prompt_cols[2]:
+            if st.button("Any injury concerns today?"):
+                st.session_state.chat_history.append({"role": "user", "content": "Any injury concerns today?"})
+                st.rerun()
+
+with tab10:
     st.markdown("## ⚙️ Settings — Customize Your Experience")
     st.markdown("### 🎨 Display Preferences")
     theme = st.selectbox("Theme", ["Dark Mode (Default)", "Light Mode"])

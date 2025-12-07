@@ -9,6 +9,7 @@ import os
 from sqlalchemy import create_engine, text
 import numpy as np
 from algo_engine import AlgoEngine
+from algo_ai import get_algo_ai
 
 # ========== TIMEZONE FIX ==========
 def get_eastern_date():
@@ -366,6 +367,9 @@ def get_db_engine():
             return None
         
         engine = create_engine(database_url)
+        
+        # Initialize Claude AI
+        algo_ai = get_algo_ai()
         
         # Test connection and count games
         with engine.connect() as conn:
@@ -1068,6 +1072,32 @@ with tab2:
 </div>
 </div>"""
                         st.markdown(algo_html, unsafe_allow_html=True)
+                        
+                        # AI Breakdown - Claude explains the pick
+                        if algo_ai:
+                            try:
+                                game_data = {
+                                    'home_team': home,
+                                    'away_team': visitor,
+                                    'algo_pick': pick_text,
+                                    'confidence': confidence,
+                                    'ev': pick_edge,
+                                    'key_factors': f"{home} Net RTG: {home_net:+.1f}, {visitor} Net RTG: {away_net:+.1f}, {home} Form: {home_form:+.1f}, {visitor} Form: {away_form:+.1f}, Algo Spread: {algo_spread:+.1f}, Line: {spread_line_display}, Algo Total: {algo_total:.0f}, Line Total: {total_line_display}"
+                                }
+                                with st.spinner("🧠 Generating AI analysis..."):
+                                    ai_analysis = algo_ai.analyze_game(game_data)
+                                    if ai_analysis:
+                                        st.markdown(f"""
+                                        <div style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(168, 85, 247, 0.05) 100%); border: 2px solid rgba(168, 85, 247, 0.3); border-radius: 12px; padding: 1.2rem; margin-top: 1rem;">
+                                            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.8rem;">
+                                                <span style="font-size: 1.2rem;">🧠</span>
+                                                <h4 style="color: #a855f7; margin: 0; font-size: 1rem;">AI Breakdown</h4>
+                                            </div>
+                                            <p style="color: #e2e8f0; font-size: 0.9rem; line-height: 1.6; margin: 0;">{ai_analysis}</p>
+                                        </div>
+                                        """, unsafe_allow_html=True)
+                            except Exception as e:
+                                pass  # Silently fail if AI unavailable
                 
                 with col2:
                     # Win Probability Gauge

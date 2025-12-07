@@ -11,6 +11,9 @@ import numpy as np
 from algo_engine import AlgoEngine
 from algo_ai import get_algo_ai
 
+# Initialize Claude AI globally
+algo_ai = get_algo_ai()
+
 # ========== TIMEZONE FIX ==========
 def get_eastern_date():
     """Get current date in US Eastern timezone"""
@@ -367,9 +370,6 @@ def get_db_engine():
             return None
         
         engine = create_engine(database_url)
-        
-        # Initialize Claude AI
-        algo_ai = get_algo_ai()
         
         # Test connection and count games
         with engine.connect() as conn:

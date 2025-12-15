@@ -11,6 +11,14 @@ import numpy as np
 from algo_engine import AlgoEngine
 from algo_ai import get_algo_ai
 
+# Page config MUST be first Streamlit command
+st.set_page_config(
+    page_title="SB ALGO — NBA Edge Engine",
+    page_icon="🎯",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
 # Initialize Claude AI globally
 try:
     algo_ai = get_algo_ai()
@@ -324,12 +332,7 @@ def get_totals_trends(engine, limit=6):
         return pd.DataFrame()
 
 # Page config
-st.set_page_config(
-    page_title="SB ALGO — NBA Edge Engine",
-    page_icon="🎯",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+
 
 # Custom CSS
 st.markdown("""

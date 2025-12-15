@@ -37,7 +37,8 @@ def get_eastern_datetime():
     return datetime.now(eastern)
 
 # ========== DATA FUNCTIONS ==========
-def get_dashboard_metrics(engine):
+@st.cache_data(ttl=60)
+def get_dashboard_metrics(_engine):
     """Fetch real metrics for dashboard"""
     metrics = {
         'games_today': 0,
@@ -87,7 +88,8 @@ def get_dashboard_metrics(engine):
     
     return metrics
 
-def get_todays_games(engine):
+@st.cache_data(ttl=60)
+def get_todays_games(_engine):
     """Fetch today's games from database"""
     if not engine:
         return []
@@ -134,7 +136,8 @@ def get_todays_games(engine):
         print(f"Error fetching today's games: {e}")
         return []
 
-def get_recent_team_record(engine, team, days=30):
+@st.cache_data(ttl=300)
+def get_recent_team_record(_engine, team, days=30):
     """Get team's recent record"""
     if not engine:
         return {'wins': 0, 'losses': 0, 'home_record': '0-0', 'away_record': '0-0'}
@@ -179,7 +182,8 @@ def get_recent_team_record(engine, team, days=30):
     
     return {'wins': 0, 'losses': 0, 'home_record': '0-0', 'away_record': '0-0'}
 
-def get_hot_teams(engine, limit=5):
+@st.cache_data(ttl=300)
+def get_hot_teams(_engine, limit=5):
     """Get hottest teams in last 30 days"""
     if not engine:
         return pd.DataFrame()
@@ -228,7 +232,8 @@ def get_hot_teams(engine, limit=5):
         print(f"Error getting hot teams: {e}")
         return pd.DataFrame()
 
-def get_cold_teams(engine, limit=5):
+@st.cache_data(ttl=300)
+def get_cold_teams(_engine, limit=5):
     """Get coldest teams in last 30 days"""
     if not engine:
         return pd.DataFrame()
@@ -277,7 +282,8 @@ def get_cold_teams(engine, limit=5):
         print(f"Error getting cold teams: {e}")
         return pd.DataFrame()
 
-def get_totals_trends(engine, limit=6):
+@st.cache_data(ttl=300)
+def get_totals_trends(_engine, limit=6):
     """Get teams' over/under trends"""
     if not engine:
         return pd.DataFrame()
@@ -958,6 +964,10 @@ with tab2:
                     
                     # Algorithm Recommendation - FULL ANALYSIS
                     from math_engine import GamePredictor
+
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def get_game_analysis(_predictor, home, away, spread_line, total_line):
+    return _predictor.analyze_game(home, away, spread_line, total_line)
                     predictor = GamePredictor(engine)
                     
                     # Get betting odds for this game
@@ -977,7 +987,7 @@ with tab2:
                         pass
                     
                     # Run prediction
-                    analysis = predictor.analyze_game(home, visitor, spread_line, total_line)
+                    analysis = get_game_analysis(predictor, home, visitor, spread_line, total_line)
                     spread_pred = analysis['spread']
                     total_pred = analysis['total']
                     picks = analysis.get('picks', [])

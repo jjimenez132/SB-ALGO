@@ -983,7 +983,7 @@ with tab2:
                         pass
                     
                     # Run prediction
-                    analysis = get_game_analysis(predictor, home, visitor, spread_line, total_line)
+                    analysis = predictor.analyze_game(home, visitor, spread_line, total_line)
                     spread_pred = analysis['spread']
                     total_pred = analysis['total']
                     picks = analysis.get('picks', [])

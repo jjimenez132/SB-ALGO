@@ -964,10 +964,6 @@ with tab2:
                     
                     # Algorithm Recommendation - FULL ANALYSIS
                     from math_engine import GamePredictor
-
-@st.cache_data(ttl=300)  # Cache for 5 minutes
-def get_game_analysis(_predictor, home, away, spread_line, total_line):
-    return _predictor.analyze_game(home, away, spread_line, total_line)
                     predictor = GamePredictor(engine)
                     
                     # Get betting odds for this game

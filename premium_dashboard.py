@@ -12,7 +12,10 @@ from algo_engine import AlgoEngine
 from algo_ai import get_algo_ai
 
 # Initialize Claude AI globally
-algo_ai = get_algo_ai()
+try:
+    algo_ai = get_algo_ai()
+except:
+    algo_ai = None
 
 # ========== TIMEZONE FIX ==========
 def get_eastern_date():

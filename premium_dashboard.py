@@ -33,21 +33,16 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Initialize Claude AI globally
-try:
-    
-# SPEED BOOSTER: Cache AI Connection so it doesn't reconnect every click
+# Initialize Claude AI globally - CACHED for speed
 @st.cache_resource
 def get_cached_ai_agent():
     try:
+        from algo_ai import get_algo_ai
         return get_algo_ai()
     except:
         return None
 
 algo_ai = get_cached_ai_agent()
-
-except:
-    algo_ai = None
 
 # ========== TIMEZONE FIX ==========
 def get_eastern_date():

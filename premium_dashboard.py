@@ -37,7 +37,9 @@ def get_eastern_datetime():
     return datetime.now(eastern)
 
 # ========== DATA FUNCTIONS ==========
-def get_dashboard_metrics(engine):
+@st.cache_data(ttl=60)
+def get_dashboard_metrics(_engine):
+    engine = _engine  # Map cached argument to local variable
     """Fetch real metrics for dashboard"""
     metrics = {
         'games_today': 0,
@@ -75,7 +77,9 @@ def get_dashboard_metrics(engine):
     
     return metrics
 
-def get_todays_games(engine):
+@st.cache_data(ttl=60)
+def get_todays_games(_engine):
+    engine = _engine  # Map cached argument to local variable
     """Fetch today's games from database"""
     if not engine:
         return []
@@ -167,7 +171,9 @@ def get_recent_team_record(engine, team, days=30):
     
     return {'wins': 0, 'losses': 0, 'home_record': '0-0', 'away_record': '0-0'}
 
-def get_hot_teams(engine, limit=5):
+@st.cache_data(ttl=300)
+def get_hot_teams(_engine, limit=5):
+    engine = _engine  # Map cached argument to local variable
     """Get hottest teams in last 30 days"""
     if not engine:
         return pd.DataFrame()
@@ -216,7 +222,9 @@ def get_hot_teams(engine, limit=5):
         print(f"Error getting hot teams: {e}")
         return pd.DataFrame()
 
-def get_cold_teams(engine, limit=5):
+@st.cache_data(ttl=300)
+def get_cold_teams(_engine, limit=5):
+    engine = _engine  # Map cached argument to local variable
     """Get coldest teams in last 30 days"""
     if not engine:
         return pd.DataFrame()

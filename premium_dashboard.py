@@ -12,6 +12,20 @@ from algo_engine import AlgoEngine
 from algo_ai import get_algo_ai
 
 # Page config MUST be first Streamlit command
+
+# SPEED BOOSTER: Cache algo predictions for 10 minutes
+@st.cache_data(ttl=600)
+def get_cached_algo_predictions():
+    """Runs heavy algo model once, caches for 10 min"""
+    try:
+        
+        game_edges, prop_edges = get_cached_algo_predictions()
+        prop_edges = analyze_props()
+        return game_edges, prop_edges
+    except Exception as e:
+        print(f"Algo Brain Error: {e}")
+        return [], []
+
 st.set_page_config(
     page_title="SB ALGO — NBA Edge Engine",
     page_icon="🎯",
@@ -21,7 +35,17 @@ st.set_page_config(
 
 # Initialize Claude AI globally
 try:
-    algo_ai = get_algo_ai()
+    
+# SPEED BOOSTER: Cache AI Connection so it doesn't reconnect every click
+@st.cache_resource
+def get_cached_ai_agent():
+    try:
+        return get_algo_ai()
+    except:
+        return None
+
+algo_ai = get_cached_ai_agent()
+
 except:
     algo_ai = None
 
@@ -440,9 +464,9 @@ with tab1:
         
         # Get picks from ALGO BRAIN
         try:
-            from algo_brain import analyze_games, analyze_props
             
-            game_edges = analyze_games()
+            
+            game_edges, prop_edges = get_cached_algo_predictions()
             prop_edges = analyze_props()
             
             col_games, col_props = st.columns(2)
@@ -746,7 +770,7 @@ with tab2:
     # ========== TOP GAME BETS FROM ALGO BRAIN ==========
     try:
         from algo_brain import analyze_games
-        game_edges = analyze_games()
+        game_edges, prop_edges = get_cached_algo_predictions()
         
         if game_edges:
             st.markdown("""
@@ -1266,11 +1290,11 @@ with tab4:
         """, unsafe_allow_html=True)
         
         try:
-            from algo_brain import analyze_games, analyze_props
+            
             from math_engine import GameBettingMemory, PropsMemory
             
             # Get current edges
-            game_edges = analyze_games()
+            game_edges, prop_edges = get_cached_algo_predictions()
             prop_edges = analyze_props()
             
             # Display current status

@@ -189,6 +189,46 @@ def analyze_props():
         'player_blocks': 13      # avg_blk
     }
     
+    # Get today's actual games to filter props
+    with engine.connect() as conn:
+        todays_games = conn.execute(text("""
+            SELECT home_team, visitor_team FROM games WHERE date = :today
+        """), {"today": today}).fetchall()
+    
+    # Build list of team abbreviations playing today
+    teams_today = set()
+    for g in todays_games:
+        teams_today.add(g[0])  # home
+        teams_today.add(g[1])  # visitor
+    
+    # Team name mapping
+    TEAM_NAMES = {
+        'NYK': ['Knicks', 'New York'], 'SAS': ['Spurs', 'San Antonio'],
+        'LAL': ['Lakers', 'Los Angeles Lakers'], 'BOS': ['Celtics', 'Boston'],
+        'GSW': ['Warriors', 'Golden State'], 'MIA': ['Heat', 'Miami'],
+        'CHI': ['Bulls', 'Chicago'], 'CLE': ['Cavaliers', 'Cleveland'],
+        'MEM': ['Grizzlies', 'Memphis'], 'MIN': ['Timberwolves', 'Minnesota'],
+        'DEN': ['Nuggets', 'Denver'], 'PHX': ['Suns', 'Phoenix'],
+        'MIL': ['Bucks', 'Milwaukee'], 'PHI': ['76ers', 'Philadelphia'],
+        'DAL': ['Mavericks', 'Dallas'], 'HOU': ['Rockets', 'Houston'],
+        'ATL': ['Hawks', 'Atlanta'], 'SAC': ['Kings', 'Sacramento'],
+        'OKC': ['Thunder', 'Oklahoma'], 'ORL': ['Magic', 'Orlando'],
+        'IND': ['Pacers', 'Indiana'], 'TOR': ['Raptors', 'Toronto'],
+        'BKN': ['Nets', 'Brooklyn'], 'DET': ['Pistons', 'Detroit'],
+        'CHA': ['Hornets', 'Charlotte'], 'WAS': ['Wizards', 'Washington'],
+        'POR': ['Blazers', 'Portland'], 'UTA': ['Jazz', 'Utah'],
+        'NOP': ['Pelicans', 'New Orleans'], 'LAC': ['Clippers', 'LA Clippers']
+    }
+    
+    def is_team_playing(home_team_str, away_team_str):
+        """Check if the prop's teams are in today's games"""
+        for abbr in teams_today:
+            names = TEAM_NAMES.get(abbr, [])
+            for name in names:
+                if name.lower() in home_team_str.lower() or name.lower() in away_team_str.lower():
+                    return True
+        return False
+    
     seen = set()  # Avoid duplicates
     
     for row in results:
@@ -198,6 +238,12 @@ def analyze_props():
         over_odds = row[3]
         under_odds = row[4]
         sportsbook = row[5]
+        home_team = row[6] or ""
+        away_team = row[7] or ""
+        
+        # Skip if teams not playing today
+        if teams_today and not is_team_playing(home_team, away_team):
+            continue
         
         if line < PROP_MIN_LINE:
             continue  # Skip low lines like 0.5 blocks - causes inflated edges

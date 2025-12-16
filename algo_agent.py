@@ -1,16 +1,12 @@
 import os
 import google.generativeai as genai
-from google.generativeai.types import FunctionDeclaration, Tool
 from google.api_core.exceptions import ResourceExhausted
 from sqlalchemy import create_engine, text
-import json
 import time
 
 # --- CONFIGURATION ---
 api_key = os.environ.get("GOOGLE_API_KEY")
-if not api_key:
-    print("⚠️ WARNING: GOOGLE_API_KEY not found.")
-else:
+if api_key:
     genai.configure(api_key=api_key)
 
 def get_db_engine():
@@ -20,96 +16,78 @@ def get_db_engine():
         return create_engine(db_url)
     except: return None
 
-# --- TOOLS ---
-
-def get_algo_status():
-    return {"status": "Online", "mode": "Presidential"}
-
-def lookup_historical_data(date: str):
-    """Retrieves NBA games and stats for a historical date (YYYY-MM-DD)."""
-    try:
-        engine = get_db_engine()
-        with engine.connect() as conn:
-            # Games
-            games = conn.execute(text("SELECT home_team, visitor_team, home_pts, visitor_pts, home_win FROM games WHERE date = :d ORDER BY start_time"), {"d": date}).fetchall()
-            if not games: return f"No games found for {date}."
-            
-            games_list = []
-            for g in games:
-                score = f"{g[0]} {int(g[2] or 0)} - {g[1]} {int(g[3] or 0)}"
-                games_list.append(score)
-
-            # Top Players
-            players = conn.execute(text("SELECT player_name, pts, reb, ast FROM player_boxscores WHERE game_date = :d ORDER BY pts DESC LIMIT 5"), {"d": date}).fetchall()
-            top_players = [f"{p[0]}: {int(p[1])}pts" for p in players]
-
-            return {"date": date, "games": games_list, "leaders": top_players}
-    except Exception as e: return f"Error: {str(e)}"
-
-def check_player_projection(player_name: str, stat_type: str, line: float):
-    """Runs a LIVE Monte Carlo simulation for a player line (e.g. 'LeBron James', 'points', 24.5)."""
-    try:
-        # Import inside function to avoid circular import issues
-        from math_engine import PlayerSimulator
-        engine = get_db_engine()
-        if not engine: return "Database Error"
-        
-        sim = PlayerSimulator(engine)
-        return sim.run_projection(player_name, stat_type, line)
-    except Exception as e:
-        return f"Calculation Error: {str(e)}"
-
 # --- INITIALIZE MODEL ---
-tools_list = [get_algo_status, lookup_historical_data, check_player_projection]
+system_prompt = """You are SB-ALGO's voice. You speak directly to Javier.
 
-system_prompt = """
-You are the President of the SB-ALGO.
-You are "Always Awake".
+YOUR ROLE:
+- Report what the algorithm calculated
+- Be direct and confident
+- Use the data provided in the prompt
 
-YOUR PROTOCOL:
-1. **Line Checks:** If user asks "Is Wemby 20.5 good?", use 'check_player_projection'.
-2. **History:** If user asks about a past date, use 'lookup_historical_data'.
-3. **Tone:** Direct. "Yo Javier, ran the numbers..."
-"""
+When given game data, explain the edge in 2-3 sentences.
+When given prop data, explain why the pick has value.
+Never say you can't analyze - you have the data, just explain it."""
 
 try:
-    model = genai.GenerativeModel('gemini-2.0-flash', tools=tools_list, system_instruction=system_prompt)
-    chat_session = model.start_chat(enable_automatic_function_calling=True)
+    model = genai.GenerativeModel('gemini-2.0-flash', system_instruction=system_prompt)
+    chat_session = model.start_chat()
+    AGENT_AVAILABLE = True
 except Exception as e:
     print(f"Model Init Error: {e}")
     chat_session = None
+    AGENT_AVAILABLE = False
 
-def query_algo_agent(user_input):
-    if not chat_session: return "Offline (Check API Key)"
-    try:
-        return chat_session.send_message(user_input).text
-    except Exception as e: return f"Error: {str(e)}"
+def query_algo_agent(prompt, retries=3):
+    if not chat_session: return "AI Offline"
+    for i in range(retries):
+        try:
+            return chat_session.send_message(prompt).text
+        except ResourceExhausted:
+            time.sleep(2 ** i)
+        except Exception as e:
+            return f"Error: {str(e)}"
+    return "Rate limited, try again"
 
-# --- COMPATIBILITY LAYER (THE FIX) ---
-
-# 1. Availability Flag
-AGENT_AVAILABLE = True if chat_session else False
-
-# 2. Wrapper Class for Dashboard
+# --- WRAPPER FOR DASHBOARD ---
 class AlgoAgentWrapper:
-    def __init__(self, session):
-        self.session = session
-
-    def chat(self, user_input, context=""):
-        if context:
-            full_prompt = f"{context}\n\nUSER QUESTION: {user_input}"
-            return query_algo_agent(full_prompt)
-        return query_algo_agent(user_input)
-
     def analyze_game(self, game_data):
-        h = game_data.get('home_team', 'Home')
-        a = game_data.get('away_team', 'Away')
-        return query_algo_agent(f"Analyze matchup {a} vs {h}.")
+        home = game_data.get('home_team', 'Home')
+        away = game_data.get('away_team', 'Away')
+        pick = game_data.get('algo_pick', 'N/A')
+        conf = game_data.get('confidence', 0)
+        ev = game_data.get('ev', 0)
+        factors = game_data.get('key_factors', '')
+        
+        prompt = f"""Game: {away} @ {home}
+Algo Pick: {pick}
+Confidence: {conf}%
+Edge: {ev}%
+Factors: {factors}
 
-# 3. Factory Function (Required by Dashboard)
+Explain why this pick has value in 2-3 sentences. Be specific."""
+        return query_algo_agent(prompt)
+    
+    def analyze_player_prop(self, prop_data):
+        player = prop_data.get('player', 'Player')
+        prop_type = prop_data.get('prop_type', 'points')
+        line = prop_data.get('line', 'N/A')
+        pick = prop_data.get('pick', 'N/A')
+        edge = prop_data.get('hit_rate', 0)
+        
+        prompt = f"""Player: {player}
+Prop: {prop_type} {line}
+Pick: {pick}
+Edge: {edge}%
+
+Explain why this prop has value in 2 sentences."""
+        return query_algo_agent(prompt)
+    
+    def chat(self, msg, context=None):
+        if context:
+            return query_algo_agent(f"{context}\n\nQuestion: {msg}")
+        return query_algo_agent(msg)
+
 def get_algo_ai():
-    if chat_session:
-        return AlgoAgentWrapper(chat_session)
+    if AGENT_AVAILABLE:
+        return AlgoAgentWrapper()
     return None
-
-# Force Deployment Update

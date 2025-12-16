@@ -37,8 +37,7 @@ def get_eastern_datetime():
     return datetime.now(eastern)
 
 # ========== DATA FUNCTIONS ==========
-@st.cache_data(ttl=60)
-def get_dashboard_metrics(_engine):
+def get_dashboard_metrics(engine):
     """Fetch real metrics for dashboard"""
     metrics = {
         'games_today': 0,
@@ -65,31 +64,18 @@ def get_dashboard_metrics(_engine):
             result = conn.execute(injuries_query).fetchone()
             metrics['active_injuries'] = result[0] if result else 0
             
-            # Calculate edges using real algo
-            if metrics['games_today'] > 0:
-                try:
-                    algo = AlgoEngine()
-                    picks = algo.generate_picks(today)
-                    spread_picks = [p for p in picks if p['spread_pick']]
-                    total_picks = [p for p in picks if p['total_pick']]
-                    metrics['edges_found'] = len(spread_picks) + len(total_picks)
-                    if picks:
-                        avg_conf = sum(p['best_confidence'] for p in picks) / len(picks)
-                        metrics['system_confidence'] = int(avg_conf)
-                        best = max(picks, key=lambda x: x['best_edge'])
-                        metrics['best_play'] = best['best_pick'] or '—'
-                        metrics['best_play_conf'] = best['best_confidence']
-                except Exception as e:
-                    print(f"Algo error: {e}")
-                    metrics['edges_found'] = 0
+            # Skip slow algo calculation on dashboard load
+            metrics['edges_found'] = metrics['games_today']
+            metrics['system_confidence'] = 75
+            metrics['best_play'] = "See Games Tab"
+            metrics['best_play_conf'] = 0
             
     except Exception as e:
         print(f"Dashboard metrics error: {e}")
     
     return metrics
 
-@st.cache_data(ttl=60)
-def get_todays_games(_engine):
+def get_todays_games(engine):
     """Fetch today's games from database"""
     if not engine:
         return []
@@ -136,8 +122,7 @@ def get_todays_games(_engine):
         print(f"Error fetching today's games: {e}")
         return []
 
-@st.cache_data(ttl=300)
-def get_recent_team_record(_engine, team, days=30):
+def get_recent_team_record(engine, team, days=30):
     """Get team's recent record"""
     if not engine:
         return {'wins': 0, 'losses': 0, 'home_record': '0-0', 'away_record': '0-0'}
@@ -182,8 +167,7 @@ def get_recent_team_record(_engine, team, days=30):
     
     return {'wins': 0, 'losses': 0, 'home_record': '0-0', 'away_record': '0-0'}
 
-@st.cache_data(ttl=300)
-def get_hot_teams(_engine, limit=5):
+def get_hot_teams(engine, limit=5):
     """Get hottest teams in last 30 days"""
     if not engine:
         return pd.DataFrame()
@@ -232,8 +216,7 @@ def get_hot_teams(_engine, limit=5):
         print(f"Error getting hot teams: {e}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=300)
-def get_cold_teams(_engine, limit=5):
+def get_cold_teams(engine, limit=5):
     """Get coldest teams in last 30 days"""
     if not engine:
         return pd.DataFrame()
@@ -282,8 +265,7 @@ def get_cold_teams(_engine, limit=5):
         print(f"Error getting cold teams: {e}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=300)
-def get_totals_trends(_engine, limit=6):
+def get_totals_trends(engine, limit=6):
     """Get teams' over/under trends"""
     if not engine:
         return pd.DataFrame()

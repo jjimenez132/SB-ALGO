@@ -86,3 +86,35 @@ def query_algo_agent(user_input):
         return chat_session.send_message(user_input).text
     except Exception as e:
         return f"Error: {e}"
+
+
+# --- COMPATIBILITY LAYER (Fixes ImportError) ---
+
+# 1. Define Availability Flag
+AGENT_AVAILABLE = True if chat_session else False
+
+# 2. Define Wrapper Class to handle Dashboard calls like .analyze_game()
+class AlgoAgentWrapper:
+    def __init__(self, session):
+        self.session = session
+
+    def chat(self, user_input, context=""):
+        # Redirects .chat() calls to our new query function
+        if context:
+            full_prompt = f"{context}\n\nUSER QUESTION: {user_input}"
+            return query_algo_agent(full_prompt)
+        return query_algo_agent(user_input)
+
+    def analyze_game(self, game_data):
+        # Redirects .analyze_game() calls to a prompt
+        home = game_data.get('home_team', 'Home Team')
+        away = game_data.get('away_team', 'Away Team')
+        prompt = f"Analyze the betting matchup between {away} and {home}. Look for edges."
+        return query_algo_agent(prompt)
+
+# 3. Define the Factory Function the Dashboard is looking for
+def get_algo_ai():
+    if chat_session:
+        return AlgoAgentWrapper(chat_session)
+    return None
+

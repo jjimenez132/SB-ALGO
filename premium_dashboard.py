@@ -455,6 +455,8 @@ with tab1:
     """, unsafe_allow_html=True)
     
     if dashboard_data['games_today'] > 0:
+        game_edges = []
+        prop_edges = []
         st.markdown("""
         <div style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 1rem; margin-bottom: 1rem;">
         """, unsafe_allow_html=True)

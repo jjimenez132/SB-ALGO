@@ -654,6 +654,65 @@ with tab1:
     </div>
     """, unsafe_allow_html=True)
 
+    # ========== AI CHAT BOX ==========
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(168, 85, 247, 0.05) 100%);
+        border: 2px solid rgba(168, 85, 247, 0.4);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin-top: 2rem;
+    ">
+        <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1rem;">
+            <span style="font-size: 1.5rem;">🧠</span>
+            <h3 style="margin: 0; color: #a855f7; font-size: 1.2rem;">Ask the Algorithm</h3>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Initialize chat history in session state
+    if "ai_chat_history" not in st.session_state:
+        st.session_state.ai_chat_history = []
+    
+    # Display chat history
+    for msg in st.session_state.ai_chat_history[-5:]:  # Show last 5 messages
+        if msg["role"] == "user":
+            st.markdown(f"""
+            <div style="background: rgba(59, 130, 246, 0.2); border-radius: 8px; padding: 0.8rem; margin-bottom: 0.5rem;">
+                <p style="color: #93c5fd; font-size: 0.75rem; margin: 0 0 0.3rem 0;">You</p>
+                <p style="color: #e2e8f0; font-size: 0.9rem; margin: 0;">{msg["content"]}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div style="background: rgba(168, 85, 247, 0.2); border-radius: 8px; padding: 0.8rem; margin-bottom: 0.5rem;">
+                <p style="color: #c084fc; font-size: 0.75rem; margin: 0 0 0.3rem 0;">SB-ALGO</p>
+                <p style="color: #e2e8f0; font-size: 0.9rem; margin: 0; line-height: 1.5;">{msg["content"]}</p>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Chat input
+    user_input = st.text_input("Ask about picks, system status, injuries...", key="ai_chat_input", label_visibility="collapsed", placeholder="Ask about picks, system status, injuries...")
+    
+    col_send, col_clear = st.columns([4, 1])
+    with col_send:
+        if st.button("🚀 Send", key="ai_send", use_container_width=True):
+            if user_input:
+                st.session_state.ai_chat_history.append({"role": "user", "content": user_input})
+                
+                from algo_agent import query_algo_agent
+                with st.spinner("🧠 Thinking..."):
+                    response = query_algo_agent(user_input)
+                
+                st.session_state.ai_chat_history.append({"role": "assistant", "content": response})
+                st.rerun()
+    
+    with col_clear:
+        if st.button("🗑️", key="ai_clear", use_container_width=True):
+            st.session_state.ai_chat_history = []
+            st.rerun()
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+
 # ========== TAB 2: TODAY'S GAMES ==========
 with tab2:
     st.markdown("""

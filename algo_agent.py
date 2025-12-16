@@ -245,7 +245,22 @@ def get_algo_ai():
             def analyze_game(self, data):
                 return query_algo_agent(f"Analyze: {data}")
             def analyze_player_prop(self, data):
-                return query_algo_agent(f"Prop analysis: {data}")
+                player = data.get('player', 'Unknown')
+                prop = data.get('prop_type', 'points')
+                line = data.get('line', 'N/A')
+                pick = data.get('pick', 'N/A')
+                edge = data.get('hit_rate', 0)
+                projected = data.get('recent_form', '')
+                
+                prompt = f"""Give me a 2-3 sentence breakdown on this prop bet:
+Player: {player}
+Prop: {prop} {line}
+Pick: {pick}
+Edge: {edge}%
+{projected}
+
+Explain WHY this prop has value based on the edge detected. Be specific and direct."""
+                return query_algo_agent(prompt)
             def chat(self, msg, ctx=None):
                 return query_algo_agent(msg)
         return AgentWrapper()

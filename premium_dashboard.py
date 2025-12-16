@@ -1,4 +1,5 @@
 import streamlit as st
+from algo_brain import analyze_games, analyze_props
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
@@ -19,9 +20,9 @@ def get_cached_algo_predictions():
     """Runs heavy algo model once, caches for 10 min"""
     try:
         
-        game_edges = analyze_games()
-        prop_edges = analyze_props()
-        prop_edges = analyze_props()
+        g_edges = analyze_games()
+        p_edges = analyze_props()
+        p_edges = analyze_props()
         return game_edges, prop_edges
     except Exception as e:
         print(f"Algo Brain Error: {e}")
@@ -462,9 +463,9 @@ with tab1:
         try:
             
             
-        game_edges = analyze_games()
-        prop_edges = analyze_props()
-            prop_edges = analyze_props()
+            g_edges = analyze_games()
+            p_edges = analyze_props()
+            p_edges = analyze_props()
             
             col_games, col_props = st.columns(2)
             
@@ -767,8 +768,8 @@ with tab2:
     # ========== TOP GAME BETS FROM ALGO BRAIN ==========
     try:
         from algo_brain import analyze_games
-        game_edges = analyze_games()
-        prop_edges = analyze_props()
+        g_edges = analyze_games()
+        p_edges = analyze_props()
         
         if game_edges:
             st.markdown("""
@@ -1292,9 +1293,9 @@ with tab4:
             from math_engine import GameBettingMemory, PropsMemory
             
             # Get current edges
-        game_edges = analyze_games()
-        prop_edges = analyze_props()
-            prop_edges = analyze_props()
+            g_edges = analyze_games()
+            p_edges = analyze_props()
+            p_edges = analyze_props()
             
             # Display current status
             col1, col2, col3, col4 = st.columns(4)

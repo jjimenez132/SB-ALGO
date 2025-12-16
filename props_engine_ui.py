@@ -434,7 +434,7 @@ def render_props_engine(engine):
                         border: 2px solid {border_color};
                         border-radius: 12px;
                         padding: 1rem;
-                        margin-bottom: 0.8rem;
+                        margin-bottom: 0.5rem;
                     ">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                             <span style="color: {border_color}; font-size: 0.75rem; font-weight: 600;">{conf_label}</span>
@@ -458,6 +458,30 @@ def render_props_engine(engine):
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
+                    
+                    # AI Breakdown button
+                    if st.button("🧠 AI Breakdown", key=f"ai_prop_{idx}"):
+                        from algo_ai import get_algo_ai
+                        ai = get_algo_ai()
+                        if ai:
+                            with st.spinner("Analyzing..."):
+                                prop_data = {
+                                    'player': edge['player'],
+                                    'prop_type': market_clean,
+                                    'line': edge.get('line', 'N/A'),
+                                    'pick': edge['pick'],
+                                    'hit_rate': edge_val,
+                                    'recent_form': f"Projected: {edge.get('projected', 'N/A')}",
+                                    'matchup_notes': f"Edge: {edge_val}%"
+                                }
+                                analysis = ai.analyze_player_prop(prop_data)
+                                st.markdown(f"""
+                                <div style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(168, 85, 247, 0.05) 100%); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 8px; padding: 1rem; margin-top: 0.5rem;">
+                                    <p style="color: #e2e8f0; font-size: 0.85rem; line-height: 1.5; margin: 0;">{analysis}</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                        else:
+                            st.warning("AI unavailable")
         else:
             st.info("No prop edges found above threshold")
     except Exception as e:

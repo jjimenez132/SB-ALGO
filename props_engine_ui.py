@@ -740,6 +740,9 @@ def render_deep_dive(summary_df, books_df, engine):
     proj_data = get_algo_projection(player, prop_type, row["avg_line"])
     best_o, best_u, all_books = get_best_books(books_df, player, prop_type, game)
     game_log = get_player_game_log(engine, player, prop_type, 20)
+    print(f"DEBUG: player={player}, prop_type={prop_type}, game_log rows={len(game_log)}")
+    if not game_log.empty:
+        print(f"DEBUG: columns={game_log.columns.tolist()}, first row={game_log.iloc[0].to_dict()}")
     hit_rates = calculate_hit_rates(game_log, row["avg_line"])
     averages = calculate_averages(game_log)
     matchup = get_matchup_data(row["away_team"], prop_type)

@@ -252,15 +252,22 @@ def get_algo_ai():
                 edge = data.get('hit_rate', 0)
                 projected = data.get('recent_form', '')
                 
-                prompt = f"""Give me a 2-3 sentence breakdown on this prop bet:
+                # Direct response without going through agent logic
+                try:
+                    direct_prompt = f"""You are SB-ALGO. Give a 2-sentence breakdown on this specific prop:
+
 Player: {player}
 Prop: {prop} {line}
-Pick: {pick}
+Pick: {pick}  
 Edge: {edge}%
 {projected}
 
-Explain WHY this prop has value based on the edge detected. Be specific and direct."""
-                return query_algo_agent(prompt)
+Explain why this {pick} has a {edge}% edge. Be specific about the player and prop."""
+                    
+                    response = chat.send_message(direct_prompt)
+                    return response.text
+                except Exception as e:
+                    return f"Edge detected: {edge}% on {player} {pick}"
             def chat(self, msg, ctx=None):
                 return query_algo_agent(msg)
         return AgentWrapper()

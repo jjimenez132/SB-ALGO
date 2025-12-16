@@ -6,6 +6,7 @@ import psycopg2
 from datetime import datetime, timedelta
 import statistics
 import math
+import random
 
 DATABASE_URL = 'postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db?sslmode=require'
 
@@ -15,6 +16,26 @@ class NBAMathEngine:
         self.conn = psycopg2.connect(DATABASE_URL)
         self.cur = self.conn.cursor()
         self.NBA_AVG_PACE = 100.0
+        self.ALLOWED_STATS = {
+            'pts': 'pts',
+            'points': 'pts',
+            'player_points': 'pts',
+            'reb': 'reb',
+            'rebounds': 'reb',
+            'player_rebounds': 'reb',
+            'ast': 'ast',
+            'assists': 'ast',
+            'player_assists': 'ast',
+            'fg3m': 'fg3m',
+            'threes': 'fg3m',
+            'player_threes': 'fg3m',
+            'stl': 'stl',
+            'steals': 'stl',
+            'blk': 'blk',
+            'blocks': 'blk',
+            'pra': 'pra',
+            'points_rebounds_assists': 'pra'
+        }
     
     def get_rolling_average(self, player_name, stat='pts', games=10, days_back=None):
         query = f"SELECT {stat}, game_date FROM player_boxscores WHERE player_name = %s AND {stat} IS NOT NULL"
@@ -77,6 +98,39 @@ class NBAMathEngine:
             'stdev': statistics.stdev(values) if len(values) > 1 else 0,
             'trend': self._calculate_trend(values)
         }
+
+    def _normalize_stat_column(self, stat):
+        if not stat:
+            return 'pts'
+        stat_key = str(stat).lower().strip()
+        return self.ALLOWED_STATS.get(stat_key)
+
+    def get_recent_stat_samples(self, player_name, stat='pts', games=30):
+        column = self._normalize_stat_column(stat)
+        if not column:
+            return []
+
+        if column == 'pra':
+            query = """
+                SELECT COALESCE(pts,0) + COALESCE(reb,0) + COALESCE(ast,0) as pra
+                FROM player_boxscores
+                WHERE player_name = %s
+                ORDER BY game_date DESC
+                LIMIT %s
+            """
+        else:
+            query = f"""
+                SELECT {column}
+                FROM player_boxscores
+                WHERE player_name = %s AND {column} IS NOT NULL
+                ORDER BY game_date DESC
+                LIMIT %s
+            """
+
+        self.cur.execute(query, (player_name, games))
+        results = self.cur.fetchall()
+        values = [float(r[0]) for r in results if r[0] is not None]
+        return values
     
     def get_home_away_splits(self, player_name, stat='pts', games=20):
         self.cur.execute(f"SELECT pb.{stat}, CASE WHEN g.home_team = pb.team_id THEN 'home' ELSE 'away' END as location FROM player_boxscores pb JOIN games g ON pb.game_date = g.date WHERE pb.player_name = %s AND pb.{stat} > 0 ORDER BY pb.game_date DESC LIMIT %s", (player_name, games * 2))
@@ -210,7 +264,73 @@ class NBAMathEngine:
         recent_avg = sum(proj['recent_games']) / len(proj['recent_games'])
         reasons.append(f"L5 games: {proj['recent_games']} (avg: {recent_avg:.1f})")
         return reasons
-    
+
+    def run_player_monte_carlo(self, player_name, stat='pts', line=None, odds=-110, iterations=5000, games=30):
+        """Simulate a single player's outcome distribution and return EV/edge."""
+        samples = self.get_recent_stat_samples(player_name, stat, games)
+        if not samples or len(samples) < 3:
+            return None
+
+        mean = statistics.mean(samples)
+        stdev = statistics.stdev(samples) if len(samples) > 1 else max(mean * 0.15, 1.0)
+        simulated = [max(0, random.gauss(mean, stdev)) for _ in range(iterations)]
+        sim_avg = statistics.mean(simulated)
+        sim_std = statistics.stdev(simulated) if len(simulated) > 1 else stdev
+
+        result = {
+            'player': player_name,
+            'stat': stat.upper() if isinstance(stat, str) else stat,
+            'projection': round(sim_avg, 2),
+            'historical_avg': round(mean, 2),
+            'historical_std': round(stdev, 2),
+            'sample_size': len(samples),
+            'simulations': iterations
+        }
+
+        if line is None:
+            return result
+
+        over_prob = sum(1 for val in simulated if val >= line) / iterations
+        under_prob = 1 - over_prob
+        recommendation = 'OVER' if over_prob >= under_prob else 'UNDER'
+        edge = round(sim_avg - line, 2)
+
+        if recommendation == 'UNDER':
+            win_probability = under_prob
+        else:
+            win_probability = over_prob
+
+        ev = self.calculate_expected_value(win_probability, odds)
+
+        result.update({
+            'line': line,
+            'recommended': recommendation,
+            'prob_over': round(over_prob * 100, 1),
+            'prob_under': round(under_prob * 100, 1),
+            'edge': edge,
+            'ev_percent': ev['ev_percent'] if ev else None,
+            'ev_dollars': ev['ev_dollars'] if ev else None,
+            'sim_std': round(sim_std, 2)
+        })
+
+        return result
+
     def close(self):
         self.cur.close()
         self.conn.close()
+
+
+def run_player_projection(player_name, line=None, stat='pts', odds=-110, iterations=5000, games=30):
+    """Helper to run a one-off player Monte Carlo projection with automatic cleanup."""
+    engine = NBAMathEngine()
+    try:
+        return engine.run_player_monte_carlo(
+            player_name=player_name,
+            stat=stat,
+            line=line,
+            odds=odds,
+            iterations=iterations,
+            games=games
+        )
+    finally:
+        engine.close()

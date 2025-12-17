@@ -11,22 +11,23 @@ from sqlalchemy import create_engine, text
 import numpy as np
 from algo_engine import AlgoEngine
 from algo_ai import get_algo_ai
+import fast_loader
 
 # Page config MUST be first Streamlit command
 
-# SPEED BOOSTER: Cache algo predictions for 10 minutes
-@st.cache_data(ttl=600)
-def get_cached_algo_predictions():
-    """Runs heavy algo model once, caches for 10 min"""
-    try:
-        
-        g_edges = analyze_games()
-        p_edges = analyze_props()
-        p_edges = analyze_props()
-        return game_edges, prop_edges
-    except Exception as e:
-        print(f"Algo Brain Error: {e}")
-        return [], []
+# DISABLED - using fast_loader now: # SPEED BOOSTER: Cache algo predictions for 10 minutes
+# DISABLED - using fast_loader now: @st.cache_data(ttl=600)
+# DISABLED - using fast_loader now: def get_cached_algo_predictions():
+# DISABLED - using fast_loader now:     """Runs heavy algo model once, caches for 10 min"""
+# DISABLED - using fast_loader now:     try:
+# DISABLED - using fast_loader now:         
+# DISABLED - using fast_loader now:         # g_edges loaded at startup via fast_loader
+# DISABLED - using fast_loader now:         # p_edges loaded at startup via fast_loader
+# DISABLED - using fast_loader now:         # p_edges loaded at startup via fast_loader
+# DISABLED - using fast_loader now:         return game_edges, prop_edges
+# DISABLED - using fast_loader now:     except Exception as e:
+# DISABLED - using fast_loader now:         print(f"Algo Brain Error: {e}")
+# DISABLED - using fast_loader now:         return [], []
 
 st.set_page_config(
     page_title="SB ALGO — NBA Edge Engine",
@@ -147,7 +148,7 @@ def get_todays_games(_engine):
         print(f"Error fetching today's games: {e}")
         return []
 
-def get_recent_team_record(engine, team, days=30):
+def get_recent_team_record(team, days=30):
     """Get team's recent record"""
     if not engine:
         return {'wins': 0, 'losses': 0, 'home_record': '0-0', 'away_record': '0-0'}
@@ -408,6 +409,21 @@ def get_db_engine():
 # Initialize database
 engine = get_db_engine()
 
+# ========== SPEED: Load algo edges ONCE ==========
+if "edges_loaded" not in st.session_state:
+    try:
+        st.session_state.game_edges, st.session_state.prop_edges = fast_loader.get_all_edges()
+        st.session_state.edges_loaded = True
+    except Exception as e:
+        st.session_state.game_edges = []
+        st.session_state.prop_edges = []
+        st.session_state.edges_loaded = True
+        print(f"Edge loading error: {e}")
+
+game_edges = st.session_state.game_edges
+prop_edges = st.session_state.prop_edges
+# =================================================
+
 # Header
 eastern_now = get_eastern_datetime()
 st.markdown(f"""
@@ -433,7 +449,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
 
 with tab1:
     # Get real metrics
-    dashboard_data = get_dashboard_metrics(engine)
+    dashboard_data = fast_loader.load_dashboard_metrics()
     
     # ========== SECTION 1: TOP DAILY PICKS (HERO SECTION) ==========
     st.markdown("""
@@ -455,8 +471,8 @@ with tab1:
     """, unsafe_allow_html=True)
     
     if dashboard_data['games_today'] > 0:
-        game_edges = []
-        prop_edges = []
+# REMOVED - using cached edges:         game_edges = []
+# REMOVED - using cached edges:         prop_edges = []
         st.markdown("""
         <div style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 1rem; margin-bottom: 1rem;">
         """, unsafe_allow_html=True)
@@ -465,9 +481,9 @@ with tab1:
         try:
             
             
-            g_edges = analyze_games()
-            p_edges = analyze_props()
-            p_edges = analyze_props()
+            # g_edges loaded at startup via fast_loader
+            # p_edges loaded at startup via fast_loader
+            # p_edges loaded at startup via fast_loader
             
             col_games, col_props = st.columns(2)
             
@@ -770,8 +786,8 @@ with tab2:
     # ========== TOP GAME BETS FROM ALGO BRAIN ==========
     try:
         from algo_brain import analyze_games
-        g_edges = analyze_games()
-        p_edges = analyze_props()
+        # g_edges loaded at startup via fast_loader
+        # p_edges loaded at startup via fast_loader
         
         if game_edges:
             st.markdown("""
@@ -833,7 +849,7 @@ with tab2:
         pass  # Silently fail if algo_brain not available
     
     # Get real games
-    todays_games = get_todays_games(engine)
+    todays_games = fast_loader.load_todays_games()
     
     if not todays_games:
         eastern_date = get_eastern_date()
@@ -1008,8 +1024,8 @@ with tab2:
                 
                 with col1:
                     # Get team records
-                    home_record = get_recent_team_record(engine, home)
-                    visitor_record = get_recent_team_record(engine, visitor)
+                    home_record = fast_loader.get_team_record(home)
+                    visitor_record = fast_loader.get_team_record(visitor)
                     
                     # Game Analysis - Matchup Overview
                     home_b2b = " (B2B)" if game['home_is_b2b'] else ""
@@ -1295,9 +1311,9 @@ with tab4:
             from math_engine import GameBettingMemory, PropsMemory
             
             # Get current edges
-            g_edges = analyze_games()
-            p_edges = analyze_props()
-            p_edges = analyze_props()
+            # g_edges loaded at startup via fast_loader
+            # p_edges loaded at startup via fast_loader
+            # p_edges loaded at startup via fast_loader
             
             # Display current status
             col1, col2, col3, col4 = st.columns(4)
@@ -1407,7 +1423,7 @@ with tab4:
         </div>
         """, unsafe_allow_html=True)
         
-        hot_teams_df = get_hot_teams(engine, 5)
+        hot_teams_df = fast_loader.get_hot_teams(5)
         if not hot_teams_df.empty:
             st.dataframe(hot_teams_df, use_container_width=True, hide_index=True)
         else:
@@ -1457,7 +1473,7 @@ with tab4:
         </div>
         """, unsafe_allow_html=True)
         
-        cold_teams_df = get_cold_teams(engine, 5)
+        cold_teams_df = fast_loader.get_cold_teams(5)
         if not cold_teams_df.empty:
             st.dataframe(cold_teams_df, use_container_width=True, hide_index=True)
         else:
@@ -1481,7 +1497,7 @@ with tab4:
         """, unsafe_allow_html=True)
         
         # Get today's games for situational analysis
-        todays_games = get_todays_games(engine)
+        todays_games = fast_loader.load_todays_games()
         
         if todays_games:
             # Rest advantages

@@ -2539,8 +2539,8 @@ with tab8:
         props_memory = PropsMemory(engine)
         
         # ========== TIME PERIOD SELECTOR ==========
-        period = st.selectbox("Select Period", ["Last 7 Days", "Last 30 Days", "Last 60 Days", "All Time"], key="report_period")
-        days_map = {"Last 7 Days": 7, "Last 30 Days": 30, "Last 60 Days": 60, "All Time": 365}
+        period = st.selectbox("Select Period", ["Last 1 Day", "Last 7 Days", "Last 14 Days", "Last 30 Days", "Last 60 Days", "All Time"], key="report_period")
+        days_map = {"Last 1 Day": 1, "Last 7 Days": 7, "Last 14 Days": 14, "Last 30 Days": 30, "Last 60 Days": 60, "All Time": 365}
         days = days_map[period]
         
         st.markdown("<br>", unsafe_allow_html=True)

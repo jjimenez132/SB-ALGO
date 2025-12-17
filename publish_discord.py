@@ -54,7 +54,7 @@ def fetch_todays_games(engine):
                g.home_is_b2b, g.visitor_is_b2b, b.home_spread, b.total, b.sportsbook
         FROM games g
         LEFT JOIN betting_odds b ON g.date = b.game_date AND g.home_team = b.home_team
-        WHERE g.date = :today AND g.home_pts IS NULL
+        WHERE g.date = :today AND (g.home_pts IS NULL OR g.home_pts = 0)
         ORDER BY g.start_time
     """)
     with engine.connect() as conn:

@@ -1,23 +1,33 @@
 import os
-import google.generativeai as genai
-from google.api_core.exceptions import ResourceExhausted
-from sqlalchemy import create_engine, text
 import time
 
 # --- CONFIGURATION ---
-api_key = os.environ.get("GOOGLE_API_KEY")
-if api_key:
-    genai.configure(api_key=api_key)
+AGENT_AVAILABLE = False
+_model = None
+_chat_session = None
+_initialized = False
 
-def get_db_engine():
+def _ensure_initialized():
+    """Lazy initialization - only runs when actually needed"""
+    global _model, _chat_session, AGENT_AVAILABLE, _initialized
+    
+    if _initialized:
+        return
+    
+    _initialized = True
+    
     try:
-        db_url = os.environ.get("DATABASE_URL")
-        if not db_url: return None
-        return create_engine(db_url)
-    except: return None
-
-# --- INITIALIZE MODEL ---
-system_prompt = """You are SB-ALGO's voice. You speak directly to Javier.
+        import google.generativeai as genai
+        from google.api_core.exceptions import ResourceExhausted
+        
+        api_key = os.environ.get("GOOGLE_API_KEY")
+        if not api_key:
+            print("No GOOGLE_API_KEY found")
+            return
+        
+        genai.configure(api_key=api_key)
+        
+        system_prompt = """You are SB-ALGO's voice. You speak directly to Javier.
 
 YOUR ROLE:
 - Report what the algorithm calculated
@@ -28,20 +38,35 @@ When given game data, explain the edge in 2-3 sentences.
 When given prop data, explain why the pick has value.
 Never say you can't analyze - you have the data, just explain it."""
 
-try:
-    model = genai.GenerativeModel('gemini-2.0-flash', system_instruction=system_prompt)
-    chat_session = model.start_chat()
-    AGENT_AVAILABLE = True
-except Exception as e:
-    print(f"Model Init Error: {e}")
-    chat_session = None
-    AGENT_AVAILABLE = False
+        _model = genai.GenerativeModel('gemini-2.0-flash', system_instruction=system_prompt)
+        _chat_session = _model.start_chat()
+        AGENT_AVAILABLE = True
+        print("✅ Gemini AI initialized successfully")
+    except Exception as e:
+        print(f"Model Init Error: {e}")
+        AGENT_AVAILABLE = False
+
+def get_db_engine():
+    try:
+        from sqlalchemy import create_engine
+        db_url = os.environ.get("DATABASE_URL")
+        if not db_url: return None
+        return create_engine(db_url)
+    except: 
+        return None
 
 def query_algo_agent(prompt, retries=3):
-    if not chat_session: return "AI Offline"
+    """Query the AI - initializes on first call"""
+    _ensure_initialized()
+    
+    if not _chat_session: 
+        return "AI Offline"
+    
+    from google.api_core.exceptions import ResourceExhausted
+    
     for i in range(retries):
         try:
-            return chat_session.send_message(prompt).text
+            return _chat_session.send_message(prompt).text
         except ResourceExhausted:
             time.sleep(2 ** i)
         except Exception as e:
@@ -88,6 +113,5 @@ Explain why this prop has value in 2 sentences."""
         return query_algo_agent(msg)
 
 def get_algo_ai():
-    if AGENT_AVAILABLE:
-        return AlgoAgentWrapper()
-    return None
+    """Get AI wrapper - does NOT initialize until actually used"""
+    return AlgoAgentWrapper()

@@ -24,7 +24,7 @@ def get_engine():
 
 def analyze_games():
     """Analyze all upcoming games for edges"""
-    from math_engine import GamePredictor, GameBettingMemory
+    from math_engine import GamePredictor, GameBettingMemory, PropsMemory
     
     engine = get_engine()
     predictor = GamePredictor(engine)
@@ -276,7 +276,9 @@ def analyze_props():
                     'line': line,
                     'odds': over_odds,
                     'sportsbook': sportsbook,
-                    'game_date': today
+                    'game_date': today,
+                    'home_team': home_team,
+                    'away_team': away_team
                 })
         
         elif edge_under >= PROP_EDGE_THRESHOLD:
@@ -293,8 +295,37 @@ def analyze_props():
                     'line': line,
                     'odds': under_odds,
                     'sportsbook': sportsbook,
-                    'game_date': today
+                    'game_date': today,
+                    'home_team': home_team,
+                    'away_team': away_team
                 })
+    
+    # Save props to database
+    try:
+        props_memory = PropsMemory(engine)
+        for prop in edges_found:
+            pick_direction = "OVER" if "OVER" in prop['pick'] else "UNDER"
+            units = 1.5 if prop['edge'] >= 25 else 1.0 if prop['edge'] >= 18 else 0.5
+            props_memory.save_prop_prediction(
+                game_date=today,
+                player_name=prop['player'],
+                team=prop.get('home_team', ''),
+                opponent=prop.get('away_team', ''),
+                market=prop['subtype'],
+                pick=pick_direction,
+                line=prop['line'],
+                projected_value=prop['projected'],
+                edge=prop['edge'],
+                confidence=min(90, 50 + prop['edge']),
+                hit_rate_l5=0,
+                hit_rate_l10=0,
+                sportsbook=prop.get('sportsbook', ''),
+                odds=prop.get('odds', 0),
+                units_bet=units
+            )
+        print(f"✅ Saved {len(edges_found)} props to database")
+    except Exception as e:
+        print(f"⚠️ Could not save props: {e}")
     
     return edges_found
 

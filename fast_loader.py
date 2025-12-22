@@ -120,7 +120,7 @@ def load_injuries():
         return cached
     
     engine = get_engine()
-    query = text("SELECT player_name, team, status, description FROM injuries LIMIT 150")
+    query = text("SELECT player_name, team_name, status, description FROM injuries LIMIT 150")
     with engine.connect() as conn:
         result = conn.execute(query)
         injuries = [{'player_name': row[0], 'team': row[1], 'status': row[2], 'description': row[3]} for row in result]
@@ -206,7 +206,7 @@ def get_hot_teams(limit: int = 5):
             FROM games WHERE date >= :start_date AND date < :today AND home_win IS NOT NULL
         )
         SELECT team, SUM(win) as wins, COUNT(*) - SUM(win) as losses,
-               ROUND(100.0 * SUM(win) / COUNT(*), 1) as win_pct, ROUND(AVG(margin), 1) as avg_margin
+               ROUND((100.0 * SUM(win) / COUNT(*))::numeric, 1) as win_pct, ROUND(AVG(margin)::numeric, 1) as avg_margin
         FROM team_games GROUP BY team HAVING COUNT(*) >= 5 ORDER BY win_pct DESC, avg_margin DESC LIMIT :limit
     """)
     with engine.connect() as conn:
@@ -233,7 +233,7 @@ def get_cold_teams(limit: int = 5):
             FROM games WHERE date >= :start_date AND date < :today AND home_win IS NOT NULL
         )
         SELECT team, SUM(win) as wins, COUNT(*) - SUM(win) as losses,
-               ROUND(100.0 * SUM(win) / COUNT(*), 1) as win_pct, ROUND(AVG(margin), 1) as avg_margin
+               ROUND((100.0 * SUM(win) / COUNT(*))::numeric, 1) as win_pct, ROUND(AVG(margin)::numeric, 1) as avg_margin
         FROM team_games GROUP BY team HAVING COUNT(*) >= 5 ORDER BY win_pct ASC, avg_margin ASC LIMIT :limit
     """)
     with engine.connect() as conn:

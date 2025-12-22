@@ -1,21 +1,28 @@
 """
 fast_loader.py - Speed Layer for SB-ALGO
 =========================================
-Uses @functools.lru_cache to keep data in RAM for 5000x speedup.
+Uses time-based caching to keep data fresh while staying fast.
 """
 
 import functools
 import os
+import time
 import pandas as pd
 from sqlalchemy import create_engine, text
 from datetime import datetime, timedelta
 import pytz
 
-@functools.lru_cache(maxsize=1)
+# Cache expiration time (in seconds)
+CACHE_TTL = 3600  # 1 hour
+
+# Simple time-based cache storage
+_cache = {}
+_cache_times = {}
+
 def get_engine():
     database_url = os.getenv('DATABASE_URL')
     if not database_url:
-        # Fallback for local testing
+        # Fallback for local development
         database_url = "postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db"
     return create_engine(database_url, pool_pre_ping=True, pool_recycle=300)
 
@@ -27,8 +34,36 @@ def get_eastern_datetime():
     eastern = pytz.timezone('US/Eastern')
     return datetime.now(eastern)
 
-@functools.lru_cache(maxsize=1)
+def _is_cache_valid(key):
+    """Check if cache entry is still valid"""
+    if key not in _cache_times:
+        return False
+    # Also invalidate if the date changed
+    cached_date = _cache.get(f"{key}_date")
+    current_date = get_eastern_date()
+    if cached_date != current_date:
+        return False
+    return (time.time() - _cache_times[key]) < CACHE_TTL
+
+def _get_cached(key):
+    """Get cached value if valid"""
+    if _is_cache_valid(key):
+        return _cache.get(key)
+    return None
+
+def _set_cached(key, value):
+    """Set cache with timestamp"""
+    _cache[key] = value
+    _cache[f"{key}_date"] = get_eastern_date()
+    _cache_times[key] = time.time()
+
 def load_todays_games():
+    """Load today's games with time-based cache"""
+    cache_key = "todays_games"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+    
     engine = get_engine()
     today = get_eastern_date()
     query = text("""
@@ -51,10 +86,16 @@ def load_todays_games():
                 'current_home_score': row[13] or 0, 'current_away_score': row[14] or 0,
                 'quarter': row[15] or '', 'time_remaining': row[16] or '', 'game_status': row[17] or 'Scheduled'
             })
+        _set_cached(cache_key, games)
         return games
 
-@functools.lru_cache(maxsize=1)
 def load_todays_odds():
+    """Load today's odds with time-based cache"""
+    cache_key = "todays_odds"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+    
     engine = get_engine()
     today = get_eastern_date()
     query = text("""
@@ -68,21 +109,41 @@ def load_todays_odds():
             key = (row[0], row[1])
             if key not in odds_map:
                 odds_map[key] = {'home_spread': row[2], 'total': row[3], 'home_ml': row[4], 'away_ml': row[5], 'sportsbook': row[6]}
+    _set_cached(cache_key, odds_map)
     return odds_map
 
-@functools.lru_cache(maxsize=1)
 def load_injuries():
+    """Load injuries with time-based cache"""
+    cache_key = "injuries"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+    
     engine = get_engine()
     query = text("SELECT player_name, team, status, description FROM injuries LIMIT 150")
     with engine.connect() as conn:
         result = conn.execute(query)
-        return [{'player_name': row[0], 'team': row[1], 'status': row[2], 'description': row[3]} for row in result]
+        injuries = [{'player_name': row[0], 'team': row[1], 'status': row[2], 'description': row[3]} for row in result]
+    _set_cached(cache_key, injuries)
+    return injuries
 
-@functools.lru_cache(maxsize=1)
 def load_dashboard_metrics():
+    """Load dashboard metrics with time-based cache"""
+    cache_key = "dashboard_metrics"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+    
     engine = get_engine()
     today = get_eastern_date()
-    metrics = {'games_today': 0, 'active_injuries': 0, 'edges_found': 0, 'system_confidence': 75, 'best_play': 'See Games Tab', 'best_play_conf': 0}
+    metrics = {
+        'games_today': 0, 
+        'active_injuries': 0, 
+        'edges_found': 0, 
+        'system_confidence': 75, 
+        'best_play': 'See Games Tab', 
+        'best_play_conf': 0
+    }
     try:
         with engine.connect() as conn:
             result = conn.execute(text("SELECT COUNT(*) FROM games WHERE date = :today"), {"today": today}).fetchone()
@@ -92,10 +153,16 @@ def load_dashboard_metrics():
             metrics['edges_found'] = metrics['games_today']
     except Exception as e:
         print(f"Metrics error: {e}")
+    _set_cached(cache_key, metrics)
     return metrics
 
-@functools.lru_cache(maxsize=64)
 def get_team_record(team: str, days: int = 30):
+    """Get team record - cached per team"""
+    cache_key = f"team_record_{team}_{days}"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+    
     engine = get_engine()
     today = get_eastern_date()
     start_date = (datetime.strptime(today, '%Y-%m-%d') - timedelta(days=days)).strftime('%Y-%m-%d')
@@ -111,13 +178,22 @@ def get_team_record(team: str, days: int = 30):
     with engine.connect() as conn:
         result = conn.execute(query, {"team": team, "start_date": start_date, "today": today}).fetchone()
         if result and result[0] is not None:
-            return {'wins': int(result[0] or 0), 'losses': int(result[1] or 0), 
+            record = {'wins': int(result[0] or 0), 'losses': int(result[1] or 0), 
                     'home_record': f"{int(result[2] or 0)}-{int(result[3] or 0)}", 
                     'away_record': f"{int(result[4] or 0)}-{int(result[5] or 0)}"}
-    return {'wins': 0, 'losses': 0, 'home_record': '0-0', 'away_record': '0-0'}
+            _set_cached(cache_key, record)
+            return record
+    default = {'wins': 0, 'losses': 0, 'home_record': '0-0', 'away_record': '0-0'}
+    _set_cached(cache_key, default)
+    return default
 
-@functools.lru_cache(maxsize=1)
 def get_hot_teams(limit: int = 5):
+    """Get hot teams with time-based cache"""
+    cache_key = f"hot_teams_{limit}"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+    
     engine = get_engine()
     today = get_eastern_date()
     start_date = (datetime.strptime(today, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
@@ -134,10 +210,17 @@ def get_hot_teams(limit: int = 5):
         FROM team_games GROUP BY team HAVING COUNT(*) >= 5 ORDER BY win_pct DESC, avg_margin DESC LIMIT :limit
     """)
     with engine.connect() as conn:
-        return pd.read_sql(query, conn, params={"start_date": start_date, "today": today, "limit": limit})
+        df = pd.read_sql(query, conn, params={"start_date": start_date, "today": today, "limit": limit})
+        _set_cached(cache_key, df)
+        return df
 
-@functools.lru_cache(maxsize=1)
 def get_cold_teams(limit: int = 5):
+    """Get cold teams with time-based cache"""
+    cache_key = f"cold_teams_{limit}"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+    
     engine = get_engine()
     today = get_eastern_date()
     start_date = (datetime.strptime(today, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
@@ -154,46 +237,70 @@ def get_cold_teams(limit: int = 5):
         FROM team_games GROUP BY team HAVING COUNT(*) >= 5 ORDER BY win_pct ASC, avg_margin ASC LIMIT :limit
     """)
     with engine.connect() as conn:
-        return pd.read_sql(query, conn, params={"start_date": start_date, "today": today, "limit": limit})
+        df = pd.read_sql(query, conn, params={"start_date": start_date, "today": today, "limit": limit})
+        _set_cached(cache_key, df)
+        return df
 
-@functools.lru_cache(maxsize=256)
 def get_player_last_n_games(player_name: str, n: int = 20):
+    """Get player stats with time-based cache"""
+    cache_key = f"player_stats_{player_name}_{n}"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+    
     engine = get_engine()
     query = text("""
         SELECT game_date, pts, reb, ast, stl, blk, fg3m, min, team_abbreviation
         FROM player_boxscores WHERE player_name = :player ORDER BY game_date DESC LIMIT :n
     """)
     with engine.connect() as conn:
-        return pd.read_sql(query, conn, params={"player": player_name, "n": n})
+        df = pd.read_sql(query, conn, params={"player": player_name, "n": n})
+        _set_cached(cache_key, df)
+        return df
 
 def clear_all_caches():
-    load_todays_games.cache_clear()
-    load_todays_odds.cache_clear()
-    load_injuries.cache_clear()
-    load_dashboard_metrics.cache_clear()
-    get_team_record.cache_clear()
-    get_hot_teams.cache_clear()
-    get_cold_teams.cache_clear()
-    get_player_last_n_games.cache_clear()
+    """Clear all caches"""
+    global _cache, _cache_times
+    _cache = {}
+    _cache_times = {}
     print("All caches cleared")
 
-@functools.lru_cache(maxsize=1)
 def load_game_edges():
+    """Load game edges with time-based cache"""
+    cache_key = "game_edges"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+    
     try:
         from algo_brain import analyze_games
-        return analyze_games()
+        edges = analyze_games()
+        _set_cached(cache_key, edges)
+        return edges
     except Exception as e:
-        print(f"Game edges error: {e}")
+        import traceback
+        print(f"Game edge loading error: {e}")
+        traceback.print_exc()
         return []
 
-@functools.lru_cache(maxsize=1)
 def load_prop_edges():
+    """Load prop edges with time-based cache"""
+    cache_key = "prop_edges"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+    
     try:
         from algo_brain import analyze_props
-        return analyze_props()
+        edges = analyze_props()
+        _set_cached(cache_key, edges)
+        return edges
     except Exception as e:
-        print(f"Prop edges error: {e}")
+        import traceback
+        print(f"Prop edge loading error: {e}")
+        traceback.print_exc()
         return []
 
 def get_all_edges():
+    """Get all edges"""
     return load_game_edges(), load_prop_edges()

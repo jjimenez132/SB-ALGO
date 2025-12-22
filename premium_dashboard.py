@@ -390,8 +390,8 @@ def get_db_engine():
     try:
         database_url = os.getenv('DATABASE_URL')
         if not database_url:
-            st.error("⚠️ DATABASE_URL not found in environment variables")
-            return None
+            # Fallback for local testing
+            database_url = "postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db"
         
         engine = create_engine(database_url)
         

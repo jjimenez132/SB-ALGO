@@ -15,7 +15,8 @@ import pytz
 def get_engine():
     database_url = os.getenv('DATABASE_URL')
     if not database_url:
-        raise ValueError("DATABASE_URL not set")
+        # Fallback for local testing
+        database_url = "postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db"
     return create_engine(database_url, pool_pre_ping=True, pool_recycle=300)
 
 def get_eastern_date():

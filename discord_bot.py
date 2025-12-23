@@ -921,3 +921,103 @@ async def grade_algo_pick(ctx, pick_id: int = None, result: str = None):
 async def grade_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
         await ctx.send("❌ Admin only command.")
+
+# ============================================================
+# MY PICKS (show user's active followed picks)
+# ============================================================
+
+@bot.command(name='mypicks', aliases=['following', 'active'])
+async def show_my_picks(ctx):
+    """Show your active followed picks"""
+    if not is_bankroll_channel(ctx):
+        await send_not_allowed(ctx)
+        return
+    
+    from bankroll_manager import is_onboarded
+    from pick_system import get_user_active_picks
+    
+    discord_id = str(ctx.author.id)
+    
+    if not is_onboarded(discord_id):
+        await ctx.send(f"❌ {ctx.author.mention} Use `!setup` first.")
+        return
+    
+    picks = get_user_active_picks(discord_id)
+    
+    if not picks:
+        await ctx.send("📋 No active picks. Follow one with `!bet <pick_id>`")
+        return
+    
+    embed = discord.Embed(title="🎯 Your Active Picks", color=0x667eea)
+    
+    total_risk = 0
+    for pick in picks[:10]:
+        total_risk += pick['stake']
+        embed.add_field(
+            name=f"[{pick['pick_id']}] {pick['name'][:30]}",
+            value=f"{pick['units']}u | ${pick['stake']:,.2f}",
+            inline=False
+        )
+    
+    embed.set_footer(text=f"Total at risk: ${total_risk:,.2f} | Auto-grades when results come in")
+    await ctx.send(embed=embed)
+
+# ============================================================
+# ADMIN: GRADE PICK (grades pick + all followers)
+# ============================================================
+
+@bot.command(name='gp', aliases=['gradepick'])
+@commands.has_permissions(administrator=True)
+async def admin_grade_pick(ctx, pick_id: str = None, result: str = None):
+    """Admin: Grade an algo pick and all followers"""
+    if not pick_id or not result:
+        await ctx.send("Usage: `!gp <pick_id> win/loss/void`\nExample: `!gp P03 win`")
+        return
+    
+    result = result.lower()
+    result_map = {'w': 'win', 'l': 'loss', 'v': 'void', 'p': 'void'}
+    result = result_map.get(result, result)
+    
+    if result not in ['win', 'loss', 'void']:
+        await ctx.send("❌ Result must be: win, loss, or void")
+        return
+    
+    from pick_system import grade_pick
+    
+    graded = grade_pick(pick_id.upper(), result)
+    
+    if not graded['success']:
+        await ctx.send(f"❌ {graded['error']}")
+        return
+    
+    emoji = "✅" if result == 'win' else "❌" if result == 'loss' else "🟨"
+    color = 0x00FF00 if result == 'win' else 0xFF0000 if result == 'loss' else 0xFFFF00
+    
+    embed = discord.Embed(
+        title=f"{emoji} Pick [{pick_id.upper()}] Graded: {result.upper()}",
+        color=color
+    )
+    embed.add_field(name="Result Units", value=f"{graded['result_units']:+.1f}u", inline=True)
+    embed.add_field(name="Followers Updated", value=str(len(graded['followers_graded'])), inline=True)
+    
+    await ctx.send(embed=embed)
+    
+    # DM each follower
+    for follower in graded['followers_graded']:
+        try:
+            user = await bot.fetch_user(int(follower['discord_id']))
+            dm_embed = discord.Embed(
+                title=f"{emoji} Pick [{pick_id.upper()}] Result: {result.upper()}",
+                color=color
+            )
+            dm_embed.add_field(name="Your P/L", value=f"${follower['pnl']:+,.2f}", inline=True)
+            if follower['new_bankroll']:
+                dm_embed.add_field(name="New Bankroll", value=f"${follower['new_bankroll']:,.2f}", inline=True)
+            await user.send(embed=dm_embed)
+        except:
+            pass  # Can't DM user
+
+@admin_grade_pick.error
+async def admin_grade_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ Admin only command.")

@@ -548,3 +548,258 @@ def build_health_embed(discord_id: str):
     return embed
 
 print("✅ bankroll_manager.py loaded successfully")
+
+# ============================================================
+# STAKE PREVIEW
+# ============================================================
+
+def preview_bet(discord_id: str, units: float, odds: int, description: str = ""):
+    """Preview a bet before placing it - shows full impact analysis"""
+    settings = get_bankroll_settings(discord_id)
+    if not settings:
+        return None
+    
+    current = float(settings['current_bankroll'])
+    unit_size = float(settings['unit_size'])
+    stake = unit_size * units
+    
+    # Calculate potential outcomes
+    if odds > 0:
+        potential_win = stake * (odds / 100)
+    else:
+        potential_win = stake * (100 / abs(odds))
+    
+    potential_loss = stake
+    
+    bankroll_if_win = current + potential_win
+    bankroll_if_loss = current - potential_loss
+    
+    # Exposure analysis
+    daily_used = float(settings['daily_exposure_used'])
+    max_daily = current * float(settings['max_daily_exposure_pct']) / 100
+    max_single = current * float(settings['max_single_game_pct']) / 100
+    
+    new_daily_exposure = daily_used + stake
+    daily_remaining = max_daily - new_daily_exposure
+    
+    # Risk checks
+    warnings = []
+    
+    # Check single bet limit
+    if stake > max_single:
+        warnings.append(f"⚠️ Exceeds max single bet (${max_single:,.2f})")
+    
+    # Check daily exposure
+    if new_daily_exposure > max_daily:
+        warnings.append(f"⚠️ Exceeds daily exposure limit (${max_daily:,.2f})")
+    
+    # Check stop loss
+    stop_loss = float(settings['stop_loss_limit'])
+    daily_pnl = float(settings['daily_profit_today'])
+    if stop_loss > 0 and daily_pnl <= -stop_loss:
+        warnings.append(f"🛑 Stop loss already hit (-${stop_loss:,.2f})")
+    
+    # Check if loss would hit stop loss
+    if stop_loss > 0 and (daily_pnl - stake) <= -stop_loss:
+        warnings.append(f"⚠️ Loss would trigger stop loss")
+    
+    # Discipline warnings
+    if daily_pnl < 0 and units > 1.0:
+        warnings.append("💡 Consider smaller size after losses")
+    
+    return {
+        'stake': stake,
+        'units': units,
+        'odds': odds,
+        'pct_of_bankroll': (stake / current) * 100,
+        'potential_win': potential_win,
+        'potential_loss': potential_loss,
+        'bankroll_if_win': bankroll_if_win,
+        'bankroll_if_loss': bankroll_if_loss,
+        'roi_if_win': ((bankroll_if_win - float(settings['starting_bankroll'])) / float(settings['starting_bankroll'])) * 100,
+        'roi_if_loss': ((bankroll_if_loss - float(settings['starting_bankroll'])) / float(settings['starting_bankroll'])) * 100,
+        'daily_exposure_after': new_daily_exposure,
+        'daily_remaining': max(0, daily_remaining),
+        'max_daily': max_daily,
+        'warnings': warnings,
+        'allowed': len([w for w in warnings if w.startswith('⚠️') or w.startswith('🛑')]) == 0
+    }
+
+def build_preview_embed(discord_id: str, units: float, odds: int, description: str = ""):
+    """Build Discord embed for bet preview"""
+    preview = preview_bet(discord_id, units, odds, description)
+    if not preview:
+        return None
+    
+    # Color based on risk
+    if not preview['allowed']:
+        color = 0xFF0000  # Red - blocked
+    elif preview['warnings']:
+        color = 0xFFA500  # Orange - caution
+    else:
+        color = 0x00FF00  # Green - good
+    
+    title = f"🔍 Bet Preview: {units}u @ {odds:+d}"
+    if description:
+        title = f"🔍 Preview: {description[:30]}"
+    
+    embed = {
+        "title": title,
+        "color": color,
+        "fields": [
+            {"name": "💵 Stake", "value": f"**${preview['stake']:,.2f}**\n({preview['pct_of_bankroll']:.1f}% of bankroll)", "inline": True},
+            {"name": "📈 If Win", "value": f"+${preview['potential_win']:,.2f}\n→ ${preview['bankroll_if_win']:,.2f}", "inline": True},
+            {"name": "📉 If Loss", "value": f"-${preview['potential_loss']:,.2f}\n→ ${preview['bankroll_if_loss']:,.2f}", "inline": True},
+            {"name": "📊 Daily Exposure", "value": f"${preview['daily_exposure_after']:,.2f} / ${preview['max_daily']:,.2f}\nRemaining: ${preview['daily_remaining']:,.2f}", "inline": False},
+        ]
+    }
+    
+    if preview['warnings']:
+        embed['fields'].append({
+            "name": "⚠️ Warnings",
+            "value": "\n".join(preview['warnings']),
+            "inline": False
+        })
+    
+    status = "✅ Within limits" if preview['allowed'] else "❌ Exceeds limits"
+    embed['footer'] = {"text": f"{status} | To place: !bet {units} {odds} <pick>"}
+    
+    return embed
+
+# ============================================================
+# DAILY SNAPSHOTS
+# ============================================================
+
+def save_daily_snapshot(discord_id: str):
+    """Save daily bankroll snapshot for equity curve"""
+    settings = get_bankroll_settings(discord_id)
+    if not settings:
+        return False
+    
+    engine = get_engine()
+    with engine.connect() as conn:
+        # Count today's bets
+        bet_stats = conn.execute(text("""
+            SELECT COUNT(*), 
+                   SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN result = 'loss' THEN 1 ELSE 0 END)
+            FROM user_bets 
+            WHERE discord_id = :did 
+            AND DATE(placed_at) = CURRENT_DATE
+        """), {"did": discord_id}).fetchone()
+        
+        conn.execute(text("""
+            INSERT INTO bankroll_history 
+            (discord_id, date, bankroll_value, daily_pnl, bets_placed, wins, losses)
+            VALUES (:did, CURRENT_DATE, :bv, :pnl, :bets, :wins, :losses)
+            ON CONFLICT (discord_id, date) DO UPDATE SET
+                bankroll_value = :bv,
+                daily_pnl = :pnl,
+                bets_placed = :bets,
+                wins = :wins,
+                losses = :losses
+        """), {
+            "did": discord_id,
+            "bv": settings['current_bankroll'],
+            "pnl": settings['daily_profit_today'],
+            "bets": bet_stats[0] or 0,
+            "wins": bet_stats[1] or 0,
+            "losses": bet_stats[2] or 0
+        })
+        conn.commit()
+    return True
+
+def get_equity_curve(discord_id: str, days: int = 30):
+    """Get bankroll history for equity curve"""
+    engine = get_engine()
+    with engine.connect() as conn:
+        results = conn.execute(text("""
+            SELECT date, bankroll_value, daily_pnl
+            FROM bankroll_history
+            WHERE discord_id = :did
+            ORDER BY date DESC
+            LIMIT :days
+        """), {"did": discord_id, "days": days}).fetchall()
+        return [{"date": r[0], "value": float(r[1]), "pnl": float(r[2])} for r in results]
+
+# ============================================================
+# DISCIPLINE WARNINGS
+# ============================================================
+
+def check_discipline(discord_id: str, proposed_units: float):
+    """Check for discipline issues and return warnings"""
+    settings = get_bankroll_settings(discord_id)
+    if not settings:
+        return []
+    
+    warnings = []
+    
+    daily_pnl = float(settings['daily_profit_today'])
+    current_streak = settings['current_streak']
+    
+    # Warning: Increasing size after loss
+    if daily_pnl < 0 and proposed_units > 1.0:
+        warnings.append({
+            "type": "tilt_risk",
+            "message": "💡 You're increasing size after a losing day. Consider standard sizing.",
+            "severity": "medium"
+        })
+    
+    # Warning: On a losing streak
+    if current_streak < -2:
+        warnings.append({
+            "type": "streak",
+            "message": f"📉 You're on a {abs(current_streak)}-bet losing streak. Maybe take a break?",
+            "severity": "medium"
+        })
+    
+    # Warning: Near stop loss
+    stop_loss = float(settings['stop_loss_limit'])
+    if stop_loss > 0 and daily_pnl < 0:
+        pct_to_stop = abs(daily_pnl) / stop_loss * 100
+        if pct_to_stop >= 75:
+            warnings.append({
+                "type": "stop_loss",
+                "message": f"⚠️ You're {pct_to_stop:.0f}% to your stop loss. Proceed carefully.",
+                "severity": "high"
+            })
+    
+    # Warning: High exposure already
+    daily_used = float(settings['daily_exposure_used'])
+    current = float(settings['current_bankroll'])
+    max_daily = current * float(settings['max_daily_exposure_pct']) / 100
+    if daily_used > max_daily * 0.75:
+        warnings.append({
+            "type": "exposure",
+            "message": f"📊 You've used {daily_used/max_daily*100:.0f}% of daily exposure.",
+            "severity": "low"
+        })
+    
+    return warnings
+
+def send_discipline_dm_content(warnings: list):
+    """Generate DM content for discipline warnings"""
+    if not warnings:
+        return None
+    
+    high = [w for w in warnings if w['severity'] == 'high']
+    medium = [w for w in warnings if w['severity'] == 'medium']
+    
+    if high:
+        title = "🛑 Risk Alert"
+        color = 0xFF0000
+    elif medium:
+        title = "💡 Discipline Check"
+        color = 0xFFA500
+    else:
+        title = "📊 Quick Note"
+        color = 0x667eea
+    
+    messages = [w['message'] for w in warnings]
+    
+    return {
+        "title": title,
+        "description": "\n\n".join(messages),
+        "color": color,
+        "footer": {"text": "This is coaching, not control. You decide."}
+    }

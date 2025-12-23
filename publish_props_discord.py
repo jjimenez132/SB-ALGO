@@ -120,3 +120,23 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# ============================================================
+# RESULTS INTEGRATION
+# ============================================================
+
+def post_prop_to_results(player: str, pick: str, units: float, odds: int = None):
+    """Post prop to #results channel for tracking"""
+    try:
+        from discord_results import create_pick_message
+        pick_name = f"{player} {pick}"
+        pick_id, message_id = create_pick_message('prop', pick_name, units, odds)
+        log.info(f"📊 Created results entry #{pick_id} for: {pick_name}")
+        return pick_id
+    except Exception as e:
+        log.warning(f"Could not post to results: {e}")
+        return None
+
+def get_pick_footer():
+    """Footer to add to prop embeds"""
+    return "📊 Tracking in #results | Personal stake: !preview"

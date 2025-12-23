@@ -8,7 +8,6 @@ Full-featured bot with bankroll management, bet tracking, and AI analysis.
 import os
 import discord
 from discord.ext import commands
-from discord import app_commands
 import logging
 import asyncio
 
@@ -28,8 +27,98 @@ intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 
-# Allowed channels for bot responses
-ALLOWED_CHANNELS = ['algo-chat', 'ask-algo', 'bot-test', 'bankroll', 'risk-desk']
+# Channel configuration
+BANKROLL_CHANNEL = 'bankroll-dashboard'  # ONLY channel for bankroll commands
+CHAT_CHANNELS = ['algo-chat', 'ask-algo', 'bot-test']  # Channels for general AI chat
+
+# ============================================================
+# HELPER FUNCTIONS
+# ============================================================
+
+def is_bankroll_channel(ctx):
+    """Check if command is in bankroll channel"""
+    return hasattr(ctx.channel, 'name') and ctx.channel.name == BANKROLL_CHANNEL
+
+async def send_not_allowed(ctx):
+    """Send message that command must be used in bankroll channel"""
+    await ctx.message.delete()  # Delete the command
+    try:
+        await ctx.author.send(
+            f"⚠️ Bankroll commands only work in **#{BANKROLL_CHANNEL}**\n"
+            f"Please go there to manage your bankroll."
+        )
+    except:
+        pass  # Can't DM user
+
+async def send_welcome_embed(channel):
+    """Send the welcome/instruction embed to bankroll channel"""
+    embed = discord.Embed(
+        title="💰 Bankroll Manager — Financial Control Suite",
+        description=(
+            "Welcome to your **hedge fund-style** bankroll management system.\n\n"
+            "**Get started by typing:** `!setup`"
+        ),
+        color=0x667eea
+    )
+    
+    embed.add_field(
+        name="🚀 QUICK START",
+        value=(
+            "`!setup` — Configure your bankroll (required first)\n"
+            "`!bankroll` — View your full dashboard\n"
+            "`!stake` — See your bet sizes"
+        ),
+        inline=False
+    )
+    
+    embed.add_field(
+        name="💵 BANKROLL COMMANDS",
+        value=(
+            "`!bankroll` — Full dashboard view\n"
+            "`!health` — Bankroll health analysis\n"
+            "`!update <amount>` — Update current bankroll\n"
+            "`!limits` — View/set exposure limits\n"
+            "`!targets` — Set profit goal & stop loss"
+        ),
+        inline=True
+    )
+    
+    embed.add_field(
+        name="🎯 BET SIZING",
+        value=(
+            "`!stake` — View all unit sizes\n"
+            "`!stake 1.5` — Calculate specific stake\n"
+            "🟢 0.5u = Low confidence\n"
+            "🟡 1.0u = Standard\n"
+            "🔴 2.0u = High confidence"
+        ),
+        inline=True
+    )
+    
+    embed.add_field(
+        name="📝 BET TRACKING",
+        value=(
+            "`!bet <units> <odds> <pick>` — Log a bet\n"
+            "`!grade <id> <win/loss>` — Grade result\n"
+            "`!pending` — View open bets\n"
+            "`!history` — Bet history & P/L"
+        ),
+        inline=False
+    )
+    
+    embed.add_field(
+        name="⚠️ Risk Management Notice",
+        value=(
+            "Good bankroll management is essential to long-term success. "
+            "This tool helps you plan, track, and structure your approach responsibly. "
+            "Never bet more than you can afford to lose."
+        ),
+        inline=False
+    )
+    
+    embed.set_footer(text="SB-ALGO — Institutional-grade bankroll allocation for disciplined bettors")
+    
+    return embed
 
 # ============================================================
 # BOT EVENTS
@@ -46,25 +135,58 @@ async def on_ready():
 
 @bot.event
 async def on_member_join(member):
-    """Welcome new members and start onboarding"""
+    """Welcome new members via DM and direct to bankroll channel"""
     try:
         embed = discord.Embed(
             title="🎯 Welcome to SB-ALGO",
-            description=f"Hey {member.name}! Welcome to the edge.\n\n"
-                       f"**Get started by setting up your bankroll:**\n"
-                       f"Type `!setup` to configure your personal bankroll manager.",
+            description=(
+                f"Hey **{member.name}**! Welcome to the edge.\n\n"
+                f"I'm your personal bankroll manager and betting assistant."
+            ),
             color=0x667eea
         )
-        embed.add_field(name="📊 What you get:", value=(
-            "• Personalized unit sizing\n"
-            "• Exposure limit tracking\n"
-            "• Performance analytics\n"
-            "• Bet logging & P/L tracking"
-        ), inline=False)
-        embed.set_footer(text="SB-ALGO — Institutional-grade sports betting intelligence")
+        
+        embed.add_field(
+            name="🚀 Get Started",
+            value=(
+                f"**Step 1:** Go to **#{BANKROLL_CHANNEL}**\n"
+                f"**Step 2:** Type `!setup` to configure your bankroll\n"
+                f"**Step 3:** Start receiving personalized bet sizing!"
+            ),
+            inline=False
+        )
+        
+        embed.add_field(
+            name="💰 What You Get",
+            value=(
+                "• **Personal unit sizing** based on YOUR bankroll\n"
+                "• **Exposure tracking** to manage risk\n"
+                "• **Performance analytics** (ROI, win rate, streaks)\n"
+                "• **Bet logging** with P/L tracking\n"
+                "• **AI-powered** game analysis"
+            ),
+            inline=False
+        )
+        
+        embed.add_field(
+            name="📊 Quick Commands",
+            value=(
+                "`!setup` — Configure bankroll\n"
+                "`!bankroll` — View dashboard\n"
+                "`!picks` — Today's top picks\n"
+                "`!help` — All commands"
+            ),
+            inline=False
+        )
+        
+        embed.set_footer(text="Head to #bankroll-dashboard to begin!")
+        
         await member.send(embed=embed)
-    except:
-        pass  # Can't DM user
+        log.info(f"Sent welcome DM to {member.name}")
+    except discord.Forbidden:
+        log.info(f"Could not DM {member.name} (DMs disabled)")
+    except Exception as e:
+        log.error(f"Error sending welcome DM: {e}")
 
 @bot.event
 async def on_message(message):
@@ -74,14 +196,13 @@ async def on_message(message):
     # Process commands first
     await bot.process_commands(message)
     
-    # Natural language in allowed channels
+    # Natural language AI chat in allowed channels
     channel_name = message.channel.name.lower() if hasattr(message.channel, 'name') else ''
-    if any(allowed in channel_name for allowed in ALLOWED_CHANNELS):
-        # Skip if it's a command
+    
+    if any(ch in channel_name for ch in CHAT_CHANNELS):
         if message.content.startswith('!'):
             return
         
-        # Only respond to @mentions or direct questions
         if bot.user.mentioned_in(message) or '?' in message.content:
             async with message.channel.typing():
                 try:
@@ -92,31 +213,37 @@ async def on_message(message):
                     await message.reply(f"⚠️ Error: {str(e)}")
 
 # ============================================================
-# ONBOARDING COMMANDS
+# BANKROLL SETUP (only in #bankroll-dashboard)
 # ============================================================
 
 @bot.command(name='setup')
 async def setup_bankroll(ctx):
-    """Start bankroll setup wizard"""
+    """Start bankroll setup wizard - ONLY in #bankroll-dashboard"""
+    if not is_bankroll_channel(ctx):
+        await send_not_allowed(ctx)
+        return
+    
     from bankroll_manager import get_user, create_user, is_onboarded, create_bankroll_settings, complete_onboarding
     
     discord_id = str(ctx.author.id)
     username = str(ctx.author.name)
     
-    # Create user if doesn't exist
     create_user(discord_id, username)
     
     if is_onboarded(discord_id):
-        await ctx.send("✅ You're already set up! Use `!bankroll` to view your settings or `!update` to change them.")
+        await ctx.send(f"✅ {ctx.author.mention} You're already set up! Use `!bankroll` to view your settings.")
         return
     
+    # Welcome embed
     embed = discord.Embed(
         title="💰 Bankroll Setup Wizard",
-        description="Let's configure your hedge fund-style bankroll manager.\n\n"
-                   "**Step 1 of 4:** What's your starting bankroll?",
+        description=(
+            f"Welcome {ctx.author.mention}! Let's configure your hedge fund-style bankroll.\n\n"
+            f"**Step 1 of 4:** What's your starting bankroll?\n"
+            f"_(Type a number, e.g., `5000` for $5,000)_"
+        ),
         color=0x667eea
     )
-    embed.add_field(name="Example", value="Type a number like `5000` for $5,000", inline=False)
     embed.set_footer(text="Type 'cancel' at any time to exit")
     await ctx.send(embed=embed)
     
@@ -132,123 +259,168 @@ async def setup_bankroll(ctx):
         
         try:
             starting_bankroll = float(msg.content.replace('$', '').replace(',', ''))
+            if starting_bankroll < 100:
+                await ctx.send("❌ Minimum bankroll is $100. Please run `!setup` again.")
+                return
         except:
-            await ctx.send("❌ Invalid amount. Please run `!setup` again.")
+            await ctx.send("❌ Invalid amount. Please run `!setup` again with a number like `5000`")
             return
         
-        # Step 2: Risk Method
+        # Step 2: Strategy Profile
         embed = discord.Embed(
             title="💰 Bankroll Setup Wizard",
-            description=f"Great! Starting bankroll: **${starting_bankroll:,.2f}**\n\n"
-                       f"**Step 2 of 4:** Choose your risk method:",
+            description=(
+                f"Starting bankroll: **${starting_bankroll:,.2f}** ✅\n\n"
+                f"**Step 2 of 4:** Choose your strategy profile:\n"
+            ),
             color=0x667eea
         )
-        embed.add_field(name="1️⃣ Percentage", value="Risk % of bankroll per bet (recommended)", inline=False)
-        embed.add_field(name="2️⃣ Fixed", value="Fixed dollar amount per bet", inline=False)
-        embed.add_field(name="3️⃣ Units", value="Fixed unit system", inline=False)
+        embed.add_field(name="1️⃣ Conservative", value="1-2% risk per bet\nSteady, low variance", inline=False)
+        embed.add_field(name="2️⃣ Balanced", value="2-3% risk per bet\nRecommended for most", inline=False)
+        embed.add_field(name="3️⃣ Aggressive", value="3-5% risk per bet\nHigher variance", inline=False)
         await ctx.send(embed=embed)
         
         msg = await bot.wait_for('message', check=check, timeout=60)
-        risk_method_map = {'1': 'percentage', '2': 'fixed', '3': 'units', 
-                          'percentage': 'percentage', 'fixed': 'fixed', 'units': 'units'}
-        risk_method = risk_method_map.get(msg.content.lower().strip(), 'percentage')
+        strategy_map = {'1': 'conservative', '2': 'balanced', '3': 'aggressive'}
+        strategy = strategy_map.get(msg.content.strip(), 'balanced')
         
-        # Step 3: Max Risk %
+        # Set default risk based on strategy
+        risk_defaults = {'conservative': 1.5, 'balanced': 2.5, 'aggressive': 4.0}
+        default_risk = risk_defaults[strategy]
+        
+        # Step 3: Confirm or customize risk %
         embed = discord.Embed(
             title="💰 Bankroll Setup Wizard",
-            description=f"Risk method: **{risk_method.title()}**\n\n"
-                       f"**Step 3 of 4:** What's your max risk per bet?\n"
-                       f"(Enter a number between 1-10)",
+            description=(
+                f"Strategy: **{strategy.title()}** ✅\n\n"
+                f"**Step 3 of 4:** Max risk per bet?\n\n"
+                f"Default for {strategy}: **{default_risk}%**\n"
+                f"_(Type a number 1-10, or `ok` to use default)_"
+            ),
             color=0x667eea
         )
-        embed.add_field(name="🟢 Conservative", value="1-2%", inline=True)
-        embed.add_field(name="🟡 Balanced", value="2-3%", inline=True)
-        embed.add_field(name="🔴 Aggressive", value="3-5%", inline=True)
         await ctx.send(embed=embed)
         
         msg = await bot.wait_for('message', check=check, timeout=60)
-        try:
-            max_risk_pct = float(msg.content.replace('%', ''))
-            max_risk_pct = max(1, min(10, max_risk_pct))  # Clamp 1-10
-        except:
-            max_risk_pct = 2.0
+        if msg.content.lower() in ['ok', 'yes', 'y', 'default']:
+            max_risk_pct = default_risk
+        else:
+            try:
+                max_risk_pct = float(msg.content.replace('%', ''))
+                max_risk_pct = max(1, min(10, max_risk_pct))
+            except:
+                max_risk_pct = default_risk
         
-        # Step 4: Strategy Profile
-        embed = discord.Embed(
-            title="💰 Bankroll Setup Wizard",
-            description=f"Max risk: **{max_risk_pct}%** per bet\n\n"
-                       f"**Step 4 of 4:** Choose your strategy profile:",
-            color=0x667eea
-        )
-        embed.add_field(name="🟢 1. Conservative", value="Lower variance, steady growth", inline=False)
-        embed.add_field(name="🟡 2. Balanced", value="Moderate risk/reward (recommended)", inline=False)
-        embed.add_field(name="🔴 3. Aggressive", value="Higher variance, faster growth potential", inline=False)
-        await ctx.send(embed=embed)
-        
-        msg = await bot.wait_for('message', check=check, timeout=60)
-        strategy_map = {'1': 'conservative', '2': 'balanced', '3': 'aggressive',
-                       'conservative': 'conservative', 'balanced': 'balanced', 'aggressive': 'aggressive'}
-        strategy = strategy_map.get(msg.content.lower().strip(), 'balanced')
-        
-        # Save settings
-        create_bankroll_settings(discord_id, starting_bankroll, risk_method, max_risk_pct, strategy)
-        complete_onboarding(discord_id)
-        
-        # Calculate unit size
+        # Step 4: Session targets (optional)
         unit_size = starting_bankroll * (max_risk_pct / 100)
+        
+        embed = discord.Embed(
+            title="💰 Bankroll Setup Wizard",
+            description=(
+                f"Risk per bet: **{max_risk_pct}%** = **${unit_size:,.2f}** per unit ✅\n\n"
+                f"**Step 4 of 4:** Set daily targets (optional)\n\n"
+                f"Type your **daily profit goal** in dollars, or `skip` to set later.\n"
+                f"_(e.g., `500` for $500 daily goal)_"
+            ),
+            color=0x667eea
+        )
+        await ctx.send(embed=embed)
+        
+        msg = await bot.wait_for('message', check=check, timeout=60)
+        if msg.content.lower() in ['skip', 'no', 'n', '0']:
+            profit_goal = 0
+            stop_loss = 0
+        else:
+            try:
+                profit_goal = float(msg.content.replace('$', '').replace(',', ''))
+                stop_loss = profit_goal  # Default stop loss = profit goal
+            except:
+                profit_goal = 0
+                stop_loss = 0
+        
+        # Save everything
+        create_bankroll_settings(discord_id, starting_bankroll, 'percentage', max_risk_pct, strategy)
+        
+        if profit_goal > 0:
+            from bankroll_manager import set_session_targets
+            set_session_targets(discord_id, profit_goal, stop_loss)
+        
+        complete_onboarding(discord_id)
         
         # Final summary
         embed = discord.Embed(
             title="✅ Bankroll Setup Complete!",
-            description="Your hedge fund-style bankroll is ready.",
+            description=f"Welcome to the edge, {ctx.author.mention}!",
             color=0x00FF00
         )
-        embed.add_field(name="💵 Starting Bankroll", value=f"${starting_bankroll:,.2f}", inline=True)
-        embed.add_field(name="📊 Risk Method", value=risk_method.title(), inline=True)
-        embed.add_field(name="⚠️ Max Risk", value=f"{max_risk_pct}%", inline=True)
+        embed.add_field(name="💵 Bankroll", value=f"${starting_bankroll:,.2f}", inline=True)
         embed.add_field(name="📈 Strategy", value=strategy.title(), inline=True)
-        embed.add_field(name="🎯 Unit Size", value=f"${unit_size:,.2f}", inline=True)
-        embed.add_field(name="\u200b", value="\u200b", inline=True)
+        embed.add_field(name="⚠️ Risk/Bet", value=f"{max_risk_pct}%", inline=True)
+        
+        embed.add_field(name="\u200b", value="**🎯 Your Bet Sizes:**", inline=False)
         embed.add_field(name="🟢 Low (0.5u)", value=f"${unit_size * 0.5:,.2f}", inline=True)
         embed.add_field(name="🟡 Standard (1u)", value=f"${unit_size:,.2f}", inline=True)
         embed.add_field(name="🔴 High (2u)", value=f"${unit_size * 2:,.2f}", inline=True)
-        embed.set_footer(text="Use !bankroll to view | !stake to calculate bets | !help for all commands")
+        
+        if profit_goal > 0:
+            embed.add_field(name="🎯 Daily Goal", value=f"${profit_goal:,.2f}", inline=True)
+            embed.add_field(name="🛑 Stop Loss", value=f"${stop_loss:,.2f}", inline=True)
+        
+        embed.add_field(
+            name="📚 Next Steps",
+            value=(
+                "`!bankroll` — View full dashboard\n"
+                "`!stake` — See all bet sizes\n"
+                "`!bet 1 -110 Lakers ML` — Log a bet\n"
+                "`!help` — All commands"
+            ),
+            inline=False
+        )
+        
+        embed.set_footer(text="Your bankroll is now being tracked. Good luck! 🍀")
         await ctx.send(embed=embed)
         
     except asyncio.TimeoutError:
         await ctx.send("⏰ Setup timed out. Run `!setup` to try again.")
 
 # ============================================================
-# BANKROLL COMMANDS
+# BANKROLL COMMANDS (only in #bankroll-dashboard)
 # ============================================================
 
-@bot.command(name='bankroll', aliases=['br', 'bank'])
+@bot.command(name='bankroll', aliases=['br', 'bank', 'dashboard'])
 async def show_bankroll(ctx):
-    """Show your bankroll overview"""
+    """Show your bankroll dashboard"""
+    if not is_bankroll_channel(ctx):
+        await send_not_allowed(ctx)
+        return
+    
     from bankroll_manager import is_onboarded, build_bankroll_embed
     
     discord_id = str(ctx.author.id)
     
     if not is_onboarded(discord_id):
-        await ctx.send("❌ You haven't set up your bankroll yet. Use `!setup` to get started.")
+        await ctx.send(f"❌ {ctx.author.mention} You need to set up first! Type `!setup` to begin.")
         return
     
     embed_data = build_bankroll_embed(discord_id)
     if embed_data:
         embed = discord.Embed.from_dict(embed_data)
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url if ctx.author.avatar else None)
         await ctx.send(embed=embed)
-    else:
-        await ctx.send("⚠️ Could not load bankroll data.")
 
 @bot.command(name='health')
 async def show_health(ctx):
-    """Show bankroll health analysis"""
+    """Show bankroll health"""
+    if not is_bankroll_channel(ctx):
+        await send_not_allowed(ctx)
+        return
+    
     from bankroll_manager import is_onboarded, build_health_embed
     
     discord_id = str(ctx.author.id)
     
     if not is_onboarded(discord_id):
-        await ctx.send("❌ Use `!setup` first.")
+        await ctx.send(f"❌ {ctx.author.mention} Use `!setup` first.")
         return
     
     embed_data = build_health_embed(discord_id)
@@ -257,179 +429,219 @@ async def show_health(ctx):
         await ctx.send(embed=embed)
 
 @bot.command(name='stake', aliases=['unit', 'size'])
-async def show_stake(ctx, units: float = 1.0):
-    """Calculate your stake for given units"""
+async def show_stake(ctx, units: float = None):
+    """Show/calculate bet sizes"""
+    if not is_bankroll_channel(ctx):
+        await send_not_allowed(ctx)
+        return
+    
     from bankroll_manager import is_onboarded, get_bet_sizes, check_exposure
     
     discord_id = str(ctx.author.id)
     
     if not is_onboarded(discord_id):
-        await ctx.send("❌ Use `!setup` first.")
+        await ctx.send(f"❌ {ctx.author.mention} Use `!setup` first.")
         return
     
     sizes = get_bet_sizes(discord_id)
-    stake = sizes['unit_size'] * units
     
-    # Check exposure
-    exposure = check_exposure(discord_id, stake)
+    if units:
+        stake = sizes['unit_size'] * units
+        exposure = check_exposure(discord_id, stake)
+        
+        embed = discord.Embed(
+            title=f"🎯 Stake: {units}u = ${stake:,.2f}",
+            color=0x00FF00 if exposure['allowed'] else 0xFF0000
+        )
+        if not exposure['allowed']:
+            embed.add_field(name="⚠️ Warning", value=exposure['reason'], inline=False)
+    else:
+        embed = discord.Embed(
+            title="🎯 Your Bet Sizes",
+            description=f"**1 Unit = ${sizes['unit_size']:,.2f}**",
+            color=0x667eea
+        )
+        embed.add_field(name="🟢 Low Confidence", value=f"0.5u = **${sizes['low_confidence']['stake']:,.2f}**\n60-70% plays", inline=True)
+        embed.add_field(name="🟡 Standard", value=f"1.0u = **${sizes['standard']['stake']:,.2f}**\n70-80% plays", inline=True)
+        embed.add_field(name="🔴 High Confidence", value=f"2.0u = **${sizes['high_confidence']['stake']:,.2f}**\n80%+ plays", inline=True)
+        embed.add_field(name="📊 Limits", value=f"Max single: ${sizes['max_bet']:,.2f}\nMax daily: ${sizes['max_daily']:,.2f}", inline=False)
     
-    embed = discord.Embed(
-        title=f"🎯 Stake Calculator — {units}u",
-        color=0x00FF00 if exposure['allowed'] else 0xFF0000
-    )
-    embed.add_field(name="💵 Your Stake", value=f"**${stake:,.2f}**", inline=False)
-    embed.add_field(name="🟢 0.5u", value=f"${sizes['low_confidence']['stake']:,.2f}", inline=True)
-    embed.add_field(name="🟡 1.0u", value=f"${sizes['standard']['stake']:,.2f}", inline=True)
-    embed.add_field(name="🔴 2.0u", value=f"${sizes['high_confidence']['stake']:,.2f}", inline=True)
-    
-    if not exposure['allowed']:
-        embed.add_field(name="⚠️ Warning", value=exposure['reason'], inline=False)
-    
-    embed.set_footer(text=f"Max single bet: ${sizes['max_bet']:,.2f} | Max daily: ${sizes['max_daily']:,.2f}")
     await ctx.send(embed=embed)
 
 @bot.command(name='update')
 async def update_bankroll(ctx, amount: str = None):
-    """Update your current bankroll"""
+    """Update current bankroll"""
+    if not is_bankroll_channel(ctx):
+        await send_not_allowed(ctx)
+        return
+    
     from bankroll_manager import is_onboarded, update_bankroll as update_br, get_bankroll_settings
     
     discord_id = str(ctx.author.id)
     
     if not is_onboarded(discord_id):
-        await ctx.send("❌ Use `!setup` first.")
+        await ctx.send(f"❌ Use `!setup` first.")
         return
     
     if not amount:
         settings = get_bankroll_settings(discord_id)
-        await ctx.send(f"💵 Current bankroll: **${float(settings['current_bankroll']):,.2f}**\n"
-                      f"To update, use: `!update 12500`")
+        await ctx.send(f"💵 Current bankroll: **${float(settings['current_bankroll']):,.2f}**\nTo update: `!update 12500`")
         return
     
     try:
         new_amount = float(amount.replace('$', '').replace(',', ''))
         update_br(discord_id, new_amount)
-        await ctx.send(f"✅ Bankroll updated to **${new_amount:,.2f}**")
+        
+        # Show updated unit size
+        new_settings = get_bankroll_settings(discord_id)
+        unit_size = float(new_settings['unit_size'])
+        
+        embed = discord.Embed(title="✅ Bankroll Updated", color=0x00FF00)
+        embed.add_field(name="New Bankroll", value=f"${new_amount:,.2f}", inline=True)
+        embed.add_field(name="New Unit Size", value=f"${unit_size:,.2f}", inline=True)
+        await ctx.send(embed=embed)
     except:
         await ctx.send("❌ Invalid amount. Use: `!update 12500`")
 
 @bot.command(name='limits')
 async def set_limits(ctx, daily: str = None, single: str = None):
-    """Set exposure limits"""
+    """View/set exposure limits"""
+    if not is_bankroll_channel(ctx):
+        await send_not_allowed(ctx)
+        return
+    
     from bankroll_manager import is_onboarded, set_exposure_limits, get_bankroll_settings
     
     discord_id = str(ctx.author.id)
     
     if not is_onboarded(discord_id):
-        await ctx.send("❌ Use `!setup` first.")
+        await ctx.send(f"❌ Use `!setup` first.")
         return
     
     settings = get_bankroll_settings(discord_id)
+    current = float(settings['current_bankroll'])
     
     if not daily or not single:
-        await ctx.send(f"📊 **Current Exposure Limits:**\n"
-                      f"• Max Daily: {float(settings['max_daily_exposure_pct'])}%\n"
-                      f"• Max Single Bet: {float(settings['max_single_game_pct'])}%\n\n"
-                      f"To change: `!limits 10 5` (10% daily, 5% single)")
+        daily_pct = float(settings['max_daily_exposure_pct'])
+        single_pct = float(settings['max_single_game_pct'])
+        
+        embed = discord.Embed(title="📊 Exposure Limits", color=0x667eea)
+        embed.add_field(name="Max Daily Exposure", value=f"{daily_pct}% = ${current * daily_pct / 100:,.2f}", inline=False)
+        embed.add_field(name="Max Single Bet", value=f"{single_pct}% = ${current * single_pct / 100:,.2f}", inline=False)
+        embed.add_field(name="Change Limits", value="`!limits 10 5` (10% daily, 5% single)", inline=False)
+        await ctx.send(embed=embed)
         return
     
     try:
         daily_pct = float(daily.replace('%', ''))
         single_pct = float(single.replace('%', ''))
         set_exposure_limits(discord_id, daily_pct, single_pct)
-        await ctx.send(f"✅ Limits updated: Daily {daily_pct}% | Single {single_pct}%")
+        await ctx.send(f"✅ Limits updated: Daily **{daily_pct}%** | Single **{single_pct}%**")
     except:
         await ctx.send("❌ Invalid. Use: `!limits 10 5`")
 
 @bot.command(name='targets')
 async def set_targets(ctx, profit: str = None, stop: str = None):
-    """Set daily profit goal and stop loss"""
+    """View/set daily targets"""
+    if not is_bankroll_channel(ctx):
+        await send_not_allowed(ctx)
+        return
+    
     from bankroll_manager import is_onboarded, set_session_targets, get_bankroll_settings
     
     discord_id = str(ctx.author.id)
     
     if not is_onboarded(discord_id):
-        await ctx.send("❌ Use `!setup` first.")
+        await ctx.send(f"❌ Use `!setup` first.")
         return
     
     settings = get_bankroll_settings(discord_id)
     
     if not profit or not stop:
-        await ctx.send(f"🎯 **Session Targets:**\n"
-                      f"• Daily Profit Goal: ${float(settings['daily_profit_goal']):,.2f}\n"
-                      f"• Stop Loss Limit: ${float(settings['stop_loss_limit']):,.2f}\n\n"
-                      f"To change: `!targets 500 300` ($500 goal, $300 stop)")
+        embed = discord.Embed(title="🎯 Session Targets", color=0x667eea)
+        embed.add_field(name="Daily Profit Goal", value=f"${float(settings['daily_profit_goal']):,.2f}", inline=True)
+        embed.add_field(name="Stop Loss Limit", value=f"${float(settings['stop_loss_limit']):,.2f}", inline=True)
+        embed.add_field(name="Change Targets", value="`!targets 500 300` ($500 goal, $300 stop)", inline=False)
+        await ctx.send(embed=embed)
         return
     
     try:
         profit_goal = float(profit.replace('$', '').replace(',', ''))
         stop_loss = float(stop.replace('$', '').replace(',', ''))
         set_session_targets(discord_id, profit_goal, stop_loss)
-        await ctx.send(f"✅ Targets set: Goal ${profit_goal:,.2f} | Stop ${stop_loss:,.2f}")
+        await ctx.send(f"✅ Targets set: Goal **${profit_goal:,.2f}** | Stop **${stop_loss:,.2f}**")
     except:
         await ctx.send("❌ Invalid. Use: `!targets 500 300`")
 
 # ============================================================
-# BET TRACKING COMMANDS
+# BET TRACKING (only in #bankroll-dashboard)
 # ============================================================
 
 @bot.command(name='bet', aliases=['log'])
 async def log_bet(ctx, units: float = None, odds: int = None, *, description: str = None):
-    """Log a bet: !bet 1.5 -110 Lakers ML"""
+    """Log a bet"""
+    if not is_bankroll_channel(ctx):
+        await send_not_allowed(ctx)
+        return
+    
     from bankroll_manager import is_onboarded, log_bet as log_bet_db, calculate_stake
     
     discord_id = str(ctx.author.id)
     
     if not is_onboarded(discord_id):
-        await ctx.send("❌ Use `!setup` first.")
+        await ctx.send(f"❌ Use `!setup` first.")
         return
     
     if not units or not odds or not description:
-        await ctx.send("📝 **Log a bet:**\n"
-                      "`!bet <units> <odds> <description>`\n\n"
-                      "**Examples:**\n"
-                      "`!bet 1 -110 Lakers -3.5`\n"
-                      "`!bet 2 +150 Celtics ML`\n"
-                      "`!bet 0.5 -115 LeBron o25.5 pts`")
+        embed = discord.Embed(
+            title="📝 Log a Bet",
+            description="`!bet <units> <odds> <description>`",
+            color=0x667eea
+        )
+        embed.add_field(name="Examples", value=(
+            "`!bet 1 -110 Lakers -3.5`\n"
+            "`!bet 2 +150 Celtics ML`\n"
+            "`!bet 0.5 -115 LeBron o25.5 pts`"
+        ), inline=False)
+        await ctx.send(embed=embed)
         return
     
     stake = calculate_stake(discord_id, units)
     bet_id = log_bet_db(discord_id, 'manual', description, description, units, odds)
     
-    embed = discord.Embed(
-        title="📝 Bet Logged",
-        description=f"**{description}**",
-        color=0x667eea
-    )
+    embed = discord.Embed(title="📝 Bet Logged", description=f"**{description}**", color=0x667eea)
     embed.add_field(name="Units", value=f"{units}u", inline=True)
     embed.add_field(name="Stake", value=f"${stake:,.2f}", inline=True)
     embed.add_field(name="Odds", value=f"{odds:+d}", inline=True)
-    embed.set_footer(text=f"Bet ID: {bet_id} | Grade with: !grade {bet_id} win/loss")
+    embed.set_footer(text=f"Bet ID: #{bet_id} | Grade: !grade {bet_id} win/loss")
     await ctx.send(embed=embed)
 
 @bot.command(name='grade')
 async def grade_bet(ctx, bet_id: int = None, result: str = None):
-    """Grade a bet: !grade 123 win"""
+    """Grade a bet result"""
+    if not is_bankroll_channel(ctx):
+        await send_not_allowed(ctx)
+        return
+    
     from bankroll_manager import is_onboarded, grade_bet as grade_bet_db
     
     discord_id = str(ctx.author.id)
     
     if not is_onboarded(discord_id):
-        await ctx.send("❌ Use `!setup` first.")
+        await ctx.send(f"❌ Use `!setup` first.")
         return
     
     if not bet_id or not result:
-        await ctx.send("📊 **Grade a bet:**\n`!grade <bet_id> <result>`\n\n"
-                      "Results: `win`, `loss`, `push`\n"
-                      "Example: `!grade 123 win`")
+        await ctx.send("📊 **Grade a bet:** `!grade <id> win/loss/push`\nExample: `!grade 1 win`")
         return
     
     result = result.lower()
-    if result not in ['win', 'loss', 'push', 'w', 'l', 'p']:
-        await ctx.send("❌ Result must be: win, loss, or push")
-        return
-    
     result_map = {'w': 'win', 'l': 'loss', 'p': 'push'}
     result = result_map.get(result, result)
+    
+    if result not in ['win', 'loss', 'push']:
+        await ctx.send("❌ Result must be: win, loss, or push")
+        return
     
     graded = grade_bet_db(discord_id, bet_id, result)
     
@@ -437,11 +649,8 @@ async def grade_bet(ctx, bet_id: int = None, result: str = None):
         emoji = "✅" if result == 'win' else "❌" if result == 'loss' else "➡️"
         color = 0x00FF00 if result == 'win' else 0xFF0000 if result == 'loss' else 0xFFFF00
         
-        embed = discord.Embed(
-            title=f"{emoji} Bet Graded: {result.upper()}",
-            color=color
-        )
-        embed.add_field(name="P/L", value=f"${graded['pnl']:+,.2f}", inline=True)
+        embed = discord.Embed(title=f"{emoji} Bet #{bet_id}: {result.upper()}", color=color)
+        embed.add_field(name="P/L", value=f"**${graded['pnl']:+,.2f}**", inline=True)
         embed.add_field(name="New Bankroll", value=f"${graded['new_bankroll']:,.2f}", inline=True)
         await ctx.send(embed=embed)
     else:
@@ -450,110 +659,128 @@ async def grade_bet(ctx, bet_id: int = None, result: str = None):
 @bot.command(name='pending')
 async def show_pending(ctx):
     """Show pending bets"""
+    if not is_bankroll_channel(ctx):
+        await send_not_allowed(ctx)
+        return
+    
     from bankroll_manager import is_onboarded, get_pending_bets
     
     discord_id = str(ctx.author.id)
     
     if not is_onboarded(discord_id):
-        await ctx.send("❌ Use `!setup` first.")
+        await ctx.send(f"❌ Use `!setup` first.")
         return
     
     bets = get_pending_bets(discord_id)
     
     if not bets:
-        await ctx.send("📋 No pending bets.")
+        await ctx.send("📋 No pending bets. Log one with `!bet`")
         return
     
     embed = discord.Embed(title="📋 Pending Bets", color=0x667eea)
+    total_risk = 0
     for bet in bets[:10]:
+        total_risk += float(bet['stake_usd'])
         embed.add_field(
             name=f"#{bet['id']} — {bet['units']}u @ {bet['odds']:+d}",
-            value=f"{bet['description'][:50]} | ${bet['stake_usd']:,.2f}",
+            value=f"{bet['description'][:40]} | ${float(bet['stake_usd']):,.2f}",
             inline=False
         )
-    embed.set_footer(text="Grade with: !grade <id> win/loss/push")
+    embed.set_footer(text=f"Total at risk: ${total_risk:,.2f} | Grade: !grade <id> win/loss")
     await ctx.send(embed=embed)
 
-@bot.command(name='history', aliases=['bets'])
+@bot.command(name='history', aliases=['bets', 'record'])
 async def show_history(ctx):
     """Show bet history"""
-    from bankroll_manager import is_onboarded, get_bet_history
+    if not is_bankroll_channel(ctx):
+        await send_not_allowed(ctx)
+        return
+    
+    from bankroll_manager import is_onboarded, get_bet_history, get_performance_metrics
     
     discord_id = str(ctx.author.id)
     
     if not is_onboarded(discord_id):
-        await ctx.send("❌ Use `!setup` first.")
+        await ctx.send(f"❌ Use `!setup` first.")
         return
     
     bets = get_bet_history(discord_id, 10)
+    metrics = get_performance_metrics(discord_id)
     
-    if not bets:
-        await ctx.send("📋 No bet history yet.")
-        return
+    embed = discord.Embed(
+        title="📜 Bet History",
+        description=f"**Record:** {metrics['wins']}W-{metrics['losses']}L-{metrics['pushes']}P ({metrics['win_rate']:.1f}%)",
+        color=0x667eea
+    )
     
-    embed = discord.Embed(title="📜 Recent Bet History", color=0x667eea)
-    for bet in bets:
-        emoji = "✅" if bet['result'] == 'win' else "❌" if bet['result'] == 'loss' else "➡️"
-        embed.add_field(
-            name=f"{emoji} {bet['description'][:30]}",
-            value=f"{bet['units']}u | ${bet['pnl_usd']:+,.2f}",
-            inline=True
-        )
+    if bets:
+        for bet in bets[:8]:
+            emoji = "✅" if bet['result'] == 'win' else "❌" if bet['result'] == 'loss' else "➡️"
+            pnl = float(bet['pnl_usd'])
+            embed.add_field(
+                name=f"{emoji} {bet['description'][:25]}...",
+                value=f"{bet['units']}u | ${pnl:+,.2f}",
+                inline=True
+            )
+    else:
+        embed.add_field(name="No bets yet", value="Log your first bet with `!bet`", inline=False)
+    
+    embed.set_footer(text=f"Total P/L: ${metrics['total_profit']:+,.2f} | ROI: {metrics['roi_pct']:+.1f}%")
     await ctx.send(embed=embed)
 
 # ============================================================
-# PICKS COMMANDS (existing)
+# GENERAL COMMANDS (work anywhere)
 # ============================================================
 
 @bot.command(name='picks')
 async def show_picks(ctx):
-    """Show today's top game picks"""
+    """Today's top game picks"""
     try:
         from algo_agent import query_algo_agent
-        response = query_algo_agent("What are today's top NBA game picks with the best edges?")
-        await ctx.send(response)
+        async with ctx.typing():
+            response = query_algo_agent("What are today's top NBA game picks with edges? Be concise.")
+        await ctx.send(response[:2000])
     except Exception as e:
-        await ctx.send(f"⚠️ Error getting picks: {str(e)}")
+        await ctx.send(f"⚠️ Error: {str(e)}")
 
 @bot.command(name='props')
 async def show_props(ctx):
-    """Show today's top prop bets"""
+    """Today's top props"""
     try:
         from algo_agent import query_algo_agent
-        response = query_algo_agent("What are today's top NBA player prop bets?")
-        await ctx.send(response)
+        async with ctx.typing():
+            response = query_algo_agent("What are today's top NBA player prop bets? Be concise.")
+        await ctx.send(response[:2000])
     except Exception as e:
-        await ctx.send(f"⚠️ Error getting props: {str(e)}")
+        await ctx.send(f"⚠️ Error: {str(e)}")
 
 @bot.command(name='injuries')
-async def show_injuries(ctx, team: str = None):
-    """Show injury report"""
+async def show_injuries(ctx, *, team: str = None):
+    """Injury report"""
     try:
         from algo_agent import query_algo_agent
-        query = f"What are the current injuries for {team}?" if team else "What are the major NBA injuries affecting today's games?"
-        response = query_algo_agent(query)
-        await ctx.send(response)
+        query = f"Injuries for {team}?" if team else "Major NBA injuries today?"
+        async with ctx.typing():
+            response = query_algo_agent(query)
+        await ctx.send(response[:2000])
     except Exception as e:
         await ctx.send(f"⚠️ Error: {str(e)}")
 
 @bot.command(name='game')
 async def analyze_game(ctx, *, team: str = None):
-    """Analyze a specific game"""
+    """Analyze a game"""
     if not team:
-        await ctx.send("Usage: `!game Lakers` or `!game LAL vs BOS`")
+        await ctx.send("Usage: `!game Lakers`")
         return
     try:
         from algo_agent import query_algo_agent
-        response = query_algo_agent(f"Analyze {team}'s game today. Include spread, total, and any edges.")
-        await ctx.send(response)
+        async with ctx.typing():
+            response = query_algo_agent(f"Analyze {team}'s game today. Spread, total, edges.")
+        await ctx.send(response[:2000])
     except Exception as e:
         await ctx.send(f"⚠️ Error: {str(e)}")
 
-# ============================================================
-# HELP COMMAND
-# ============================================================
-
-@bot.command(name='help', aliases=['commands', 'menu'])
+@bot.command(name='help', aliases=['commands', 'menu', '?'])
 async def show_help(ctx):
     """Show all commands"""
     embed = discord.Embed(
@@ -562,63 +789,61 @@ async def show_help(ctx):
         color=0x667eea
     )
     
-    embed.add_field(name="💰 BANKROLL", value=(
-        "`!setup` — Initial bankroll setup\n"
-        "`!bankroll` — View your dashboard\n"
-        "`!health` — Bankroll health analysis\n"
-        "`!stake <units>` — Calculate stake\n"
-        "`!update <amount>` — Update bankroll\n"
-        "`!limits <daily%> <single%>` — Set limits\n"
-        "`!targets <goal> <stop>` — Set targets"
-    ), inline=False)
+    embed.add_field(
+        name=f"💰 BANKROLL (#{BANKROLL_CHANNEL} only)",
+        value=(
+            "`!setup` — Configure bankroll\n"
+            "`!bankroll` — View dashboard\n"
+            "`!stake` — Bet sizes\n"
+            "`!health` — Health analysis\n"
+            "`!update` — Update bankroll\n"
+            "`!limits` — Exposure limits\n"
+            "`!targets` — Profit/loss targets"
+        ),
+        inline=True
+    )
     
-    embed.add_field(name="📝 BET TRACKING", value=(
-        "`!bet <units> <odds> <pick>` — Log bet\n"
-        "`!grade <id> <result>` — Grade bet\n"
-        "`!pending` — View pending bets\n"
-        "`!history` — Bet history"
-    ), inline=False)
+    embed.add_field(
+        name="📝 BET TRACKING",
+        value=(
+            "`!bet <u> <odds> <pick>`\n"
+            "`!grade <id> <result>`\n"
+            "`!pending` — Open bets\n"
+            "`!history` — Past bets"
+        ),
+        inline=True
+    )
     
-    embed.add_field(name="🎯 PICKS & ANALYSIS", value=(
-        "`!picks` — Today's top game picks\n"
-        "`!props` — Today's top props\n"
-        "`!injuries [team]` — Injury report\n"
-        "`!game <team>` — Game analysis"
-    ), inline=False)
+    embed.add_field(
+        name="🎯 PICKS (anywhere)",
+        value=(
+            "`!picks` — Top games\n"
+            "`!props` — Top props\n"
+            "`!injuries` — Report\n"
+            "`!game <team>` — Analysis"
+        ),
+        inline=True
+    )
     
     embed.set_footer(text="SB-ALGO — Built for disciplined bettors")
     await ctx.send(embed=embed)
 
-# ============================================================
-# STATUS COMMAND
-# ============================================================
-
 @bot.command(name='status')
 async def show_status(ctx):
-    """Show bot status"""
-    from bankroll_manager import get_engine
+    """Bot status"""
+    embed = discord.Embed(title="🤖 SB-ALGO Status", color=0x00FF00)
+    embed.add_field(name="Bot", value="✅ Online", inline=True)
+    embed.add_field(name="Servers", value=str(len(bot.guilds)), inline=True)
     
-    # Check database
     try:
+        from bankroll_manager import get_engine
         engine = get_engine()
         with engine.connect() as conn:
             conn.execute("SELECT 1")
-        db_status = "✅ Connected"
+        embed.add_field(name="Database", value="✅ Connected", inline=True)
     except:
-        db_status = "❌ Disconnected"
+        embed.add_field(name="Database", value="❌ Error", inline=True)
     
-    # Check AI
-    try:
-        from algo_agent import AGENT_AVAILABLE
-        ai_status = "✅ Online" if AGENT_AVAILABLE else "⚠️ Initializing"
-    except:
-        ai_status = "❌ Offline"
-    
-    embed = discord.Embed(title="🤖 SB-ALGO Status", color=0x667eea)
-    embed.add_field(name="Bot", value="✅ Online", inline=True)
-    embed.add_field(name="Database", value=db_status, inline=True)
-    embed.add_field(name="AI Agent", value=ai_status, inline=True)
-    embed.add_field(name="Servers", value=str(len(bot.guilds)), inline=True)
     await ctx.send(embed=embed)
 
 # ============================================================
@@ -635,3 +860,64 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# ============================================================
+# TODAY'S SESSION (in bankroll channel)
+# ============================================================
+
+@bot.command(name='today', aliases=['session', 'day'])
+async def show_today(ctx):
+    """Show today's session stats"""
+    if not is_bankroll_channel(ctx):
+        await send_not_allowed(ctx)
+        return
+    
+    from bankroll_manager import is_onboarded
+    from discord_results import build_today_embed
+    
+    discord_id = str(ctx.author.id)
+    
+    if not is_onboarded(discord_id):
+        await ctx.send(f"❌ {ctx.author.mention} Use `!setup` first.")
+        return
+    
+    embed_data = build_today_embed(discord_id)
+    if embed_data:
+        embed = discord.Embed.from_dict(embed_data)
+        await ctx.send(embed=embed)
+    else:
+        await ctx.send("⚠️ Could not load today's stats.")
+
+# ============================================================
+# ADMIN: GRADE ALGO PICK (for grading results channel)
+# ============================================================
+
+@bot.command(name='gradepick', aliases=['gp'])
+@commands.has_permissions(administrator=True)
+async def grade_algo_pick(ctx, pick_id: int = None, result: str = None):
+    """Admin: Grade an algo pick (updates #results)"""
+    if not pick_id or not result:
+        await ctx.send("Usage: `!gradepick <pick_id> win/loss/void`")
+        return
+    
+    result = result.lower()
+    if result not in ['win', 'loss', 'void', 'w', 'l', 'v']:
+        await ctx.send("❌ Result must be: win, loss, or void")
+        return
+    
+    result_map = {'w': 'win', 'l': 'loss', 'v': 'void'}
+    result = result_map.get(result, result)
+    
+    from discord_results import update_pick_result
+    success = update_pick_result(pick_id=pick_id, result=result)
+    
+    if success:
+        emoji = "✅" if result == 'win' else "❌" if result == 'loss' else "🟨"
+        await ctx.send(f"{emoji} Pick #{pick_id} graded as **{result.upper()}**")
+    else:
+        await ctx.send("❌ Pick not found or error grading.")
+
+@grade_algo_pick.error
+async def grade_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ Admin only command.")

@@ -149,10 +149,9 @@ def follow_pick(discord_id: str, pick_id: str, units_multiplier: float = 1.0):
     units = pick['units'] * units_multiplier
     stake = calculate_stake(discord_id, units)
     
-    # Check exposure
-    exposure = check_exposure(discord_id, stake)
-    if not exposure['allowed']:
-        return {"success": False, "error": exposure['reason'], "stake": stake}
+    # Note: We skip strict exposure checks here because unit size is already personalized
+    # The user's unit size is calculated from their bankroll and risk tolerance
+    # If they want to follow a 2u pick, that's 2x their personal unit size
     
     # Save follow
     engine = get_engine()

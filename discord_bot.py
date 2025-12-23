@@ -577,43 +577,60 @@ async def set_targets(ctx, profit: str = None, stop: str = None):
 # BET TRACKING (only in #bankroll-dashboard)
 # ============================================================
 
-@bot.command(name='bet', aliases=['log'])
-async def log_bet(ctx, units: float = None, odds: int = None, *, description: str = None):
-    """Log a bet"""
+@bot.command(name='bet', aliases=['follow', 'tail'])
+async def follow_bet(ctx, pick_id: str = None, multiplier: float = 1.0):
+    """Follow an algo pick by ID"""
     if not is_bankroll_channel(ctx):
         await send_not_allowed(ctx)
         return
     
-    from bankroll_manager import is_onboarded, log_bet as log_bet_db, calculate_stake
+    from bankroll_manager import is_onboarded
+    from pick_system import follow_pick, get_pick_by_id
     
     discord_id = str(ctx.author.id)
     
     if not is_onboarded(discord_id):
-        await ctx.send(f"❌ Use `!setup` first.")
+        await ctx.send(f"❌ {ctx.author.mention} Use `!setup` first.")
         return
     
-    if not units or not odds or not description:
+    if not pick_id:
         embed = discord.Embed(
-            title="📝 Log a Bet",
-            description="`!bet <units> <odds> <description>`",
+            title="📝 Follow a Pick",
+            description="`!bet <pick_id>` or `!bet <pick_id> <multiplier>`",
             color=0x667eea
         )
         embed.add_field(name="Examples", value=(
-            "`!bet 1 -110 Lakers -3.5`\n"
-            "`!bet 2 +150 Celtics ML`\n"
-            "`!bet 0.5 -115 LeBron o25.5 pts`"
+            "`!bet P03` — Follow prop pick P03 at full size\n"
+            "`!bet G07` — Follow game pick G07\n"
+            "`!bet P03 0.5` — Follow at half size\n"
+            "`!bet P03 2` — Follow at double size"
         ), inline=False)
+        embed.set_footer(text="Pick IDs are shown in #top-props and #game-bets")
         await ctx.send(embed=embed)
         return
     
-    stake = calculate_stake(discord_id, units)
-    bet_id = log_bet_db(discord_id, 'manual', description, description, units, odds)
+    # Follow the pick
+    result = follow_pick(discord_id, pick_id.upper(), multiplier)
     
-    embed = discord.Embed(title="📝 Bet Logged", description=f"**{description}**", color=0x667eea)
-    embed.add_field(name="Units", value=f"{units}u", inline=True)
-    embed.add_field(name="Stake", value=f"${stake:,.2f}", inline=True)
-    embed.add_field(name="Odds", value=f"{odds:+d}", inline=True)
-    embed.set_footer(text=f"Bet ID: #{bet_id} | Grade: !grade {bet_id} win/loss")
+    if not result['success']:
+        await ctx.send(f"❌ {result['error']}")
+        return
+    
+    pick = result['pick']
+    
+    embed = discord.Embed(
+        title=f"✅ Following [{pick['pick_id']}]",
+        description=f"**{pick['name']}**",
+        color=0x00FF00
+    )
+    embed.add_field(name="Units", value=f"{result['units']:.1f}u", inline=True)
+    embed.add_field(name="Your Stake", value=f"${result['stake']:,.2f}", inline=True)
+    embed.add_field(name="Status", value="⏳ Pending", inline=True)
+    
+    if multiplier != 1.0:
+        embed.add_field(name="Size", value=f"{multiplier}x original", inline=True)
+    
+    embed.set_footer(text="You will be notified when this pick is graded")
     await ctx.send(embed=embed)
 
 @bot.command(name='grade')

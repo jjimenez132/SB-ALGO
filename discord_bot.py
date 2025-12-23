@@ -999,9 +999,9 @@ async def admin_grade_pick(ctx, pick_id: str = None, result: str = None):
         await ctx.send("❌ Result must be: win, loss, or void")
         return
     
-    from pick_system import grade_pick
+    from pick_system import grade_pick_full
     
-    graded = grade_pick(pick_id.upper(), result)
+    graded = grade_pick_full(pick_id.upper(), result)
     
     if not graded['success']:
         await ctx.send(f"❌ {graded['error']}")

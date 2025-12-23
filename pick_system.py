@@ -346,3 +346,148 @@ def init_tables():
 if __name__ == "__main__":
     init_tables()
     print("✅ pick_system.py initialized")
+
+# ============================================================
+# RESULTS CHANNEL INTEGRATION
+# ============================================================
+
+def grade_pick_full(pick_id: str, result: str):
+    """Grade pick, update followers, update #results channel, send DMs"""
+    import requests
+    
+    RESULTS_WEBHOOK = os.environ.get('DISCORD_WEBHOOK_RESULTS')
+    
+    # First grade the pick and followers
+    grade_result = grade_pick(pick_id, result)
+    
+    if not grade_result['success']:
+        return grade_result
+    
+    # Update #results channel
+    if RESULTS_WEBHOOK:
+        pick = get_pick_by_id(pick_id)
+        if pick:
+            # Build updated embed
+            if result == 'win':
+                emoji = "✅"
+                color = 0x00FF00
+            elif result == 'loss':
+                emoji = "❌"
+                color = 0xFF0000
+            else:
+                emoji = "🟨"
+                color = 0xFFFF00
+            
+            embed = {
+                "title": f"{emoji} [{pick_id}] {pick['name']}",
+                "description": f"**Result: {result.upper()}**\n{grade_result['result_units']:+.1f}u",
+                "color": color,
+                "fields": [
+                    {"name": "Followers", "value": str(len(grade_result['followers_graded'])), "inline": True},
+                ],
+                "footer": {"text": f"Graded {datetime.now(pytz.timezone('US/Eastern')).strftime('%I:%M %p ET')}"}
+            }
+            
+            try:
+                requests.post(RESULTS_WEBHOOK, json={"embeds": [embed]}, timeout=10)
+                log.info(f"✅ Posted result to #results: {pick_id} {result}")
+            except Exception as e:
+                log.error(f"Failed to post to results: {e}")
+    
+    return grade_result
+
+def get_daily_summary():
+    """Get summary for daily recap"""
+    engine = get_engine()
+    today = get_eastern_date()
+    
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'win' THEN 1 ELSE 0 END) as wins,
+                SUM(CASE WHEN status = 'loss' THEN 1 ELSE 0 END) as losses,
+                SUM(CASE WHEN status = 'void' THEN 1 ELSE 0 END) as voids,
+                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+                COALESCE(SUM(result_units), 0) as net_units,
+                COALESCE(SUM(CASE WHEN status = 'win' THEN result_units ELSE 0 END), 0) as units_won,
+                COALESCE(SUM(CASE WHEN status = 'loss' THEN ABS(result_units) ELSE 0 END), 0) as units_lost
+            FROM algo_picks_tracking
+            WHERE pick_date = :today
+        """), {"today": today}).fetchone()
+        
+        return {
+            "date": today,
+            "total": result[0] or 0,
+            "wins": result[1] or 0,
+            "losses": result[2] or 0,
+            "voids": result[3] or 0,
+            "pending": result[4] or 0,
+            "net_units": float(result[5] or 0),
+            "units_won": float(result[6] or 0),
+            "units_lost": float(result[7] or 0)
+        }
+
+def post_daily_recap():
+    """Post daily recap to #daily-recap"""
+    import requests
+    
+    RECAP_WEBHOOK = os.environ.get('DISCORD_WEBHOOK_RECAP')
+    if not RECAP_WEBHOOK:
+        log.warning("No DISCORD_WEBHOOK_RECAP configured")
+        return False
+    
+    stats = get_daily_summary()
+    
+    if stats['total'] == 0:
+        log.info("No picks today, skipping recap")
+        return False
+    
+    if stats['pending'] > 0:
+        log.info(f"{stats['pending']} picks still pending")
+        return False
+    
+    # Build embed
+    net = stats['net_units']
+    if net > 0:
+        emoji = "✅"
+        color = 0x00FF00
+        note = "Solid day. The edge delivered. 📈"
+    elif net < 0:
+        emoji = "❌"
+        color = 0xFF0000
+        note = "Variance happens. Trust the process. 📊"
+    else:
+        emoji = "➡️"
+        color = 0xFFFF00
+        note = "Break even. Live to fight another day."
+    
+    # Format date
+    date_obj = datetime.strptime(stats['date'], '%Y-%m-%d')
+    date_formatted = date_obj.strftime('%B %d, %Y').upper()
+    
+    embed = {
+        "title": f"📊 DAILY RECAP — {date_formatted}",
+        "color": color,
+        "fields": [
+            {"name": "✅ Wins", "value": str(stats['wins']), "inline": True},
+            {"name": "❌ Losses", "value": str(stats['losses']), "inline": True},
+            {"name": "🟨 Voids", "value": str(stats['voids']), "inline": True},
+            {"name": "📈 Units Won", "value": f"+{stats['units_won']:.1f}u", "inline": True},
+            {"name": "📉 Units Lost", "value": f"-{stats['units_lost']:.1f}u", "inline": True},
+            {"name": f"{emoji} NET RESULT", "value": f"**{net:+.1f} units**", "inline": True},
+        ],
+        "footer": {"text": note}
+    }
+    
+    try:
+        r = requests.post(RECAP_WEBHOOK, json={"embeds": [embed]}, timeout=10)
+        if r.status_code == 204:
+            log.info(f"✅ Posted daily recap: {net:+.1f}u")
+            return True
+        else:
+            log.error(f"Recap webhook error: {r.status_code}")
+            return False
+    except Exception as e:
+        log.error(f"Recap failed: {e}")
+        return False

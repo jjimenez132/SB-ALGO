@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
 ================================================================================
-DAILY RUNNER - SB-ALGO NBA BETTING SYSTEM
+DAILY RUNNER v2.0 - SB-ALGO NBA BETTING SYSTEM
 ================================================================================
-Automated daily prediction generator.
+Automated daily prediction generator using LIVE ODDS from your database.
 
 USAGE:
 ------
 python3 daily_runner.py              # Run with defaults
 python3 daily_runner.py --bankroll 5000
 python3 daily_runner.py --output discord   # Format for Discord
-python3 daily_runner.py --date 2024-01-15  # Specific date
+python3 daily_runner.py --save             # Save to JSON
 
 ================================================================================
 """
 
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime, date
 from sqlalchemy import create_engine, text
 import json
 import os
@@ -26,70 +26,23 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from meta_merge_engine_v4 import MetaMergeEngine
+from live_odds_connector import LiveOddsConnector
 
 DATABASE_URL = "postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db"
 
 
-def get_todays_games(date: str = None) -> list:
+def get_todays_games_live() -> list:
     """
-    Fetch today's games from the database.
-    
-    Returns list of games with spreads and totals.
+    Fetch today's games from LIVE ODDS in database.
+    NO API CALLS - uses your existing twice-daily pulls.
     """
-    engine = create_engine(DATABASE_URL)
+    connector = LiveOddsConnector()
+    games = connector.get_games_for_daily_runner()
     
-    if date is None:
-        date = datetime.now().strftime('%Y-%m-%d')
+    # Filter out games without spreads
+    valid_games = [g for g in games if g.get('spread') is not None]
     
-    games = []
-    
-    # Try to get from schedule table
-    try:
-        with engine.connect() as conn:
-            # Check if we have a schedule table
-            result = conn.execute(text("""
-                SELECT table_name FROM information_schema.tables 
-                WHERE table_name LIKE '%schedule%' OR table_name LIKE '%games%'
-            """)).fetchall()
-            
-            # For now, return sample games for testing
-            # In production, this would query actual schedule
-            pass
-    except Exception as e:
-        print(f"Warning: Could not fetch schedule: {e}")
-    
-    # Sample games for today (replace with actual API data)
-    sample_games = [
-        {
-            'home_team': 'Celtics',
-            'away_team': 'Lakers',
-            'spread': -8.5,
-            'total': 224.5,
-            'home_ml': -350,
-            'away_ml': 280,
-            'time': '7:30 PM ET',
-        },
-        {
-            'home_team': 'Thunder',
-            'away_team': 'Cavaliers',
-            'spread': -2.5,
-            'total': 228.0,
-            'home_ml': -140,
-            'away_ml': 120,
-            'time': '8:00 PM ET',
-        },
-        {
-            'home_team': 'Warriors',
-            'away_team': 'Suns',
-            'spread': 3.5,
-            'total': 230.5,
-            'home_ml': 145,
-            'away_ml': -170,
-            'time': '10:00 PM ET',
-        },
-    ]
-    
-    return sample_games
+    return valid_games
 
 
 def format_for_discord(analysis: dict) -> str:
@@ -206,21 +159,20 @@ def save_to_file(analysis: dict, filename: str = None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='SB-ALGO Daily Runner')
+    parser = argparse.ArgumentParser(description='SB-ALGO Daily Runner v2.0')
     parser.add_argument('--bankroll', type=float, default=10000, help='Bankroll amount')
     parser.add_argument('--risk', choices=['conservative', 'moderate', 'aggressive'], 
                         default='moderate', help='Risk profile')
     parser.add_argument('--output', choices=['console', 'discord', 'json', 'all'], 
                         default='console', help='Output format')
-    parser.add_argument('--date', type=str, default=None, help='Date (YYYY-MM-DD)')
     parser.add_argument('--save', action='store_true', help='Save to file')
     
     args = parser.parse_args()
     
     print("\n" + "=" * 70)
-    print("🚀 SB-ALGO DAILY RUNNER")
+    print("🚀 SB-ALGO DAILY RUNNER v2.0 - LIVE ODDS")
     print("=" * 70)
-    print(f"📅 Date: {args.date or datetime.now().strftime('%Y-%m-%d')}")
+    print(f"📅 Date: {datetime.now().strftime('%Y-%m-%d')}")
     print(f"💰 Bankroll: ${args.bankroll:,}")
     print(f"⚡ Risk Profile: {args.risk}")
     print("=" * 70)
@@ -229,10 +181,15 @@ def main():
     print("\n🔧 Initializing engines...")
     engine = MetaMergeEngine(bankroll=args.bankroll, risk_profile=args.risk)
     
-    # Get today's games
-    print("\n📅 Fetching today's games...")
-    games = get_todays_games(args.date)
-    print(f"   Found {len(games)} games")
+    # Get today's games from LIVE ODDS
+    print("\n📅 Fetching today's games from LIVE ODDS...")
+    games = get_todays_games_live()
+    print(f"   Found {len(games)} games with odds")
+    
+    if not games:
+        print("\n❌ No games with odds found for today.")
+        print("   Make sure your odds pull has run (fetch_betting_odds.py)")
+        return None
     
     # Analyze
     print("\n🧠 Running analysis...")

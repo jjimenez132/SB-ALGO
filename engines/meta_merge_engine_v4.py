@@ -180,18 +180,39 @@ class MetaMergeEngine:
     # ==========================================================================
     
     def get_team_stats(self, team_name: str) -> Dict:
-        """Get comprehensive team stats"""
+        """Get comprehensive team stats with team name normalization"""
+        # Team abbreviation to full name mapping
+        TEAM_MAP = {
+            'ATL': 'Atlanta Hawks', 'BOS': 'Boston Celtics', 'BKN': 'Brooklyn Nets',
+            'CHA': 'Charlotte Hornets', 'CHI': 'Chicago Bulls', 'CLE': 'Cleveland Cavaliers',
+            'DAL': 'Dallas Mavericks', 'DEN': 'Denver Nuggets', 'DET': 'Detroit Pistons',
+            'GS': 'Golden State Warriors', 'GSW': 'Golden State Warriors',
+            'HOU': 'Houston Rockets', 'IND': 'Indiana Pacers',
+            'LAC': 'LA Clippers', 'LAL': 'Los Angeles Lakers',
+            'MEM': 'Memphis Grizzlies', 'MIA': 'Miami Heat', 'MIL': 'Milwaukee Bucks',
+            'MIN': 'Minnesota Timberwolves', 'NO': 'New Orleans Pelicans', 
+            'NOP': 'New Orleans Pelicans', 'NY': 'New York Knicks', 'NYK': 'New York Knicks',
+            'OKC': 'Oklahoma City Thunder', 'ORL': 'Orlando Magic',
+            'PHI': 'Philadelphia 76ers', 'PHX': 'Phoenix Suns',
+            'POR': 'Portland Trail Blazers', 'SAC': 'Sacramento Kings',
+            'SA': 'San Antonio Spurs', 'SAS': 'San Antonio Spurs',
+            'TOR': 'Toronto Raptors', 'UTA': 'Utah Jazz', 'WAS': 'Washington Wizards',
+        }
+        
+        # Normalize team name
+        full_name = TEAM_MAP.get(team_name.upper(), team_name)
+        
         with self.db.connect() as conn:
             adv = conn.execute(text("""
-                SELECT * FROM nba_team_advanced_stats 
+                SELECT * FROM nba_team_advanced_stats
                 WHERE "TEAM_NAME" ILIKE :team LIMIT 1
-            """), {"team": f"%{team_name}%"}).fetchone()
+            """), {"team": f"%{full_name}%"}).fetchone()
             
             if not adv:
                 return None
             
             return {'advanced': dict(adv._mapping)}
-    
+
     # ==========================================================================
     # FULL GAME PREDICTION v4.0
     # ==========================================================================

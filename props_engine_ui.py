@@ -406,8 +406,8 @@ def render_props_engine(engine):
     
     # Get real picks from algo_brain
     try:
-        from algo_brain import analyze_props
-        prop_edges = analyze_props()
+        from fast_loader import load_prop_edges
+        prop_edges = load_prop_edges()
         
         if prop_edges:
             pick_cols = st.columns(3)

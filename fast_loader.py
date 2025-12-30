@@ -2,6 +2,8 @@
 fast_loader.py - Speed Layer for SB-ALGO
 =========================================
 Uses time-based caching to keep data fresh while staying fast.
+
+UPDATED: Now uses sb_algo_api for game and prop edges (new engine)
 """
 
 import functools
@@ -265,42 +267,147 @@ def clear_all_caches():
     _cache_times = {}
     print("All caches cleared")
 
+
+# =============================================================================
+# NEW ENGINE INTEGRATION - Uses sb_algo_api instead of algo_brain
+# =============================================================================
+
 def load_game_edges():
-    """Load game edges with time-based cache"""
+    """Load game edges using NEW SB-ALGO ENGINE"""
     cache_key = "game_edges"
     cached = _get_cached(cache_key)
     if cached is not None:
         return cached
     
     try:
-        from algo_brain import analyze_games
-        edges = analyze_games()
+        # Try new engine first
+        from sb_algo_api import get_todays_picks
+        algo_data = get_todays_picks()
+        
+        # Convert to old format for compatibility with premium_dashboard
+        edges = []
+        for pick in algo_data.get('game_picks', []):
+            # Determine subtype from pick string
+            pick_str = pick.get('pick', '')
+            if 'UNDER' in pick_str or 'OVER' in pick_str:
+                subtype = 'TOTAL'
+            elif '+' in pick_str or '-' in pick_str:
+                subtype = 'SPREAD'
+            else:
+                subtype = 'ML'
+            
+            edge_val = float(str(pick.get('edge', '0')).replace('+', '').replace('%', ''))
+            conf_val = float(str(pick.get('confidence', '50')).replace('%', ''))
+            
+            edges.append({
+                'type': 'GAME',
+                'subtype': subtype,
+                'game': pick.get('matchup', ''),
+                'pick': pick_str,
+                'edge': edge_val,
+                'confidence': conf_val,
+                'start_time': 'TBD',
+                'game_date': get_eastern_date(),
+                'line': 0,
+                'predicted': 0,
+                'ev': pick.get('ev', '0%'),
+                'grade': pick.get('grade', 'N/A'),
+                'stake': pick.get('stake', '$0'),
+            })
+        
         _set_cached(cache_key, edges)
         return edges
+        
     except Exception as e:
         import traceback
-        print(f"Game edge loading error: {e}")
+        print(f"NEW ENGINE Error, falling back to algo_brain: {e}")
         traceback.print_exc()
-        return []
+        
+        # Fallback to old engine
+        try:
+            from algo_brain import analyze_games
+            edges = analyze_games()
+            _set_cached(cache_key, edges)
+            return edges
+        except Exception as e2:
+            print(f"FALLBACK also failed: {e2}")
+            return []
+
 
 def load_prop_edges():
-    """Load prop edges with time-based cache"""
+    """Load prop edges using NEW SB-ALGO ENGINE"""
     cache_key = "prop_edges"
     cached = _get_cached(cache_key)
     if cached is not None:
         return cached
     
     try:
-        from algo_brain import analyze_props
-        edges = analyze_props()
+        # Try new engine first
+        from sb_algo_api import get_todays_picks
+        algo_data = get_todays_picks()
+        
+        # Convert to old format for compatibility with premium_dashboard
+        edges = []
+        for pick in algo_data.get('prop_picks', []):
+            hit_rate = pick.get('hit_rate', '0%')
+            if isinstance(hit_rate, str):
+                hit_rate_val = float(hit_rate.replace('%', ''))
+            else:
+                hit_rate_val = float(hit_rate) * 100
+            
+            edge_str = pick.get('edge', '0%')
+            if isinstance(edge_str, str):
+                edge_val = float(edge_str.replace('+', '').replace('%', ''))
+            else:
+                edge_val = float(edge_str)
+            
+            # Parse prop type from prop string (e.g., "REB UNDER 5.5" -> "rebounds")
+            prop_str = pick.get('prop', '')
+            if 'PTS' in prop_str.upper():
+                prop_type = 'points'
+            elif 'REB' in prop_str.upper():
+                prop_type = 'rebounds'
+            elif 'AST' in prop_str.upper():
+                prop_type = 'assists'
+            elif '3P' in prop_str.upper() or 'THREE' in prop_str.upper():
+                prop_type = 'threes'
+            else:
+                prop_type = 'points'
+            
+            edges.append({
+                'type': 'PROP',
+                'subtype': prop_type,  # Added subtype
+                'player': pick.get('player', ''),
+                'prop_type': prop_type,
+                'pick': f"{pick.get('player', '')} {pick.get('prop', '')}",
+                'line': pick.get('line', 0),
+                'projection': pick.get('model', 0),
+                'edge': edge_val,
+                'confidence': hit_rate_val,
+                'hit_rate': hit_rate,
+                'ev': pick.get('ev', '0%'),
+                'grade': pick.get('grade', 'N/A'),
+            })
+        
         _set_cached(cache_key, edges)
         return edges
+        
     except Exception as e:
         import traceback
-        print(f"Prop edge loading error: {e}")
+        print(f"NEW ENGINE Error for props, falling back to algo_brain: {e}")
         traceback.print_exc()
-        return []
+        
+        # Fallback to old engine
+        try:
+            from algo_brain import analyze_props
+            edges = analyze_props()
+            _set_cached(cache_key, edges)
+            return edges
+        except Exception as e2:
+            print(f"FALLBACK also failed: {e2}")
+            return []
+
 
 def get_all_edges():
-    """Get all edges"""
+    """Get all edges using NEW ENGINE"""
     return load_game_edges(), load_prop_edges()

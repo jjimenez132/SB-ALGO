@@ -1,0 +1,359 @@
+{
+  "game_results": [
+    {
+      "matchup": "Lakers @ Celtics",
+      "timestamp": "2025-12-29T00:08:03.470917",
+      "engines_used": [
+        "uncertainty",
+        "injury",
+        "calibration",
+        "kelly"
+      ],
+      "regime": {
+        "status": "NORMAL",
+        "confidence": 93.8,
+        "kelly_multiplier": 1.0,
+        "warnings": []
+      },
+      "injuries": {
+        "spread_adjustment": 0,
+        "total_adjustment": 0,
+        "confidence_penalty": 0,
+        "edge_for": "NEUTRAL"
+      },
+      "predictions": {
+        "margin": 11.0,
+        "spread": -11.0,
+        "total": 210.7,
+        "home_pts": 105.6,
+        "away_pts": 105.2,
+        "pace": 97.4
+      },
+      "spread_analysis": {
+        "type": "SPREAD",
+        "pick": "Celtics -8.5",
+        "raw_prob": 0.5829,
+        "calibrated_prob": 0.5763,
+        "edge": 2.5,
+        "ev_pct": 10.02,
+        "grade": "A+",
+        "stake": 275.58,
+        "should_bet": true,
+        "game": "Lakers @ Celtics"
+      },
+      "total_analysis": {
+        "type": "TOTAL",
+        "pick": "UNDER 224.5",
+        "raw_prob": 0.9158,
+        "calibrated_prob": 0.8825,
+        "edge": 13.8,
+        "ev_pct": 68.47,
+        "grade": "A+",
+        "stake": 500.0,
+        "should_bet": true,
+        "game": "Lakers @ Celtics"
+      },
+      "moneyline_analysis": {
+        "home_win_prob": 0.8147,
+        "away_win_prob": 0.1853,
+        "home_implied": 0.7778,
+        "edge_pct": 3.69,
+        "best_bet": "Celtics ML"
+      },
+      "picks": [
+        {
+          "type": "SPREAD",
+          "pick": "Celtics -8.5",
+          "raw_prob": 0.5829,
+          "calibrated_prob": 0.5763,
+          "edge": 2.5,
+          "ev_pct": 10.02,
+          "grade": "A+",
+          "stake": 275.58,
+          "should_bet": true,
+          "game": "Lakers @ Celtics"
+        },
+        {
+          "type": "TOTAL",
+          "pick": "UNDER 224.5",
+          "raw_prob": 0.9158,
+          "calibrated_prob": 0.8825,
+          "edge": 13.8,
+          "ev_pct": 68.47,
+          "grade": "A+",
+          "stake": 500.0,
+          "should_bet": true,
+          "game": "Lakers @ Celtics"
+        }
+      ],
+      "total_picks": 2,
+      "total_stake": 775.5799999999999,
+      "has_value": true,
+      "recommendation": "\ud83d\udfe2 PROCEED - 2 picks, $776 total"
+    },
+    {
+      "matchup": "Cavaliers @ Thunder",
+      "timestamp": "2025-12-29T00:08:05.173753",
+      "engines_used": [
+        "uncertainty",
+        "injury",
+        "calibration",
+        "kelly"
+      ],
+      "regime": {
+        "status": "NORMAL",
+        "confidence": 93.8,
+        "kelly_multiplier": 1.0,
+        "warnings": []
+      },
+      "injuries": {
+        "spread_adjustment": 0,
+        "total_adjustment": 0,
+        "confidence_penalty": 0,
+        "edge_for": "NEUTRAL"
+      },
+      "predictions": {
+        "margin": 6.3,
+        "spread": -6.3,
+        "total": 223.0,
+        "home_pts": 109.8,
+        "away_pts": 113.2,
+        "pace": 100.6
+      },
+      "spread_analysis": {
+        "type": "SPREAD",
+        "pick": "Thunder -2.5",
+        "raw_prob": 0.6246,
+        "calibrated_prob": 0.6146,
+        "edge": 3.8,
+        "ev_pct": 17.33,
+        "grade": "A+",
+        "stake": 476.65,
+        "should_bet": true,
+        "game": "Cavaliers @ Thunder"
+      },
+      "total_analysis": {
+        "type": "TOTAL",
+        "pick": "UNDER 228.0",
+        "raw_prob": 0.6922,
+        "calibrated_prob": 0.6768,
+        "edge": 5.0,
+        "ev_pct": 29.2,
+        "grade": "A+",
+        "stake": 500.0,
+        "should_bet": true,
+        "game": "Cavaliers @ Thunder"
+      },
+      "moneyline_analysis": {
+        "home_win_prob": 0.6996,
+        "away_win_prob": 0.3004,
+        "home_implied": 0.5833,
+        "edge_pct": 11.62,
+        "best_bet": "Thunder ML"
+      },
+      "picks": [
+        {
+          "type": "SPREAD",
+          "pick": "Thunder -2.5",
+          "raw_prob": 0.6246,
+          "calibrated_prob": 0.6146,
+          "edge": 3.8,
+          "ev_pct": 17.33,
+          "grade": "A+",
+          "stake": 476.65,
+          "should_bet": true,
+          "game": "Cavaliers @ Thunder"
+        },
+        {
+          "type": "TOTAL",
+          "pick": "UNDER 228.0",
+          "raw_prob": 0.6922,
+          "calibrated_prob": 0.6768,
+          "edge": 5.0,
+          "ev_pct": 29.2,
+          "grade": "A+",
+          "stake": 500.0,
+          "should_bet": true,
+          "game": "Cavaliers @ Thunder"
+        }
+      ],
+      "total_picks": 2,
+      "total_stake": 976.65,
+      "has_value": true,
+      "recommendation": "\ud83d\udfe2 PROCEED - 2 picks, $977 total"
+    },
+    {
+      "matchup": "Suns @ Warriors",
+      "timestamp": "2025-12-29T00:08:05.927236",
+      "engines_used": [
+        "uncertainty",
+        "injury",
+        "calibration",
+        "kelly"
+      ],
+      "regime": {
+        "status": "NORMAL",
+        "confidence": 93.8,
+        "kelly_multiplier": 1.0,
+        "warnings": []
+      },
+      "injuries": {
+        "spread_adjustment": 0,
+        "total_adjustment": 0,
+        "confidence_penalty": 0,
+        "edge_for": "NEUTRAL"
+      },
+      "predictions": {
+        "margin": 9.0,
+        "spread": -9.0,
+        "total": 208.8,
+        "home_pts": 102.7,
+        "away_pts": 106.1,
+        "pace": 98.8
+      },
+      "spread_analysis": {
+        "type": "SPREAD",
+        "pick": "Warriors +3.5",
+        "raw_prob": 0.8435,
+        "calibrated_prob": 0.816,
+        "edge": 12.5,
+        "ev_pct": 55.77,
+        "grade": "A+",
+        "stake": 500.0,
+        "should_bet": true,
+        "game": "Suns @ Warriors"
+      },
+      "total_analysis": {
+        "type": "TOTAL",
+        "pick": "UNDER 230.5",
+        "raw_prob": 0.985,
+        "calibrated_prob": 0.9462,
+        "edge": 21.7,
+        "ev_pct": 80.63,
+        "grade": "A+",
+        "stake": 500.0,
+        "should_bet": true,
+        "game": "Suns @ Warriors"
+      },
+      "moneyline_analysis": {
+        "home_win_prob": 0.7702,
+        "away_win_prob": 0.2298,
+        "home_implied": 0.4082,
+        "edge_pct": 36.21,
+        "best_bet": "Warriors ML"
+      },
+      "picks": [
+        {
+          "type": "SPREAD",
+          "pick": "Warriors +3.5",
+          "raw_prob": 0.8435,
+          "calibrated_prob": 0.816,
+          "edge": 12.5,
+          "ev_pct": 55.77,
+          "grade": "A+",
+          "stake": 500.0,
+          "should_bet": true,
+          "game": "Suns @ Warriors"
+        },
+        {
+          "type": "TOTAL",
+          "pick": "UNDER 230.5",
+          "raw_prob": 0.985,
+          "calibrated_prob": 0.9462,
+          "edge": 21.7,
+          "ev_pct": 80.63,
+          "grade": "A+",
+          "stake": 500.0,
+          "should_bet": true,
+          "game": "Suns @ Warriors"
+        }
+      ],
+      "total_picks": 2,
+      "total_stake": 1000.0,
+      "has_value": true,
+      "recommendation": "\ud83d\udfe2 PROCEED - 2 picks, $1000 total"
+    }
+  ],
+  "bet_slip": {
+    "generated_at": "2025-12-29T00:08:06.835638",
+    "bankroll": 10000,
+    "games_analyzed": 3,
+    "total_picks": 6,
+    "total_stake": 2752.23,
+    "avg_ev": 43.57,
+    "picks": [
+      {
+        "type": "TOTAL",
+        "pick": "UNDER 230.5",
+        "raw_prob": 0.985,
+        "calibrated_prob": 0.9462,
+        "edge": 21.7,
+        "ev_pct": 80.63,
+        "grade": "A+",
+        "stake": 500.0,
+        "should_bet": true,
+        "game": "Suns @ Warriors"
+      },
+      {
+        "type": "TOTAL",
+        "pick": "UNDER 224.5",
+        "raw_prob": 0.9158,
+        "calibrated_prob": 0.8825,
+        "edge": 13.8,
+        "ev_pct": 68.47,
+        "grade": "A+",
+        "stake": 500.0,
+        "should_bet": true,
+        "game": "Lakers @ Celtics"
+      },
+      {
+        "type": "SPREAD",
+        "pick": "Warriors +3.5",
+        "raw_prob": 0.8435,
+        "calibrated_prob": 0.816,
+        "edge": 12.5,
+        "ev_pct": 55.77,
+        "grade": "A+",
+        "stake": 500.0,
+        "should_bet": true,
+        "game": "Suns @ Warriors"
+      },
+      {
+        "type": "TOTAL",
+        "pick": "UNDER 228.0",
+        "raw_prob": 0.6922,
+        "calibrated_prob": 0.6768,
+        "edge": 5.0,
+        "ev_pct": 29.2,
+        "grade": "A+",
+        "stake": 500.0,
+        "should_bet": true,
+        "game": "Cavaliers @ Thunder"
+      },
+      {
+        "type": "SPREAD",
+        "pick": "Thunder -2.5",
+        "raw_prob": 0.6246,
+        "calibrated_prob": 0.6146,
+        "edge": 3.8,
+        "ev_pct": 17.33,
+        "grade": "A+",
+        "stake": 476.65,
+        "should_bet": true,
+        "game": "Cavaliers @ Thunder"
+      },
+      {
+        "type": "SPREAD",
+        "pick": "Celtics -8.5",
+        "raw_prob": 0.5829,
+        "calibrated_prob": 0.5763,
+        "edge": 2.5,
+        "ev_pct": 10.02,
+        "grade": "A+",
+        "stake": 275.58,
+        "should_bet": true,
+        "game": "Lakers @ Celtics"
+      }
+    ]
+  }
+}

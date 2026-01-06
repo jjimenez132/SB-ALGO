@@ -751,23 +751,68 @@ async def show_history(ctx):
 
 @bot.command(name='picks')
 async def show_picks(ctx):
-    """Today's top game picks"""
+    """Today's top game picks (filtered by strict criteria)"""
     try:
-        from algo_agent import query_algo_agent
+        from sb_algo_api import get_todays_picks
         async with ctx.typing():
-            response = query_algo_agent("What are today's top NBA game picks with edges? Be concise.")
-        await ctx.send(response[:2000])
+            picks_data = get_todays_picks()
+            game_picks = picks_data.get('game_picks', [])
+        
+        if not game_picks:
+            await ctx.send("📊 No game picks meet the strict criteria today (Edge >= 30%, Confidence >= 70%)")
+            return
+        
+        embed = discord.Embed(
+            title="🏀 TODAY'S TOP GAME PICKS",
+            description=f"**{len(game_picks)} picks** passed strict filters (Edge ≥ 30%)",
+            color=0x667eea
+        )
+        
+        for p in game_picks[:5]:
+            embed.add_field(
+                name=f"🔥 {p['matchup']}",
+                value=(
+                    f"**{p['pick']}**\n"
+                    f"Edge: {p['edge']} | EV: {p['ev']} | Conf: {p['confidence']}"
+                ),
+                inline=False
+            )
+        
+        embed.set_footer(text=f"SB-ALGO • {picks_data.get('date', 'Today')} • Avg EV: {picks_data.get('avg_ev', 'N/A')}")
+        await ctx.send(embed=embed)
+        
     except Exception as e:
         await ctx.send(f"⚠️ Error: {str(e)}")
 
 @bot.command(name='props')
 async def show_props(ctx):
-    """Today's top props"""
+    """Today's top prop picks (filtered by strict criteria)"""
     try:
-        from algo_agent import query_algo_agent
+        from sb_algo_api import get_todays_picks
         async with ctx.typing():
-            response = query_algo_agent("What are today's top NBA player prop bets? Be concise.")
-        await ctx.send(response[:2000])
+            picks_data = get_todays_picks()
+            prop_picks = picks_data.get('prop_picks', [])
+        
+        if not prop_picks:
+            await ctx.send("🎯 No prop picks meet the strict criteria today (Edge >= 30%, Hit Rate >= 60%)")
+            return
+        
+        embed = discord.Embed(
+            title="🎯 TODAY'S TOP PROP PICKS",
+            description=f"**{len(prop_picks)} picks** passed strict filters",
+            color=0xFF6B35
+        )
+        
+        for p in prop_picks[:5]:
+            embed.add_field(
+                name=f"🔥 {p['player']}",
+                value=f"**{p['prop']}**\nEdge: {p['edge']} | Hit Rate: {p['hit_rate']} | EV: {p['ev']}",
+                inline=False
+            )
+        
+        embed.set_footer(text=f"SB-ALGO • {picks_data.get('date', 'Today')} • Filters: Edge≥30%, HR≥60%")
+        await ctx.send(embed=embed)
+        
     except Exception as e:
         await ctx.send(f"⚠️ Error: {str(e)}")
 

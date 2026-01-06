@@ -20,7 +20,7 @@ DATABASE_URL = os.environ.get('DATABASE_URL',
     "postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db")
 
 # Discord webhooks
-RESULTS_WEBHOOK = os.environ.get('DISCORD_WEBHOOK_RESULTS')
+RESULTS_WEBHOOK = os.environ.get('DISCORD_WEBHOOK_RESULTS', 'https://discord.com/api/webhooks/1453117355327750185/SIakCtSyVdXBzyhguN_2NWsYjAw6Xg6sTOMcdudnp9L9WDO5Mj7k0pk1o51qFyfX7EJb')
 RECAP_WEBHOOK = os.environ.get('DISCORD_WEBHOOK_RECAP')
 HEALTH_WEBHOOK = os.environ.get('DISCORD_WEBHOOK_HEALTH')
 

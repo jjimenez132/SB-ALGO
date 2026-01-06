@@ -36,6 +36,13 @@ import sys
 from datetime import date, datetime
 from typing import Dict, List, Optional
 import json
+import hashlib
+
+def generate_pick_id(pick_type: str, index: int) -> str:
+    """Generate unique pick ID: G01, G02 for games, P01, P02 for props"""
+    prefix = 'G' if pick_type == 'game' else 'P'
+    return f"{prefix}{index:02d}"
+
 
 # Add engines directory to path
 ENGINES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'engines')
@@ -250,7 +257,9 @@ class SBAlgoAPI:
             if isinstance(edge, str):
                 edge = float(edge.replace('+', '').replace('%', ''))
             
+            pick_id = generate_pick_id('game', len(game_picks_display) + 1)
             game_picks_display.append({
+                'id': pick_id,
                 'matchup': p.get('game_id', 'Unknown'),
                 'pick': p.get('pick', 'Unknown'),
                 'type': p.get('type', 'Unknown'),
@@ -267,7 +276,9 @@ class SBAlgoAPI:
             edge = p.get('_edge_numeric', p.get('edge_pct', 0))
             hit_rate = p.get('_hit_rate_numeric', 0)
             
+            pick_id = generate_pick_id('prop', len(prop_picks_display) + 1)
             prop_picks_display.append({
+                'id': pick_id,
                 'player': p.get('player', 'Unknown'),
                 'prop': f"{p.get('stat', '').upper()} {p.get('best_side', '')} {p.get('book_line', '')}",
                 'model': p.get('projection', {}).get('weighted', 0),

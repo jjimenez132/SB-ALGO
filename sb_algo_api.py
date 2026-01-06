@@ -49,9 +49,9 @@ MIN_CONFIDENCE = 70          # Minimum model confidence
 MIN_HIT_RATE = 0.60          # Minimum hit rate for props
 MIN_EV = 0                   # EV must be positive
 
-MAX_GAME_PICKS = 2           # Top 2 games only
-MAX_PROP_PICKS = 2           # Top 2 props only
-MAX_TOTAL_PICKS = 4          # Never more than 4 picks
+MAX_GAME_PICKS = 10  # No hard limit, filters are the gatekeeper           # Top 2 games only
+MAX_PROP_PICKS = 10  # No hard limit, filters are the gatekeeper           # Top 2 props only
+MAX_TOTAL_PICKS = 20  # No hard limit, filters are the gatekeeper          # Never more than 4 picks
 
 
 class SBAlgoAPI:

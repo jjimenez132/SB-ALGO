@@ -81,63 +81,42 @@ def get_todays_games():
         return "\n".join(games_text)
 
 def get_todays_picks():
-    """Get today's algo picks"""
-    engine = get_engine()
-    today = get_eastern_date()
-    
-    with engine.connect() as conn:
-        result = conn.execute(text("""
-            SELECT pick_id, pick_name, units, status
-            FROM algo_picks_tracking 
-            WHERE pick_date = :today
-            ORDER BY created_at DESC
-            LIMIT 10
-        """), {"today": today}).fetchall()
+    """Get today's algo picks from sb_algo_api"""
+    try:
+        from sb_algo_api import get_todays_picks as get_picks
+        data = get_picks()
+        game_picks = data.get('game_picks', [])
         
-        if not result:
-            return "No picks generated yet today."
+        if not game_picks:
+            return "No game picks meet the strict criteria today (Edge >= 30%)."
         
-        picks_text = []
-        for r in result:
-            status_emoji = "⏳" if r[3] == 'pending' else "✅" if r[3] == 'win' else "❌"
-            picks_text.append(f"{status_emoji} **[{r[0]}]** {r[1]} - {r[2]}u")
+        picks_text = [f"**{len(game_picks)} picks** passed filters (Edge ≥ 30%)\n"]
+        for p in game_picks:
+            picks_text.append(f"🔥 **[{p['id']}]** {p['matchup']} → {p['pick']}")
+            picks_text.append(f"   Edge: {p['edge']} | EV: {p['ev']} | Conf: {p['confidence']}\n")
         
         return "\n".join(picks_text)
+    except Exception as e:
+        return f"Error loading picks: {str(e)}"
 
 def get_top_props():
-    """Get today's top prop edges"""
-    engine = get_engine()
-    today = get_eastern_date()
-    
-    with engine.connect() as conn:
-        result = conn.execute(text("""
-            SELECT pick_id, pick_name, units, status
-            FROM algo_picks_tracking 
-            WHERE pick_date = :today AND pick_type = 'prop'
-            ORDER BY units DESC
-            LIMIT 5
-        """), {"today": today}).fetchall()
+    """Get today's top prop edges from sb_algo_api"""
+    try:
+        from sb_algo_api import get_todays_picks as get_picks
+        data = get_picks()
+        prop_picks = data.get('prop_picks', [])
         
-        if not result:
-            # Try to get from analyze_props
-            try:
-                from algo_brain import analyze_props
-                props = analyze_props()
-                if props:
-                    props_text = []
-                    for p in sorted(props, key=lambda x: x['edge'], reverse=True)[:5]:
-                        props_text.append(f"🎯 **{p['player']}** {p['pick']} - {p['edge']:.0f}% edge")
-                    return "\n".join(props_text)
-            except:
-                pass
-            return "No prop picks yet today. Check back later."
+        if not prop_picks:
+            return "No prop picks meet the strict criteria today (Edge >= 30%, Hit Rate >= 60%)."
         
-        props_text = []
-        for r in result:
-            status_emoji = "⏳" if r[3] == 'pending' else "✅" if r[3] == 'win' else "❌"
-            props_text.append(f"{status_emoji} **[{r[0]}]** {r[1]} - {r[2]}u")
+        props_text = [f"**{len(prop_picks)} props** passed filters\n"]
+        for p in prop_picks:
+            props_text.append(f"🎯 **[{p['id']}]** {p['player']} {p['prop']}")
+            props_text.append(f"   Edge: {p['edge']} | Hit Rate: {p['hit_rate']} | EV: {p['ev']}\n")
         
         return "\n".join(props_text)
+    except Exception as e:
+        return f"Error loading props: {str(e)}"
 
 def get_game_analysis(team: str):
     """Get analysis for a specific team's game"""
@@ -171,6 +150,217 @@ def get_game_analysis(team: str):
         
         return analysis
 
+
+def get_algo_full_context():
+    """Get comprehensive algo context for AI responses"""
+    engine = get_engine()
+    today = get_eastern_date()
+    context = {}
+    
+    with engine.connect() as conn:
+        # 1. TODAY'S PICKS PERFORMANCE
+        try:
+            from sb_algo_api import get_todays_picks as get_picks
+            picks_data = get_picks()
+            context['todays_picks'] = {
+                'game_picks': picks_data.get('game_picks', []),
+                'prop_picks': picks_data.get('prop_picks', []),
+                'total_picks': picks_data.get('total_picks', 0),
+                'avg_ev': picks_data.get('avg_ev', '0%'),
+                'total_stake': picks_data.get('total_stake', '$0')
+            }
+        except:
+            context['todays_picks'] = {'error': 'Could not load picks'}
+        
+        # 2. HISTORICAL PERFORMANCE (Last 30 days)
+        try:
+            result = conn.execute(text("""
+                SELECT 
+                    COUNT(*) as total_picks,
+                    SUM(CASE WHEN status = 'win' THEN 1 ELSE 0 END) as wins,
+                    SUM(CASE WHEN status = 'loss' THEN 1 ELSE 0 END) as losses,
+                    SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
+                FROM algo_picks_tracking 
+                WHERE pick_date >= CURRENT_DATE - INTERVAL '30 days'
+            """)).fetchone()
+            
+            if result and result[0] > 0:
+                total = result[0]
+                wins = result[1] or 0
+                losses = result[2] or 0
+                pending = result[3] or 0
+                decided = wins + losses
+                win_rate = (wins / decided * 100) if decided > 0 else 0
+                
+                context['historical_30d'] = {
+                    'total_picks': total,
+                    'wins': wins,
+                    'losses': losses,
+                    'pending': pending,
+                    'win_rate': f"{win_rate:.1f}%"
+                }
+            else:
+                context['historical_30d'] = {'message': 'No historical data yet'}
+        except Exception as e:
+            context['historical_30d'] = {'error': str(e)}
+        
+        # 3. BANKROLL STATUS
+        try:
+            result = conn.execute(text("""
+                SELECT current_bankroll, starting_bankroll 
+                FROM bankroll_settings 
+                LIMIT 1
+            """)).fetchone()
+            
+            if result:
+                current = float(result[0]) if result[0] else 10000
+                starting = float(result[1]) if result[1] else 10000
+                pnl = current - starting
+                roi = ((current - starting) / starting * 100) if starting > 0 else 0
+                
+                context['bankroll'] = {
+                    'current': f"${current:,.0f}",
+                    'starting': f"${starting:,.0f}",
+                    'pnl': f"${pnl:+,.0f}",
+                    'roi': f"{roi:+.1f}%"
+                }
+            else:
+                context['bankroll'] = {'current': '$10,000', 'starting': '$10,000', 'pnl': '$0', 'roi': '0%'}
+        except:
+            context['bankroll'] = {'current': '$10,000', 'message': 'Default bankroll'}
+        
+        # 4. RECENT RESULTS (Last 7 days with details)
+        try:
+            result = conn.execute(text("""
+                SELECT pick_id, pick_name, pick_type, units, status, pick_date
+                FROM algo_picks_tracking 
+                WHERE status IN ('win', 'loss')
+                ORDER BY pick_date DESC, created_at DESC
+                LIMIT 10
+            """)).fetchall()
+            
+            recent = []
+            for r in result:
+                recent.append({
+                    'id': r[0],
+                    'name': r[1],
+                    'type': r[2],
+                    'units': float(r[3]) if r[3] else 0,
+                    'result': r[4],
+                    'date': str(r[5])
+                })
+            context['recent_results'] = recent
+        except:
+            context['recent_results'] = []
+        
+        # 5. TODAY'S GAMES
+        try:
+            result = conn.execute(text("""
+                SELECT away_team, home_team, commence_time
+                FROM games 
+                WHERE DATE(commence_time) = :today
+                ORDER BY commence_time
+            """), {"today": today}).fetchall()
+            
+            games = []
+            for r in result:
+                games.append(f"{r[0]} @ {r[1]}")
+            context['todays_games'] = games
+        except:
+            context['todays_games'] = []
+        
+        # 6. MAJOR INJURIES
+        try:
+            result = conn.execute(text("""
+                SELECT player_name, team_name, status 
+                FROM injuries 
+                WHERE status IN ('Out', 'Doubtful')
+                ORDER BY updated_at DESC
+                LIMIT 15
+            """)).fetchall()
+            
+            injuries = []
+            for r in result:
+                injuries.append(f"{r[0]} ({r[1]}) - {r[2]}")
+            context['major_injuries'] = injuries
+        except:
+            context['major_injuries'] = []
+        
+        # 7. ALGO HEALTH METRICS
+        try:
+            # Check data freshness
+            result = conn.execute(text("""
+                SELECT table_name, MAX(updated_at) as last_update
+                FROM (
+                    SELECT 'betting_odds' as table_name, MAX(last_update) as updated_at FROM betting_odds
+                    UNION ALL
+                    SELECT 'player_props', MAX(updated_at) FROM player_props
+                    UNION ALL
+                    SELECT 'injuries', MAX(updated_at) FROM injuries
+                ) t
+                GROUP BY table_name
+            """)).fetchall()
+            
+            health = {}
+            for r in result:
+                health[r[0]] = str(r[1]) if r[1] else 'Unknown'
+            context['data_health'] = health
+        except:
+            context['data_health'] = {'status': 'Unable to check'}
+    
+    return context
+
+
+def format_context_for_ai():
+    """Format the full context as a string for the AI"""
+    ctx = get_algo_full_context()
+    
+    lines = ["=== SB-ALGO CURRENT STATUS ===\n"]
+    
+    # Today's picks
+    picks = ctx.get('todays_picks', {})
+    lines.append(f"📊 TODAY'S PICKS: {picks.get('total_picks', 0)} total")
+    lines.append(f"   Avg EV: {picks.get('avg_ev', 'N/A')} | Stake: {picks.get('total_stake', 'N/A')}")
+    
+    for p in picks.get('game_picks', [])[:3]:
+        lines.append(f"   🏀 [{p.get('id')}] {p.get('matchup')} → {p.get('pick')} ({p.get('edge')})")
+    for p in picks.get('prop_picks', [])[:3]:
+        lines.append(f"   🎯 [{p.get('id')}] {p.get('player')} {p.get('prop')} ({p.get('edge')})")
+    
+    # Historical
+    hist = ctx.get('historical_30d', {})
+    if hist.get('total_picks'):
+        lines.append(f"\n📈 LAST 30 DAYS: {hist.get('wins', 0)}W - {hist.get('losses', 0)}L ({hist.get('win_rate', 'N/A')})")
+    
+    # Bankroll
+    bank = ctx.get('bankroll', {})
+    lines.append(f"\n💰 BANKROLL: {bank.get('current', 'N/A')} | P/L: {bank.get('pnl', 'N/A')} | ROI: {bank.get('roi', 'N/A')}")
+    
+    # Recent results
+    recent = ctx.get('recent_results', [])[:5]
+    if recent:
+        lines.append("\n📋 RECENT RESULTS:")
+        for r in recent:
+            emoji = "✅" if r.get('result') == 'win' else "❌"
+            lines.append(f"   {emoji} [{r.get('id')}] {r.get('name')} ({r.get('date')})")
+    
+    # Games today
+    games = ctx.get('todays_games', [])
+    if games:
+        lines.append(f"\n🏀 TODAY'S GAMES ({len(games)}):")
+        for g in games[:6]:
+            lines.append(f"   • {g}")
+    
+    # Major injuries
+    injuries = ctx.get('major_injuries', [])[:5]
+    if injuries:
+        lines.append("\n🏥 KEY INJURIES:")
+        for inj in injuries:
+            lines.append(f"   • {inj}")
+    
+    return "\n".join(lines)
+
+
 # ============================================================
 # GEMINI AI (for natural language)
 # ============================================================
@@ -194,9 +384,22 @@ def _ensure_initialized():
         
         genai.configure(api_key=api_key)
         
-        system_prompt = """You are SB-ALGO's assistant. You help users with sports betting questions.
-        Be concise and direct. When given data, summarize it clearly.
-        You have access to real NBA data including injuries, games, odds, and picks."""
+        system_prompt = """You are SB-ALGO, a professional NBA betting algorithm assistant.
+
+You have FULL access to:
+- Real-time picks from Meta-Merge Engine v4.0 (15 sub-engines)
+- Strict filters: Edge ≥30%, Hit Rate ≥60%, Confidence ≥70%
+- Historical performance data (wins, losses, ROI)
+- Bankroll tracking and Kelly staking
+- Live injuries, odds, and game data
+
+Pick IDs: Games are G01, G02... Props are P01, P02...
+
+When answering:
+- Reference actual data and pick IDs
+- Be confident but remind users betting has risk
+- Be concise and professional
+- If asked about performance, cite real numbers"""
 
         _model = genai.GenerativeModel('gemini-2.0-flash', system_instruction=system_prompt)
         _chat_session = _model.start_chat()
@@ -213,6 +416,11 @@ def _ensure_initialized():
 def query_algo_agent(prompt: str, retries: int = 2):
     """Smart query handler - uses database first, AI for complex questions"""
     prompt_lower = prompt.lower()
+    
+    # For performance/status questions, include full context
+    if any(word in prompt_lower for word in ['how', 'performance', 'doing', 'status', 'health', 'roi', 'record', 'bankroll', 'results']):
+        context = format_context_for_ai()
+        prompt = f"{context}\n\nUser question: {prompt}"
     
     # Direct database queries for common questions
     if any(word in prompt_lower for word in ['injury', 'injuries', 'hurt', 'out']):

@@ -14,6 +14,69 @@ import pytz
 DATABASE_URL = os.environ.get('DATABASE_URL',
     "postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db?sslmode=require")
 
+# ============================================================
+# DISCORD RESULTS POSTING
+# ============================================================
+
+def post_grading_results_to_discord(yesterday, game_graded, props_graded, game_stats, props_stats):
+    """Post grading results to Discord #results channel"""
+    
+    WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_RESULTS', 
+        'https://discord.com/api/webhooks/1453117355327750185/SIakCtSyVdXBzyhguN_2NWsYjAw6Xg6sTOMcdudnp9L9WDO5Mj7k0pk1o51qFyfX7EJb')
+    
+    if not WEBHOOK_URL:
+        print("   ⚠️ No results webhook configured")
+        return
+    
+    # Build embed
+    embed = {
+        "title": f"📊 DAILY GRADING RESULTS",
+        "description": f"**{yesterday}** - All picks graded",
+        "color": 0x667eea,
+        "fields": [
+            {"name": "🏀 Games Graded", "value": str(game_graded), "inline": True},
+            {"name": "🎯 Props Graded", "value": str(props_graded), "inline": True},
+            {"name": "📈 Total", "value": str(game_graded + props_graded), "inline": True},
+        ]
+    }
+    
+    # Add game stats if available
+    if game_stats and game_stats.get('by_type'):
+        game_summary = []
+        for pred_type, data in game_stats['by_type'].items():
+            game_summary.append(f"{pred_type}: {data['win_rate']}% ({data['wins']}-{data['losses']})")
+        if game_summary:
+            embed["fields"].append({
+                "name": "🏀 L30 Game Performance",
+                "value": "\n".join(game_summary[:3]),
+                "inline": False
+            })
+    
+    # Add props stats if available
+    if props_stats and props_stats.get('overall'):
+        overall = props_stats['overall']
+        embed["fields"].append({
+            "name": "🎯 L30 Props Performance",
+            "value": f"Win Rate: {overall['win_rate']}% ({overall['wins']}-{overall['losses']})\nROI: {overall['roi']}% | P/L: {overall['units_profit']:+.1f}u",
+            "inline": False
+        })
+    
+    embed["footer"] = {"text": f"SB-ALGO • Auto-graded at 6:00 AM ET"}
+    
+    # Send to Discord
+    try:
+        response = requests.post(WEBHOOK_URL, json={"embeds": [embed]}, timeout=10)
+        if response.status_code in [200, 204]:
+            print("   ✅ Posted grading results to Discord")
+        else:
+            print(f"   ⚠️ Discord error: {response.status_code}")
+    except Exception as e:
+        print(f"   ⚠️ Discord post failed: {e}")
+
+# ============================================================
+# MAIN GRADING LOGIC
+# ============================================================
+
 def main():
     eastern = pytz.timezone('US/Eastern')
     now = datetime.now(eastern)
@@ -85,6 +148,7 @@ def main():
         print(f"      avoid: {', '.join(prop_filters['avoid_markets'][:3])}")
     
     print(f"\n{'='*60}")
+    
     # Post to Discord
     post_grading_results_to_discord(yesterday, game_graded, props_graded, game_stats, props_stats)
     
@@ -93,63 +157,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# ============================================================
-# DISCORD RESULTS POSTING
-# ============================================================
-
-def post_grading_results_to_discord(yesterday, game_graded, props_graded, game_stats, props_stats):
-    """Post grading results to Discord #results channel"""
-    import requests
-    
-    WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_RESULTS', 
-        'https://discord.com/api/webhooks/1453117355327750185/SIakCtSyVdXBzyhguN_2NWsYjAw6Xg6sTOMcdudnp9L9WDO5Mj7k0pk1o51qFyfX7EJb')
-    
-    if not WEBHOOK_URL:
-        print("   ⚠️ No results webhook configured")
-        return
-    
-    # Build embed
-    embed = {
-        "title": f"📊 DAILY GRADING RESULTS",
-        "description": f"**{yesterday}** - All picks graded",
-        "color": 0x667eea,
-        "fields": [
-            {"name": "🏀 Games Graded", "value": str(game_graded), "inline": True},
-            {"name": "🎯 Props Graded", "value": str(props_graded), "inline": True},
-            {"name": "📈 Total", "value": str(game_graded + props_graded), "inline": True},
-        ]
-    }
-    
-    # Add game stats if available
-    if game_stats and game_stats.get('by_type'):
-        game_summary = []
-        for pred_type, data in game_stats['by_type'].items():
-            game_summary.append(f"{pred_type}: {data['win_rate']}% ({data['wins']}-{data['losses']})")
-        if game_summary:
-            embed["fields"].append({
-                "name": "🏀 L30 Game Performance",
-                "value": "\n".join(game_summary[:3]),
-                "inline": False
-            })
-    
-    # Add props stats if available
-    if props_stats and props_stats.get('overall'):
-        overall = props_stats['overall']
-        embed["fields"].append({
-            "name": "🎯 L30 Props Performance",
-            "value": f"Win Rate: {overall['win_rate']}% ({overall['wins']}-{overall['losses']})\nROI: {overall['roi']}% | P/L: {overall['units_profit']:+.1f}u",
-            "inline": False
-        })
-    
-    embed["footer"] = {"text": f"SB-ALGO • Auto-graded at 6:00 AM ET"}
-    
-    # Send to Discord
-    try:
-        response = requests.post(WEBHOOK_URL, json={"embeds": [embed]}, timeout=10)
-        if response.status_code in [200, 204]:
-            print("   ✅ Posted grading results to Discord")
-        else:
-            print(f"   ⚠️ Discord error: {response.status_code}")
-    except Exception as e:
-        print(f"   ⚠️ Discord post failed: {e}")

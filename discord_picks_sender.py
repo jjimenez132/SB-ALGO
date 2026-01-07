@@ -196,24 +196,33 @@ def send_discord_message(channel_id, content=None, embed=None):
     
     url = f"{DISCORD_API}/channels/{channel_id}/messages"
     
-    try:
-        import time
-        time.sleep(0.5)  # Rate limit prevention
-        response = requests.post(url, headers=headers, json=data, verify=False)
-        if response.status_code == 200:
-            return True
-        elif response.status_code == 429:
-            retry_after = response.json().get('retry_after', 1)
-            print(f"   ⏳ Rate limited, waiting {retry_after}s...")
-            time.sleep(retry_after + 0.5)
-            response = requests.post(url, headers=headers, json=data, verify=False)
-            return response.status_code == 200
-        else:
-            print(f"   ⚠️ Discord error {response.status_code}: {response.text[:100]}")
-            return False
-    except Exception as e:
-        print(f"   ❌ Request error: {e}")
-        return False
+    import time
+    for attempt in range(3):
+        try:
+            time.sleep(0.5)  # Rate limit prevention
+            response = requests.post(url, headers=headers, json=data, timeout=30)
+            
+            if response.status_code == 200:
+                return True
+            elif response.status_code == 429:
+                try:
+                    retry_after = response.json().get('retry_after', 2)
+                except:
+                    retry_after = 2
+                print(f"   ⏳ Rate limited, waiting {retry_after}s...")
+                time.sleep(retry_after + 1)
+                continue
+            else:
+                print(f"   ⚠️ Discord error {response.status_code}: {response.text[:100] if response.text else 'empty'}")
+                return False
+        except requests.exceptions.Timeout:
+            print(f"   ⏳ Timeout, retrying ({attempt+1}/3)...")
+            time.sleep(2)
+        except Exception as e:
+            print(f"   ❌ Request error ({attempt+1}/3): {e}")
+            time.sleep(2)
+    
+    return False
 
 def create_game_pick_embed(pick, is_alert=False):
     """Create embed dict for game pick"""
@@ -441,6 +450,10 @@ def check_new_picks():
         if send_discord_message(GAME_PICKS_CHANNEL, embed=create_game_pick_embed(pick, is_alert=True)):
             pick_key = create_pick_key(pick, 'game')
             mark_pick_sent(pick_key, 'game')
+            # Save for grading
+            pick_id = pick.get('id', f'G{alerts_sent+1:02d}')
+            pick_name = f"{pick.get('matchup', 'Unknown')} {pick.get('pick', '')}"
+            save_pick_for_grading(pick_id, pick_name, 'game', 2.0)
             alerts_sent += 1
     
     # Send new prop picks
@@ -450,6 +463,10 @@ def check_new_picks():
         if send_discord_message(PROP_PICKS_CHANNEL, embed=create_prop_pick_embed(pick, is_alert=True)):
             pick_key = create_pick_key(pick, 'prop')
             mark_pick_sent(pick_key, 'prop')
+            # Save for grading
+            pick_id = pick.get('id', f'P{alerts_sent+1:02d}')
+            pick_name = f"{pick.get('player', 'Unknown')} {pick.get('prop', '')}"
+            save_pick_for_grading(pick_id, pick_name, 'prop', 1.5)
             alerts_sent += 1
     
     if alerts_sent == 0:

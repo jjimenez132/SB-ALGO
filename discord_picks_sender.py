@@ -175,11 +175,25 @@ def save_pick_for_grading(pick_id, pick_name, pick_type, units, odds=-110, detai
         print(f"   ⚠️ Could not save for grading: {e}")
 
 def create_pick_key(pick, pick_type):
-    """Create unique key for a pick"""
+    """Create unique key for a pick - ignores line numbers to avoid duplicates"""
+    import re
     if pick_type == 'game':
-        return f"GAME_{pick.get('matchup', '')}_{pick.get('pick', '')}"
+        matchup = pick.get('matchup', '')
+        pick_str = pick.get('pick', '')
+        # Extract just OVER/UNDER direction, ignore the number
+        direction = 'OVER' if 'OVER' in pick_str.upper() else 'UNDER' if 'UNDER' in pick_str.upper() else pick_str
+        return f"GAME_{matchup}_{direction}"
     else:
-        return f"PROP_{pick.get('player', '')}_{pick.get('prop', '')}"
+        player = pick.get('player', '')
+        prop = pick.get('prop', '')
+        # Extract stat type and direction, ignore the number
+        # e.g., "PTS OVER 25.5" -> "PTS_OVER"
+        parts = prop.upper().split()
+        if len(parts) >= 2:
+            stat = parts[0]  # PTS, REB, AST, etc.
+            direction = 'OVER' if 'OVER' in prop.upper() else 'UNDER' if 'UNDER' in prop.upper() else ''
+            return f"PROP_{player}_{stat}_{direction}"
+        return f"PROP_{player}_{prop}"
 
 def send_discord_message(channel_id, content=None, embed=None):
     """Send a message to Discord channel"""
@@ -199,7 +213,7 @@ def send_discord_message(channel_id, content=None, embed=None):
     import time
     for attempt in range(3):
         try:
-            time.sleep(0.5)  # Rate limit prevention
+            time.sleep(1.5)  # Rate limit prevention
             response = requests.post(url, headers=headers, json=data, timeout=30)
             
             if response.status_code == 200:
@@ -244,8 +258,17 @@ def create_game_pick_embed(pick, is_alert=False):
     if is_alert:
         title = f"🚨 NEW EDGE: {matchup}"
     
-    # Determine units based on edge
-    units = "2.0u" if edge_val >= 20 else "1.5u" if edge_val >= 15 else "1.0u"
+    # Determine units - CONSERVATIVE (start small, only go big on locks)
+    # 2.0u = LOCK (edge 40%+, confidence 95%+)
+    # 1.0u = Strong edge (edge 30%+, confidence 90%+)
+    # 0.5u = Standard (everything else)
+    confidence = float(str(pick.get('confidence', '80')).replace('%', ''))
+    if edge_val >= 40 and confidence >= 95:
+        units = "2.0u"
+    elif edge_val >= 30 and confidence >= 90:
+        units = "1.0u"
+    else:
+        units = "0.5u"
     
     embed = {
         "title": title,
@@ -285,7 +308,17 @@ def create_prop_pick_embed(pick, is_alert=False):
     if is_alert:
         title = f"🚨 NEW EDGE: {player}"
     
-    units = "1.5u" if edge_val >= 25 else "1.0u"
+    # Conservative prop sizing
+    # 1.5u = LOCK (edge 50%+, hit rate 80%+)
+    # 1.0u = Strong (edge 35%+, hit rate 70%+)
+    # 0.5u = Standard (everything else)
+    hit_rate_val = float(str(hit_rate).replace('%', '')) if hit_rate else 0
+    if edge_val >= 50 and hit_rate_val >= 80:
+        units = "1.5u"
+    elif edge_val >= 35 and hit_rate_val >= 70:
+        units = "1.0u"
+    else:
+        units = "0.5u"
     
     embed = {
         "title": title,
@@ -446,8 +479,8 @@ def check_new_picks():
     # Send new game picks
     for pick in new_game_picks:
         print(f"   🚨 NEW GAME: {pick.get('matchup')} - {pick.get('pick')}")
-        send_discord_message(GAME_PICKS_CHANNEL, content="🚨 **NEW EDGE DETECTED** 🚨")
-        if send_discord_message(GAME_PICKS_CHANNEL, embed=create_game_pick_embed(pick, is_alert=True)):
+        embed = create_game_pick_embed(pick, is_alert=True)
+        if send_discord_message(GAME_PICKS_CHANNEL, embed=embed):
             pick_key = create_pick_key(pick, 'game')
             mark_pick_sent(pick_key, 'game')
             # Save for grading
@@ -459,8 +492,8 @@ def check_new_picks():
     # Send new prop picks
     for pick in new_prop_picks:
         print(f"   🚨 NEW PROP: {pick.get('player')} - {pick.get('prop')}")
-        send_discord_message(PROP_PICKS_CHANNEL, content="🚨 **NEW EDGE DETECTED** 🚨")
-        if send_discord_message(PROP_PICKS_CHANNEL, embed=create_prop_pick_embed(pick, is_alert=True)):
+        embed = create_prop_pick_embed(pick, is_alert=True)
+        if send_discord_message(PROP_PICKS_CHANNEL, embed=embed):
             pick_key = create_pick_key(pick, 'prop')
             mark_pick_sent(pick_key, 'prop')
             # Save for grading

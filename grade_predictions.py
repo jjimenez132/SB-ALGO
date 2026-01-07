@@ -63,15 +63,24 @@ def post_grading_results_to_discord(yesterday, game_graded, props_graded, game_s
     
     embed["footer"] = {"text": f"SB-ALGO • Auto-graded at 6:00 AM ET"}
     
-    # Send to Discord
-    try:
-        response = requests.post(WEBHOOK_URL, json={"embeds": [embed]}, timeout=10)
-        if response.status_code in [200, 204]:
-            print("   ✅ Posted grading results to Discord")
-        else:
-            print(f"   ⚠️ Discord error: {response.status_code}")
-    except Exception as e:
-        print(f"   ⚠️ Discord post failed: {e}")
+    # Send to Discord with retry
+    import time
+    for attempt in range(3):
+        try:
+            response = requests.post(WEBHOOK_URL, json={"embeds": [embed]}, timeout=10)
+            if response.status_code in [200, 204]:
+                print("   ✅ Posted grading results to Discord")
+                return
+            elif response.status_code == 429:
+                retry_after = response.json().get('retry_after', 5)
+                print(f"   ⏳ Rate limited, waiting {retry_after}s...")
+                time.sleep(retry_after + 1)
+            else:
+                print(f"   ⚠️ Discord error: {response.status_code}")
+                return
+        except Exception as e:
+            print(f"   ⚠️ Discord post failed: {e}")
+            time.sleep(2)
 
 # ============================================================
 # MAIN GRADING LOGIC

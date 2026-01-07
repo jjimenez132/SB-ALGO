@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
 ================================================================================
-SB-ALGO DISCORD PICKS SENDER v2.0
+SB-ALGO DISCORD PICKS SENDER v2.1
 ================================================================================
 Uses requests API instead of discord.py to avoid SSL issues.
+Tracks sent picks to avoid duplicates during intraday alerts.
 
 CHANNELS:
 - 🔥-top-edges (1450976507127140544) → Game picks
 - 🎯-top-props (1451003425021100103) → Player props
 
 USAGE:
-  python3 discord_picks_sender.py morning   # Send full daily report
-  python3 discord_picks_sender.py alert     # Check for high value picks
+  python3 discord_picks_sender.py morning   # Send full daily report (9:30am ET)
+  python3 discord_picks_sender.py alert     # Check for NEW picks (hourly)
   python3 discord_picks_sender.py test      # Test picks retrieval
 
 ================================================================================
@@ -32,16 +33,23 @@ PROP_PICKS_CHANNEL = 1451003425021100103  # 🎯-top-props
 # Discord Bot Token
 DISCORD_TOKEN = os.environ.get('DISCORD_BOT_TOKEN')
 
-# Thresholds
-HIGH_VALUE_EDGE_THRESHOLD = 40  # Edge % to trigger breaking alert
+# Database for tracking sent picks
+DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db')
 
 # API Base URL
 DISCORD_API = "https://discord.com/api/v10"
+
+# File to track sent picks (backup if DB fails)
+SENT_PICKS_FILE = "/tmp/sb_algo_sent_picks.json"
 
 def get_eastern_time():
     """Get current Eastern time"""
     eastern = pytz.timezone('US/Eastern')
     return datetime.now(eastern)
+
+def get_eastern_date():
+    """Get current Eastern date string"""
+    return get_eastern_time().strftime('%Y-%m-%d')
 
 def get_picks_from_engine():
     """Get picks from the NEW sb_algo engine"""
@@ -51,6 +59,127 @@ def get_picks_from_engine():
     except Exception as e:
         print(f"❌ Error getting picks: {e}")
         return None
+
+def get_sent_picks_today():
+    """Get list of picks already sent today"""
+    today = get_eastern_date()
+    
+    # Try database first
+    try:
+        from sqlalchemy import create_engine, text
+        engine = create_engine(DATABASE_URL)
+        with engine.connect() as conn:
+            # Create table if not exists
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS discord_sent_picks (
+                    id SERIAL PRIMARY KEY,
+                    pick_key VARCHAR(255) NOT NULL,
+                    pick_type VARCHAR(50),
+                    sent_date DATE NOT NULL,
+                    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(pick_key, sent_date)
+                )
+            """))
+            conn.commit()
+            
+            # Get today's sent picks
+            result = conn.execute(text("""
+                SELECT pick_key FROM discord_sent_picks WHERE sent_date = :today
+            """), {"today": today}).fetchall()
+            
+            return set(row[0] for row in result)
+    except Exception as e:
+        print(f"   ⚠️ DB error, using file: {e}")
+    
+    # Fallback to file
+    try:
+        with open(SENT_PICKS_FILE, 'r') as f:
+            data = json.load(f)
+            if data.get('date') == today:
+                return set(data.get('picks', []))
+    except:
+        pass
+    
+    return set()
+
+def mark_pick_sent(pick_key, pick_type='unknown'):
+    """Mark a pick as sent"""
+    today = get_eastern_date()
+    
+    # Try database first
+    try:
+        from sqlalchemy import create_engine, text
+        engine = create_engine(DATABASE_URL)
+        with engine.connect() as conn:
+            conn.execute(text("""
+                INSERT INTO discord_sent_picks (pick_key, pick_type, sent_date)
+                VALUES (:key, :type, :date)
+                ON CONFLICT (pick_key, sent_date) DO NOTHING
+            """), {"key": pick_key, "type": pick_type, "date": today})
+            conn.commit()
+            return
+    except Exception as e:
+        print(f"   ⚠️ DB mark error: {e}")
+    
+    # Fallback to file
+    try:
+        sent = get_sent_picks_today()
+        sent.add(pick_key)
+        with open(SENT_PICKS_FILE, 'w') as f:
+            json.dump({'date': today, 'picks': list(sent)}, f)
+    except:
+        pass
+
+def clear_sent_picks():
+    """Clear sent picks (for new day)"""
+    try:
+        from sqlalchemy import create_engine, text
+        engine = create_engine(DATABASE_URL)
+        with engine.connect() as conn:
+            # Keep last 7 days only
+            conn.execute(text("""
+                DELETE FROM discord_sent_picks 
+                WHERE sent_date < CURRENT_DATE - INTERVAL '7 days'
+            """))
+            conn.commit()
+    except:
+        pass
+
+
+def save_pick_for_grading(pick_id, pick_name, pick_type, units, odds=-110, details=None):
+    """Save pick to algo_picks_tracking for later grading"""
+    today = get_eastern_date()
+    
+    try:
+        from sqlalchemy import create_engine, text
+        engine = create_engine(DATABASE_URL)
+        with engine.connect() as conn:
+            conn.execute(text("""
+                INSERT INTO algo_picks_tracking (pick_date, pick_id, pick_name, pick_type, units, odds, status, pick_details)
+                VALUES (:date, :pick_id, :name, :type, :units, :odds, 'pending', :details)
+                ON CONFLICT (pick_date, pick_type, pick_name) DO UPDATE SET
+                    pick_id = EXCLUDED.pick_id,
+                    units = EXCLUDED.units
+            """), {
+                'date': today,
+                'pick_id': pick_id,
+                'name': pick_name,
+                'type': pick_type,
+                'units': units,
+                'odds': odds,
+                'details': details
+            })
+            conn.commit()
+            print(f"   📝 Saved {pick_id} for grading")
+    except Exception as e:
+        print(f"   ⚠️ Could not save for grading: {e}")
+
+def create_pick_key(pick, pick_type):
+    """Create unique key for a pick"""
+    if pick_type == 'game':
+        return f"GAME_{pick.get('matchup', '')}_{pick.get('pick', '')}"
+    else:
+        return f"PROP_{pick.get('player', '')}_{pick.get('prop', '')}"
 
 def send_discord_message(channel_id, content=None, embed=None):
     """Send a message to Discord channel"""
@@ -68,9 +197,17 @@ def send_discord_message(channel_id, content=None, embed=None):
     url = f"{DISCORD_API}/channels/{channel_id}/messages"
     
     try:
+        import time
+        time.sleep(0.5)  # Rate limit prevention
         response = requests.post(url, headers=headers, json=data, verify=False)
         if response.status_code == 200:
             return True
+        elif response.status_code == 429:
+            retry_after = response.json().get('retry_after', 1)
+            print(f"   ⏳ Rate limited, waiting {retry_after}s...")
+            time.sleep(retry_after + 0.5)
+            response = requests.post(url, headers=headers, json=data, verify=False)
+            return response.status_code == 200
         else:
             print(f"   ⚠️ Discord error {response.status_code}: {response.text[:100]}")
             return False
@@ -78,7 +215,7 @@ def send_discord_message(channel_id, content=None, embed=None):
         print(f"   ❌ Request error: {e}")
         return False
 
-def create_game_pick_embed(pick, is_breaking=False):
+def create_game_pick_embed(pick, is_alert=False):
     """Create embed dict for game pick"""
     
     edge_val = float(str(pick.get('edge', '0')).replace('+', '').replace('%', ''))
@@ -95,8 +232,8 @@ def create_game_pick_embed(pick, is_breaking=False):
     pick_str = pick.get('pick', '')
     
     title = f"🏀 {matchup}"
-    if is_breaking:
-        title = f"🚨 HIGH VALUE: {matchup}"
+    if is_alert:
+        title = f"🚨 NEW EDGE: {matchup}"
     
     # Determine units based on edge
     units = "2.0u" if edge_val >= 20 else "1.5u" if edge_val >= 15 else "1.0u"
@@ -118,7 +255,7 @@ def create_game_pick_embed(pick, is_breaking=False):
     
     return embed
 
-def create_prop_pick_embed(pick, is_breaking=False):
+def create_prop_pick_embed(pick, is_alert=False):
     """Create embed dict for prop pick"""
     
     edge_val = float(str(pick.get('edge', '0')).replace('+', '').replace('%', ''))
@@ -136,8 +273,8 @@ def create_prop_pick_embed(pick, is_breaking=False):
     prop = pick.get('prop', '')
     
     title = f"🎯 {player}"
-    if is_breaking:
-        title = f"🚨 HIGH VALUE: {player}"
+    if is_alert:
+        title = f"🚨 NEW EDGE: {player}"
     
     units = "1.5u" if edge_val >= 25 else "1.0u"
     
@@ -195,6 +332,9 @@ def send_morning_report():
     print(f"📤 SENDING MORNING REPORT - {get_eastern_time().strftime('%I:%M %p ET')}")
     print(f"{'='*60}")
     
+    # Clear old sent picks
+    clear_sent_picks()
+    
     # Get picks
     picks_data = get_picks_from_engine()
     
@@ -219,6 +359,12 @@ def send_morning_report():
         embed = create_game_pick_embed(pick)
         if send_discord_message(GAME_PICKS_CHANNEL, embed=embed):
             sent_games += 1
+            pick_key = create_pick_key(pick, 'game')
+            mark_pick_sent(pick_key, 'game')
+            # Save for grading
+            pick_id = pick.get('id', f'G{sent_games:02d}')
+            pick_name = f"{pick.get('matchup', 'Unknown')} {pick.get('pick', '')}"
+            save_pick_for_grading(pick_id, pick_name, 'game', 2.0)
     
     print(f"   ✅ Sent {sent_games} game picks")
     
@@ -237,6 +383,12 @@ def send_morning_report():
         embed = create_prop_pick_embed(pick)
         if send_discord_message(PROP_PICKS_CHANNEL, embed=embed):
             sent_props += 1
+            pick_key = create_pick_key(pick, 'prop')
+            mark_pick_sent(pick_key, 'prop')
+            # Save for grading
+            pick_id = pick.get('id', f'P{sent_props:02d}')
+            pick_name = f"{pick.get('player', 'Unknown')} {pick.get('prop', '')}"
+            save_pick_for_grading(pick_id, pick_name, 'prop', 1.5)
     
     print(f"   ✅ Sent {sent_props} prop picks")
     
@@ -246,40 +398,66 @@ def send_morning_report():
     
     return True
 
-def check_high_value_picks():
-    """Check for high value picks and send alerts"""
+def check_new_picks():
+    """Check for NEW picks that weren't in morning report"""
     
-    print(f"\n🔍 Checking for high value picks (edge >= {HIGH_VALUE_EDGE_THRESHOLD}%)...")
+    print(f"\n{'='*60}")
+    print(f"🔍 CHECKING FOR NEW PICKS - {get_eastern_time().strftime('%I:%M %p ET')}")
+    print(f"{'='*60}")
     
+    # Get already sent picks
+    sent_picks = get_sent_picks_today()
+    print(f"   📋 {len(sent_picks)} picks already sent today")
+    
+    # Get current picks
     picks_data = get_picks_from_engine()
     if not picks_data:
         print("❌ No picks data")
         return
     
-    alerts_sent = 0
+    new_game_picks = []
+    new_prop_picks = []
     
     # Check game picks
     for pick in picks_data.get('game_picks', []):
-        edge_val = float(str(pick.get('edge', '0')).replace('+', '').replace('%', ''))
-        if edge_val >= HIGH_VALUE_EDGE_THRESHOLD:
-            print(f"   🚨 HIGH VALUE GAME: {pick.get('matchup')} - {pick.get('pick')} ({edge_val}%)")
-            send_discord_message(GAME_PICKS_CHANNEL, content="🚨 **HIGH VALUE ALERT** 🚨")
-            send_discord_message(GAME_PICKS_CHANNEL, embed=create_game_pick_embed(pick, is_breaking=True))
-            alerts_sent += 1
+        pick_key = create_pick_key(pick, 'game')
+        if pick_key not in sent_picks:
+            new_game_picks.append(pick)
     
     # Check prop picks
     for pick in picks_data.get('prop_picks', []):
-        edge_val = float(str(pick.get('edge', '0')).replace('+', '').replace('%', ''))
-        if edge_val >= HIGH_VALUE_EDGE_THRESHOLD:
-            print(f"   🚨 HIGH VALUE PROP: {pick.get('player')} - {pick.get('prop')} ({edge_val}%)")
-            send_discord_message(PROP_PICKS_CHANNEL, content="🚨 **HIGH VALUE ALERT** 🚨")
-            send_discord_message(PROP_PICKS_CHANNEL, embed=create_prop_pick_embed(pick, is_breaking=True))
+        pick_key = create_pick_key(pick, 'prop')
+        if pick_key not in sent_picks:
+            new_prop_picks.append(pick)
+    
+    print(f"   🆕 {len(new_game_picks)} new game picks, {len(new_prop_picks)} new prop picks")
+    
+    alerts_sent = 0
+    
+    # Send new game picks
+    for pick in new_game_picks:
+        print(f"   🚨 NEW GAME: {pick.get('matchup')} - {pick.get('pick')}")
+        send_discord_message(GAME_PICKS_CHANNEL, content="🚨 **NEW EDGE DETECTED** 🚨")
+        if send_discord_message(GAME_PICKS_CHANNEL, embed=create_game_pick_embed(pick, is_alert=True)):
+            pick_key = create_pick_key(pick, 'game')
+            mark_pick_sent(pick_key, 'game')
+            alerts_sent += 1
+    
+    # Send new prop picks
+    for pick in new_prop_picks:
+        print(f"   🚨 NEW PROP: {pick.get('player')} - {pick.get('prop')}")
+        send_discord_message(PROP_PICKS_CHANNEL, content="🚨 **NEW EDGE DETECTED** 🚨")
+        if send_discord_message(PROP_PICKS_CHANNEL, embed=create_prop_pick_embed(pick, is_alert=True)):
+            pick_key = create_pick_key(pick, 'prop')
+            mark_pick_sent(pick_key, 'prop')
             alerts_sent += 1
     
     if alerts_sent == 0:
-        print("   ✅ No high value picks found above threshold")
+        print("   ✅ No new picks found")
     else:
-        print(f"   ✅ Sent {alerts_sent} high value alerts")
+        print(f"   ✅ Sent {alerts_sent} new pick alerts")
+    
+    print(f"{'='*60}")
 
 def test_picks():
     """Test picks retrieval"""
@@ -309,7 +487,7 @@ if __name__ == "__main__":
     
     print("""
 ================================================================================
-🏀 SB-ALGO DISCORD PICKS SENDER v2.0
+🏀 SB-ALGO DISCORD PICKS SENDER v2.1
 ================================================================================
     """)
     
@@ -323,7 +501,7 @@ if __name__ == "__main__":
     if mode == 'morning':
         send_morning_report()
     elif mode == 'alert':
-        check_high_value_picks()
+        check_new_picks()
     elif mode == 'test':
         test_picks()
     else:

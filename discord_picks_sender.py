@@ -20,6 +20,14 @@ USAGE:
 
 import os
 import requests
+
+# Import explanation engine
+try:
+    from explanation_engine import generate_game_explanation, generate_prop_explanation
+    EXPLANATION_ENABLED = True
+except ImportError:
+    EXPLANATION_ENABLED = False
+    print("⚠️ Explanation engine not available")
 import json
 from datetime import datetime
 import pytz
@@ -270,18 +278,45 @@ def create_game_pick_embed(pick, is_alert=False):
     else:
         units = "0.5u"
     
+    # Generate explanation if available
+    explanation = ""
+    if EXPLANATION_ENABLED:
+        try:
+            # Build pick data for explanation engine - use numeric values
+            pick_data = {
+                'game_id': pick.get('game_id', matchup),
+                'pick': pick_str,
+                'type': pick.get('type', 'TOTAL'),
+                'edge': pick.get('edge_numeric', edge_val),
+                'ev_pct': pick.get('ev_pct', float(str(pick.get('ev', '0')).replace('%', ''))),
+                'confidence': pick.get('confidence_numeric', confidence),
+                'grade': pick.get('grade', 'A+')
+            }
+            explanation = generate_game_explanation(pick_data)
+        except Exception as e:
+            print(f"   ⚠️ Explanation failed: {e}")
+            explanation = ""
+    
+    fields = [
+        {"name": "Expected Value", "value": f"+{edge_val:.1f} pts", "inline": True},
+        {"name": "EV %", "value": pick.get('ev', 'N/A'), "inline": True},
+        {"name": "Grade", "value": pick.get('grade', 'A+'), "inline": True},
+        {"name": "AI Stake", "value": units, "inline": True},
+        {"name": "Risk Class", "value": "High" if edge_val >= 25 else "Medium", "inline": True},
+        {"name": "Confidence", "value": f"{pick.get('confidence', '80')}%", "inline": True},
+    ]
+    
+    # Add explanation as a field if available (truncate if needed)
+    if explanation:
+        # Discord field value limit is 1024 chars
+        explanation_truncated = explanation[:1000] + "..." if len(explanation) > 1000 else explanation
+        fields.append({"name": "🔒 Why This Bet Has Edge", "value": explanation_truncated, "inline": False})
+    
     embed = {
         "title": title,
         "description": f"**{pick_str}** — {units} 🔥🔥",
         "color": color,
-        "fields": [
-            {"name": "Expected Value", "value": f"+{edge_val:.1f} pts", "inline": True},
-            {"name": "EV %", "value": pick.get('ev', 'N/A'), "inline": True},
-            {"name": "Grade", "value": pick.get('grade', 'A+'), "inline": True},
-            {"name": "AI Stake", "value": units, "inline": True},
-            {"name": "Risk Class", "value": "High" if edge_val >= 25 else "Medium", "inline": True},
-            {"name": "Confidence", "value": f"{pick.get('confidence', '80')}%", "inline": True},
-        ],
+        "fields": fields,
         "footer": {"text": f"SB-ALGO Terminal • {get_eastern_time().strftime('%I:%M %p ET')}"}
     }
     
@@ -320,18 +355,34 @@ def create_prop_pick_embed(pick, is_alert=False):
     else:
         units = "0.5u"
     
+    # Generate explanation if available
+    explanation = ""
+    if EXPLANATION_ENABLED:
+        try:
+            explanation = generate_prop_explanation(pick)
+        except Exception as e:
+            print(f"   ⚠️ Explanation failed: {e}")
+            explanation = ""
+    
+    fields = [
+        {"name": "Hit Rate", "value": hit_rate, "inline": True},
+        {"name": "Edge", "value": f"+{edge_val:.1f}%", "inline": True},
+        {"name": "EV", "value": pick.get('ev', 'N/A'), "inline": True},
+        {"name": "Model Proj", "value": f"{pick.get('model', 'N/A')}", "inline": True},
+        {"name": "Line", "value": f"{pick.get('line', 'N/A')}", "inline": True},
+        {"name": "Grade", "value": pick.get('grade', 'A+'), "inline": True},
+    ]
+    
+    # Add explanation as a field if available
+    if explanation:
+        explanation_truncated = explanation[:1000] + "..." if len(explanation) > 1000 else explanation
+        fields.append({"name": "🔒 Why This Bet Has Edge", "value": explanation_truncated, "inline": False})
+    
     embed = {
         "title": title,
         "description": f"**{prop}** — {units} 🔥",
         "color": color,
-        "fields": [
-            {"name": "Hit Rate", "value": hit_rate, "inline": True},
-            {"name": "Edge", "value": f"+{edge_val:.1f}%", "inline": True},
-            {"name": "EV", "value": pick.get('ev', 'N/A'), "inline": True},
-            {"name": "Model Proj", "value": f"{pick.get('model', 'N/A')}", "inline": True},
-            {"name": "Line", "value": f"{pick.get('line', 'N/A')}", "inline": True},
-            {"name": "Grade", "value": pick.get('grade', 'A+'), "inline": True},
-        ],
+        "fields": fields,
         "footer": {"text": f"SB-ALGO Terminal • {get_eastern_time().strftime('%I:%M %p ET')}"}
     }
     

@@ -268,6 +268,11 @@ class SBAlgoAPI:
                 'confidence': f"{p.get('_confidence_numeric', p.get('confidence', 0)):.0f}%",
                 'grade': p.get('grade', 'A+'),
                 'stake': f"${p.get('stake', 0):.0f}",
+                # NUMERIC DATA for explanation engine
+                'game_id': p.get('game_id', 'Unknown'),
+                'edge_numeric': edge,
+                'ev_pct': p.get('_ev_numeric', p.get('ev_pct', 0)),
+                'confidence_numeric': p.get('_confidence_numeric', p.get('confidence', 0)),
             })
         
         # Format prop picks for display
@@ -289,6 +294,16 @@ class SBAlgoAPI:
                 'grade': p.get('grade', 'A+'),
                 'stake': f"${p.get('stake', 0):.0f}",
                 'score': f"{p.get('_score', 0):.1f}",
+                # FULL DATA for explanation engine
+                'stat': p.get('stat', 'pts'),
+                'best_side': p.get('best_side', 'OVER'),
+                'book_line': p.get('book_line', 0),
+                'matchup': p.get('matchup', ''),
+                'projection': p.get('projection', {}),
+                'edge_pct': edge,
+                'ev_pct': p.get('_ev_numeric', p.get('ev_pct', 0)),
+                'filters': p.get('filters', {}),
+                'probabilities': p.get('probabilities', {}),
             })
         
         # Calculate summary for filtered picks

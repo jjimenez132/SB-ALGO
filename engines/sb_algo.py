@@ -197,6 +197,17 @@ class SBAlgoMaster:
                 'confidence': p.get('calibrated_prob', 0) * 100,
                 'grade': p.get('grade', 'N/A'),
                 'stake': p.get('stake', 0),
+                # EXPLANATION DATA - model predictions
+                'model_total': p.get('model_total'),
+                'model_home_pts': p.get('model_home_pts'),
+                'model_away_pts': p.get('model_away_pts'),
+                'model_pace': p.get('model_pace'),
+                'model_margin': p.get('model_margin'),
+                # Regime & injuries
+                'regime_status': p.get('regime_status'),
+                'regime_confidence': p.get('regime_confidence'),
+                'injury_adjustment': p.get('injury_adjustment', 0),
+                'injury_edge': p.get('injury_edge', 'NEUTRAL'),
             })
         
         # Apply daily limits

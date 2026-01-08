@@ -647,9 +647,24 @@ class MetaMergeEngine:
             
             game_results.append(result)
             
-            # Collect picks
+            # Collect picks with FULL context for explanations
             for pick in result.get('picks', []):
                 pick['game'] = result['matchup']
+                # Add prediction data for explanation engine
+                if 'predictions' in result:
+                    pick['model_total'] = result['predictions'].get('total')
+                    pick['model_home_pts'] = result['predictions'].get('home_pts')
+                    pick['model_away_pts'] = result['predictions'].get('away_pts')
+                    pick['model_pace'] = result['predictions'].get('pace')
+                    pick['model_margin'] = result['predictions'].get('margin')
+                # Add regime data
+                if 'regime' in result:
+                    pick['regime_status'] = result['regime'].get('status')
+                    pick['regime_confidence'] = result['regime'].get('confidence')
+                # Add injury data
+                if 'injuries' in result:
+                    pick['injury_adjustment'] = result['injuries'].get('total_adjustment', 0)
+                    pick['injury_edge'] = result['injuries'].get('edge_for', 'NEUTRAL')
                 all_picks.append(pick)
         
         # Sort by EV

@@ -397,7 +397,7 @@ def send_morning_report():
     
     # Each game pick
     sent_games = 0
-    for pick in game_picks[:10]:
+    for pick in game_picks[:2]:  # MAX 2 GAME PICKS PER DAY
         embed = create_game_pick_embed(pick)
         if send_discord_message(GAME_PICKS_CHANNEL, embed=embed):
             sent_games += 1
@@ -421,7 +421,7 @@ def send_morning_report():
     
     # Each prop pick
     sent_props = 0
-    for pick in prop_picks[:10]:
+    for pick in prop_picks[:3]:  # MAX 3 PROP PICKS PER DAY
         embed = create_prop_pick_embed(pick)
         if send_discord_message(PROP_PICKS_CHANNEL, embed=embed):
             sent_props += 1
@@ -457,6 +457,32 @@ def check_new_picks():
         print("❌ No picks data")
         return
     
+    # DAILY LIMITS: MAX 2 GAMES, MAX 3 PROPS
+    MAX_DAILY_GAMES = 2
+    MAX_DAILY_PROPS = 3
+    
+    # ABSOLUTE LOCK thresholds (only exception to exceed limits)
+    LOCK_EDGE_THRESHOLD = 50  # 50%+ edge
+    LOCK_CONFIDENCE_THRESHOLD = 95  # 95%+ confidence
+    LOCK_HIT_RATE_THRESHOLD = 80  # 80%+ hit rate for props
+    
+    def is_absolute_lock(pick, pick_type):
+        """Check if pick is an ABSOLUTE LOCK worth exceeding daily limit"""
+        edge = float(str(pick.get('edge', '0')).replace('+', '').replace('%', ''))
+        conf = float(str(pick.get('confidence', '0')).replace('%', ''))
+        if pick_type == 'prop':
+            hit_rate = float(str(pick.get('hit_rate', '0')).replace('%', ''))
+            return edge >= LOCK_EDGE_THRESHOLD and hit_rate >= LOCK_HIT_RATE_THRESHOLD
+        return edge >= LOCK_EDGE_THRESHOLD and conf >= LOCK_CONFIDENCE_THRESHOLD
+    
+    games_sent_today = len([k for k in sent_picks if k.startswith('GAME_')])
+    props_sent_today = len([k for k in sent_picks if k.startswith('PROP_')])
+    
+    games_remaining = MAX_DAILY_GAMES - games_sent_today
+    props_remaining = MAX_DAILY_PROPS - props_sent_today
+    
+    print(f"   📊 Daily limits: {games_sent_today}/{MAX_DAILY_GAMES} games, {props_sent_today}/{MAX_DAILY_PROPS} props")
+    
     new_game_picks = []
     new_prop_picks = []
     
@@ -464,13 +490,30 @@ def check_new_picks():
     for pick in picks_data.get('game_picks', []):
         pick_key = create_pick_key(pick, 'game')
         if pick_key not in sent_picks:
-            new_game_picks.append(pick)
+            # Under limit OR absolute lock
+            if games_remaining > len(new_game_picks) or is_absolute_lock(pick, 'game'):
+                new_game_picks.append(pick)
+                if is_absolute_lock(pick, 'game') and games_remaining <= 0:
+                    print(f"   🔒 ABSOLUTE LOCK detected: {pick.get('matchup')} (exceeds daily limit)")
     
     # Check prop picks
     for pick in picks_data.get('prop_picks', []):
         pick_key = create_pick_key(pick, 'prop')
         if pick_key not in sent_picks:
-            new_prop_picks.append(pick)
+            # Under limit OR absolute lock
+            if props_remaining > len(new_prop_picks) or is_absolute_lock(pick, 'prop'):
+                new_prop_picks.append(pick)
+                if is_absolute_lock(pick, 'prop') and props_remaining <= 0:
+                    print(f"   🔒 ABSOLUTE LOCK detected: {pick.get('player')} (exceeds daily limit)")
+    
+    # Limit non-locks to remaining quota
+    regular_games = [p for p in new_game_picks if not is_absolute_lock(p, 'game')][:max(0, games_remaining)]
+    lock_games = [p for p in new_game_picks if is_absolute_lock(p, 'game')]
+    new_game_picks = regular_games + lock_games
+    
+    regular_props = [p for p in new_prop_picks if not is_absolute_lock(p, 'prop')][:max(0, props_remaining)]
+    lock_props = [p for p in new_prop_picks if is_absolute_lock(p, 'prop')]
+    new_prop_picks = regular_props + lock_props
     
     print(f"   🆕 {len(new_game_picks)} new game picks, {len(new_prop_picks)} new prop picks")
     
@@ -478,29 +521,37 @@ def check_new_picks():
     
     # Send new game picks
     for pick in new_game_picks:
-        print(f"   🚨 NEW GAME: {pick.get('matchup')} - {pick.get('pick')}")
+        is_lock = is_absolute_lock(pick, 'game')
+        lock_tag = " 🔒 LOCK" if is_lock else ""
+        print(f"   🚨 NEW GAME{lock_tag}: {pick.get('matchup')} - {pick.get('pick')}")
         embed = create_game_pick_embed(pick, is_alert=True)
         if send_discord_message(GAME_PICKS_CHANNEL, embed=embed):
             pick_key = create_pick_key(pick, 'game')
             mark_pick_sent(pick_key, 'game')
             # Save for grading
-            pick_id = pick.get('id', f'G{alerts_sent+1:02d}')
+            pick_id = pick.get('id', f'G{games_sent_today + alerts_sent + 1:02d}')
             pick_name = f"{pick.get('matchup', 'Unknown')} {pick.get('pick', '')}"
-            save_pick_for_grading(pick_id, pick_name, 'game', 2.0)
+            units = 2.0 if is_lock else 0.5
+            save_pick_for_grading(pick_id, pick_name, 'game', units)
             alerts_sent += 1
     
     # Send new prop picks
+    props_sent_this_run = 0
     for pick in new_prop_picks:
-        print(f"   🚨 NEW PROP: {pick.get('player')} - {pick.get('prop')}")
+        is_lock = is_absolute_lock(pick, 'prop')
+        lock_tag = " 🔒 LOCK" if is_lock else ""
+        print(f"   🚨 NEW PROP{lock_tag}: {pick.get('player')} - {pick.get('prop')}")
         embed = create_prop_pick_embed(pick, is_alert=True)
         if send_discord_message(PROP_PICKS_CHANNEL, embed=embed):
             pick_key = create_pick_key(pick, 'prop')
             mark_pick_sent(pick_key, 'prop')
             # Save for grading
-            pick_id = pick.get('id', f'P{alerts_sent+1:02d}')
+            pick_id = pick.get('id', f'P{props_sent_today + props_sent_this_run + 1:02d}')
             pick_name = f"{pick.get('player', 'Unknown')} {pick.get('prop', '')}"
-            save_pick_for_grading(pick_id, pick_name, 'prop', 1.5)
+            units = 1.5 if is_lock else 0.5
+            save_pick_for_grading(pick_id, pick_name, 'prop', units)
             alerts_sent += 1
+            props_sent_this_run += 1
     
     if alerts_sent == 0:
         print("   ✅ No new picks found")

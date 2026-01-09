@@ -273,6 +273,16 @@ class SBAlgoAPI:
                 'edge_numeric': edge,
                 'ev_pct': p.get('_ev_numeric', p.get('ev_pct', 0)),
                 'confidence_numeric': p.get('_confidence_numeric', p.get('confidence', 0)),
+                # MODEL DATA for explanation engine
+                'model_total': p.get('model_total'),
+                'model_home_pts': p.get('model_home_pts'),
+                'model_away_pts': p.get('model_away_pts'),
+                'model_pace': p.get('model_pace'),
+                'model_margin': p.get('model_margin'),
+                'regime_status': p.get('regime_status', 'NORMAL'),
+                'regime_confidence': p.get('regime_confidence', 0),
+                'injury_adjustment': p.get('injury_adjustment', 0),
+                'injury_edge': p.get('injury_edge', 'NEUTRAL'),
             })
         
         # Format prop picks for display

@@ -392,9 +392,14 @@ def main():
         result = grade_pick(pick, game_scores, player_stats)
         
         if result:
-            # Calculate units result
+            # Calculate units result based on actual odds
             if result == 'win':
-                units_result = pick['units']
+                odds = pick.get('odds') or -110  # Default to -110 if no odds
+                if odds < 0:
+                    multiplier = 100 / abs(odds)
+                else:
+                    multiplier = odds / 100
+                units_result = round(pick['units'] * multiplier, 2)
             elif result == 'loss':
                 units_result = -pick['units']
             else:

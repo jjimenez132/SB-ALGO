@@ -290,7 +290,17 @@ def create_game_pick_embed(pick, is_alert=False):
                 'edge': pick.get('edge_numeric', edge_val),
                 'ev_pct': pick.get('ev_pct', float(str(pick.get('ev', '0')).replace('%', ''))),
                 'confidence': pick.get('confidence_numeric', confidence),
-                'grade': pick.get('grade', 'A+')
+                'grade': pick.get('grade', 'A+'),
+                # Model data for explanation engine
+                'model_total': pick.get('model_total'),
+                'model_home_pts': pick.get('model_home_pts'),
+                'model_away_pts': pick.get('model_away_pts'),
+                'model_pace': pick.get('model_pace'),
+                'model_margin': pick.get('model_margin'),
+                'regime_status': pick.get('regime_status', 'NORMAL'),
+                'regime_confidence': pick.get('regime_confidence', 0),
+                'injury_adjustment': pick.get('injury_adjustment', 0),
+                'injury_edge': pick.get('injury_edge', 'NEUTRAL'),
             }
             explanation = generate_game_explanation(pick_data)
         except Exception as e:

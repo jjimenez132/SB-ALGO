@@ -24,7 +24,7 @@ def get_period_stats(days_back=None, start_date=None, end_date=None):
     """Get stats for a specific period"""
     stats = {
         'wins': 0, 'losses': 0, 'pushes': 0,
-        'units': 0, 'units': 0,
+        'units': 0, 'units_risked': 0,
         'game_wins': 0, 'game_losses': 0, 'game_units': 0,
         'prop_wins': 0, 'prop_losses': 0, 'prop_units': 0,
         'picks': []
@@ -53,13 +53,14 @@ def get_period_stats(days_back=None, start_date=None, end_date=None):
                 return stats
             
             for row in results:
-                pick_type, status, units, result_units, pick_name, graded_at = row
+                pick_type, status, units_risked, result_units, pick_name, graded_at = row
                 
-                stats['units'] += float(units or 0)
+                # Track units risked (always positive)
+                stats['units_risked'] += float(units_risked or 0)
                 
                 if status == 'win':
                     stats['wins'] += 1
-                    stats['units'] += float(result_units or 0)
+                    stats['units'] += float(result_units or 0)  # Net P/L (positive)
                     if pick_type == 'game':
                         stats['game_wins'] += 1
                         stats['game_units'] += float(result_units or 0)
@@ -68,7 +69,7 @@ def get_period_stats(days_back=None, start_date=None, end_date=None):
                         stats['prop_units'] += float(result_units or 0)
                 elif status == 'loss':
                     stats['losses'] += 1
-                    stats['units'] += float(result_units or 0)
+                    stats['units'] += float(result_units or 0)  # Net P/L (negative)
                     if pick_type == 'game':
                         stats['game_losses'] += 1
                         stats['game_units'] += float(result_units or 0)
@@ -94,7 +95,7 @@ def get_period_stats(days_back=None, start_date=None, end_date=None):
 def calculate_roi(stats):
     """Calculate ROI percentage"""
     if stats['units'] > 0:
-        return (stats['units'] / stats['units']) * 100
+        return (stats['units'] / stats['units_risked']) * 100 if stats['units_risked'] > 0 else 0
     return 0
 
 
@@ -139,10 +140,10 @@ def get_best_worst_day():
     try:
         with engine.connect() as conn:
             results = conn.execute(text("""
-                SELECT DATE(graded_at) as day, SUM(result_units) as units
+                SELECT pick_date as day, SUM(result_units) as units
                 FROM algo_picks_tracking
-                WHERE status IN ('win', 'loss') AND graded_at >= NOW() - INTERVAL '30 days'
-                GROUP BY DATE(graded_at)
+                WHERE status IN ('win', 'loss') AND pick_date >= CURRENT_DATE - INTERVAL '30 days'
+                GROUP BY pick_date
                 ORDER BY units DESC
             """)).fetchall()
             
@@ -276,5 +277,132 @@ def send_health_report():
     return False
 
 
+def send_weekly_report():
+    """Send weekly breakdown every Sunday"""
+    print("📊 Generating Weekly Report...")
+    
+    now = datetime.now()
+    week_start = now - timedelta(days=now.weekday() + 7)  # Last Monday
+    week_end = week_start + timedelta(days=7)
+    
+    week_stats = get_period_stats(start_date=week_start, end_date=week_end)
+    
+    if week_stats['wins'] + week_stats['losses'] == 0:
+        print("   No picks to report for last week")
+        return
+    
+    week_wr = calculate_win_rate(week_stats['wins'], week_stats['losses'])
+    week_roi = calculate_roi(week_stats)
+    game_wr = calculate_win_rate(week_stats['game_wins'], week_stats['game_losses'])
+    prop_wr = calculate_win_rate(week_stats['prop_wins'], week_stats['prop_losses'])
+    
+    report = f"""**📅 WEEKLY REPORT**
+**{week_start.strftime('%b %d')} - {week_end.strftime('%b %d, %Y')}**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**📊 WEEK SUMMARY**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Record: **{week_stats['wins']}-{week_stats['losses']}** ({week_wr:.1f}%)
+- Net P/L: **{week_stats['units']:+.2f}u**
+- ROI: **{week_roi:+.1f}%**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**🎯 BY CATEGORY**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Games: {week_stats['game_wins']}-{week_stats['game_losses']} ({game_wr:.0f}%) | {week_stats['game_units']:+.1f}u
+- Props: {week_stats['prop_wins']}-{week_stats['prop_losses']} ({prop_wr:.0f}%) | {week_stats['prop_units']:+.1f}u
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+*Process over outcome. Consistency compounds.*"""
+
+    color = 0x00FF00 if week_stats['units'] > 0 else 0xFF0000 if week_stats['units'] < 0 else 0x888888
+    
+    embed = {
+        "title": "📈 SB-ALGO WEEKLY REPORT",
+        "description": report,
+        "color": color,
+    }
+    
+    try:
+        response = requests.post(HEALTH_WEBHOOK, json={"embeds": [embed]}, timeout=10)
+        if response.status_code in [200, 204]:
+            print("   ✅ Weekly report sent")
+            return True
+    except Exception as e:
+        print(f"   ❌ Error: {e}")
+    return False
+
+
+def send_monthly_report():
+    """Send monthly breakdown on 1st of each month"""
+    print("📊 Generating Monthly Report...")
+    
+    now = datetime.now()
+    # Last month
+    if now.month == 1:
+        month_start = now.replace(year=now.year-1, month=12, day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        month_start = now.replace(month=now.month-1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_end = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    month_stats = get_period_stats(start_date=month_start, end_date=month_end)
+    
+    if month_stats['wins'] + month_stats['losses'] == 0:
+        print("   No picks to report for last month")
+        return
+    
+    month_wr = calculate_win_rate(month_stats['wins'], month_stats['losses'])
+    month_roi = calculate_roi(month_stats)
+    game_wr = calculate_win_rate(month_stats['game_wins'], month_stats['game_losses'])
+    prop_wr = calculate_win_rate(month_stats['prop_wins'], month_stats['prop_losses'])
+    
+    report = f"""**📅 MONTHLY REPORT**
+**{month_start.strftime('%B %Y')}**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**📊 MONTH SUMMARY**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Record: **{month_stats['wins']}-{month_stats['losses']}** ({month_wr:.1f}%)
+- Net P/L: **{month_stats['units']:+.2f}u**
+- ROI: **{month_roi:+.1f}%**
+- Total Picks: **{month_stats['wins'] + month_stats['losses'] + month_stats['pushes']}**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**🎯 BY CATEGORY**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Games: {month_stats['game_wins']}-{month_stats['game_losses']} ({game_wr:.0f}%) | {month_stats['game_units']:+.1f}u
+- Props: {month_stats['prop_wins']}-{month_stats['prop_losses']} ({prop_wr:.0f}%) | {month_stats['prop_units']:+.1f}u
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+*New month. Same process. Discipline remains.*"""
+
+    color = 0x00FF00 if month_stats['units'] > 0 else 0xFF0000 if month_stats['units'] < 0 else 0x888888
+    
+    embed = {
+        "title": "📊 SB-ALGO MONTHLY REPORT",
+        "description": report,
+        "color": color,
+    }
+    
+    try:
+        response = requests.post(HEALTH_WEBHOOK, json={"embeds": [embed]}, timeout=10)
+        if response.status_code in [200, 204]:
+            print("   ✅ Monthly report sent")
+            return True
+    except Exception as e:
+        print(f"   ❌ Error: {e}")
+    return False
+
+
 if __name__ == "__main__":
-    send_health_report()
+    import sys
+    
+    if len(sys.argv) > 1:
+        if sys.argv[1] == 'weekly':
+            send_weekly_report()
+        elif sys.argv[1] == 'monthly':
+            send_monthly_report()
+        else:
+            send_health_report()
+    else:
+        send_health_report()

@@ -912,6 +912,34 @@ async def show_status(ctx):
 # MAIN
 # ============================================================
 
+# ============================================================
+# RECHECK VALUE COMMAND
+# ============================================================
+
+@bot.command(name="recheck", aliases=["rv", "recheckvalue", "value"])
+async def recheck_value(ctx, *, query: str = None):
+    """Recheck if a pick still has value at a new line"""
+    if not query:
+        await ctx.send("❌ Usage: `!recheck <player> <over/under> <line> <stat>`\nExample: `!recheck Anthony Edwards over 25.5 pts`")
+        return
+    
+    await ctx.send("🔄 Analyzing...")
+    
+    try:
+        from recheck_engine import RecheckEngine
+        engine = RecheckEngine()
+        result = engine.recheck(query)
+        
+        # Split into chunks if too long for Discord
+        if len(result) > 1900:
+            chunks = [result[i:i+1900] for i in range(0, len(result), 1900)]
+            for chunk in chunks:
+                await ctx.send(chunk)
+        else:
+            await ctx.send(result)
+    except Exception as e:
+        await ctx.send(f"❌ Error: {str(e)}")
+
 def main():
     if not DISCORD_TOKEN:
         log.error("Missing DISCORD_BOT_TOKEN")

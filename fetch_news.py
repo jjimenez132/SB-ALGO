@@ -11,6 +11,41 @@ import pytz
 import os
 
 API_KEY = "ada93da8e5msh75c5342a07b643cp1b45fajsn72f3bfcd3653"
+
+DISCORD_NEWS_WEBHOOK = "https://discord.com/api/webhooks/1459395253936328746/V4E1hQkIPqucYfzrgJIlTCWLskRJ-6Q5q8j547mbIJ5yQ_Mw_6JcguDJM3F1e1KPL-J3"
+
+def send_news_to_discord(news_items):
+    """Send news headlines to Discord"""
+    import time
+    if not news_items:
+        return
+    
+    print("\n📤 Sending news to Discord...")
+    sent = 0
+    
+    for item in news_items[:5]:  # Max 5 per run to avoid spam
+        title = item.get("title", "")
+        link = item.get("link", "")
+        source = item.get("source", "NBA News")
+        
+        embed = {
+            "title": f"📰 {title[:200]}",
+            "url": link,
+            "color": 0x667eea,
+            "footer": {"text": f"Source: {source} | SB-ALGO News"}
+        }
+        
+        try:
+            r = requests.post(DISCORD_NEWS_WEBHOOK, json={"embeds": [embed]}, timeout=10)
+            if r.status_code in [200, 204]:
+                sent += 1
+            elif r.status_code == 429:
+                time.sleep(2)
+            time.sleep(0.5)  # Rate limit
+        except Exception as e:
+            print(f"   ⚠️ Discord error: {e}")
+    
+    print(f"   ✅ Sent {sent} news items to Discord")
 DATABASE_URL = os.environ.get('DATABASE_URL',
     "postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db?sslmode=require")
 
@@ -90,6 +125,9 @@ def main():
     print(f"\n{'='*60}")
     print(f"✅ COMPLETE: {inserted} processed, {total} total in DB")
     print(f"{'='*60}")
+
+    # Send NEW news to Discord
+    send_news_to_discord(data)
 
 if __name__ == "__main__":
     main()

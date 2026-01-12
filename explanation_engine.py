@@ -9,7 +9,7 @@ NO INVENTING STATS - only uses what the math engine calculated.
 import os
 import google.generativeai as genai
 
-GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY', 'AIzaSyDRT2vdNsBFHCgHtEuJSEi08LSLitSIVBI')
+GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
 genai.configure(api_key=GOOGLE_API_KEY)
 
 SYSTEM_PROMPT = """You are SB-ALGO's Explanation Engine — an institutional-grade NBA betting analyst.

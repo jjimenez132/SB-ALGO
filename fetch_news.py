@@ -15,18 +15,38 @@ API_KEY = "ada93da8e5msh75c5342a07b643cp1b45fajsn72f3bfcd3653"
 DISCORD_NEWS_WEBHOOK = "https://discord.com/api/webhooks/1459395253936328746/V4E1hQkIPqucYfzrgJIlTCWLskRJ-6Q5q8j547mbIJ5yQ_Mw_6JcguDJM3F1e1KPL-J3"
 
 def send_news_to_discord(news_items):
-    """Send news headlines to Discord"""
+    """Send only NEW news headlines to Discord (not already sent)"""
     import time
+    from sqlalchemy import create_engine, text
+    
     if not news_items:
         return
     
-    print("\n📤 Sending news to Discord...")
+    engine = create_engine(DATABASE_URL)
+    
+    # Get news that hasn't been sent to Discord yet
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT id, title, link, source FROM nba_news 
+            WHERE discord_sent = FALSE OR discord_sent IS NULL
+            ORDER BY fetched_at DESC
+            LIMIT 10
+        """)).fetchall()
+        
+        unsent = [{'id': r[0], 'title': r[1], 'link': r[2], 'source': r[3]} for r in result]
+    
+    if not unsent:
+        print("\n📤 No new news to send to Discord")
+        return
+    
+    print(f"\n📤 Sending {len(unsent)} NEW news to Discord...")
     sent = 0
     
-    for item in news_items[:5]:  # Max 5 per run to avoid spam
+    for item in unsent:
         title = item.get("title", "")
         link = item.get("link", "")
         source = item.get("source", "NBA News")
+        news_id = item.get("id")
         
         embed = {
             "title": f"📰 {title[:200]}",
@@ -38,10 +58,14 @@ def send_news_to_discord(news_items):
         try:
             r = requests.post(DISCORD_NEWS_WEBHOOK, json={"embeds": [embed]}, timeout=10)
             if r.status_code in [200, 204]:
+                # Mark as sent in database
+                with engine.connect() as conn:
+                    conn.execute(text("UPDATE nba_news SET discord_sent = TRUE WHERE id = :id"), {"id": news_id})
+                    conn.commit()
                 sent += 1
             elif r.status_code == 429:
                 time.sleep(2)
-            time.sleep(0.5)  # Rate limit
+            time.sleep(0.5)
         except Exception as e:
             print(f"   ⚠️ Discord error: {e}")
     

@@ -29,24 +29,19 @@ def extract_player_name(description):
         name = match.group(1)
         first_word = name.split()[0]
         
-        # If first word is a skip word, try other patterns
         if first_word in skip_words:
-            # Try: "that Name's" or "on Name's"
             match2 = re.search(r"(?:that|on)\s+([A-Z][a-z\'\-]+)(?:'s)?", description)
             if match2 and match2.group(1) not in skip_words:
                 return match2.group(1)
             
-            # Try: "Name (injury)"
             match3 = re.search(r'([A-Z][a-z\'\-]+)\s*\([a-z]+\)', description)
             if match3 and match3.group(1) not in skip_words:
                 return match3.group(1)
             
             return None
         
-        # Return just last name (first word after date)
         return first_word
     
-    # Pattern 2: "Name (injury)" anywhere
     match = re.search(r'([A-Z][a-z\'\-]+)\s*\([a-z]+\)', description)
     if match and match.group(1) not in skip_words:
         return match.group(1)
@@ -59,7 +54,6 @@ def extract_injury_type(description):
     if match:
         return match.group(1)
     
-    # Common injury keywords
     injury_keywords = ['ankle', 'knee', 'shoulder', 'hamstring', 'back', 'hip', 
                        'toe', 'thumb', 'wrist', 'calf', 'groin', 'quad', 'foot']
     desc_lower = description.lower()
@@ -89,24 +83,6 @@ try:
     
     print(f"   Found {len(injuries_list)} injury entries")
     
-    # Create/update table
-    with engine.connect() as conn:
-        conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS injuries (
-                id SERIAL PRIMARY KEY,
-                player_id VARCHAR(50),
-                player_name VARCHAR(255),
-                status VARCHAR(50),
-                injury_type VARCHAR(100),
-                description TEXT,
-                injury_date VARCHAR(20),
-                return_date VARCHAR(20),
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(player_id, injury_date)
-            )
-        """))
-        conn.commit()
-    
     # Clear old injuries
     with engine.connect() as conn:
         conn.execute(text("DELETE FROM injuries"))
@@ -117,21 +93,19 @@ try:
     
     for injury in injuries_list:
         try:
-            player_id = injury.get('playerID', '')
             status = injury.get('designation', 'Unknown')
             description = injury.get('description', '')
             injury_date = injury.get('injDate', '')
-            return_date = injury.get('injReturnDate', '')
             
             # Extract player name
             player_name = extract_player_name(description)
             if not player_name:
-                continue  # Skip if we can't identify the player
+                continue
             
             # Extract injury type
             injury_type = extract_injury_type(description)
             
-            # Skip duplicates (same player + status, keep most recent)
+            # Skip duplicates
             player_key = f"{player_name}_{status}"
             if player_key in seen_players:
                 continue
@@ -139,20 +113,16 @@ try:
             
             with engine.connect() as conn:
                 conn.execute(text("""
-                    INSERT INTO injuries (player_id, player_name, status, injury_type, description, injury_date, return_date)
-                    VALUES (:player_id, :player_name, :status, :injury_type, :description, :injury_date, :return_date)
-                    ON CONFLICT (player_id, injury_date) DO UPDATE SET
-                        status = EXCLUDED.status,
-                        description = EXCLUDED.description,
-                        updated_at = CURRENT_TIMESTAMP
+                    INSERT INTO injuries (player_name, team_name, team_abbr, status, description, injury_type, date, updated_at)
+                    VALUES (:player_name, :team_name, :team_abbr, :status, :description, :injury_type, :date, NOW())
                 """), {
-                    'player_id': player_id,
                     'player_name': player_name,
+                    'team_name': '',
+                    'team_abbr': '',
                     'status': status,
-                    'injury_type': injury_type,
                     'description': description[:500],
-                    'injury_date': injury_date,
-                    'return_date': return_date
+                    'injury_type': injury_type,
+                    'date': injury_date
                 })
                 conn.commit()
                 total_injuries += 1

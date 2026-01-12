@@ -35,25 +35,25 @@ def get_period_stats(days_back=None, start_date=None, end_date=None):
             if days_back:
                 start = datetime.now() - timedelta(days=days_back)
                 query = text("""
-                    SELECT pick_type, status, units, result_units, pick_name, graded_at
+                    SELECT pick_type, status, units, result_units, pick_name, pick_date
                     FROM algo_picks_tracking
-                    WHERE graded_at >= :start_date AND status IN ('win', 'loss', 'push')
-                    ORDER BY graded_at DESC
+                    WHERE pick_date >= :start_date AND status IN ('win', 'loss', 'push')
+                    ORDER BY pick_date DESC
                 """)
                 results = conn.execute(query, {"start_date": start}).fetchall()
             elif start_date:
                 query = text("""
-                    SELECT pick_type, status, units, result_units, pick_name, graded_at
+                    SELECT pick_type, status, units, result_units, pick_name, pick_date
                     FROM algo_picks_tracking
-                    WHERE graded_at >= :start_date AND graded_at < :end_date AND status IN ('win', 'loss', 'push')
-                    ORDER BY graded_at DESC
+                    WHERE pick_date >= :start_date AND pick_date < :end_date AND status IN ('win', 'loss', 'push')
+                    ORDER BY pick_date DESC
                 """)
                 results = conn.execute(query, {"start_date": start_date, "end_date": end_date or datetime.now()}).fetchall()
             else:
                 return stats
             
             for row in results:
-                pick_type, status, units_risked, result_units, pick_name, graded_at = row
+                pick_type, status, units_risked, result_units, pick_name, pick_date = row
                 
                 # Track units risked (always positive)
                 stats['units_risked'] += float(units_risked or 0)
@@ -114,7 +114,7 @@ def get_streak():
             results = conn.execute(text("""
                 SELECT status FROM algo_picks_tracking
                 WHERE status IN ('win', 'loss')
-                ORDER BY graded_at DESC
+                ORDER BY pick_date DESC
                 LIMIT 20
             """)).fetchall()
             
@@ -168,8 +168,10 @@ def send_health_report():
     now = datetime.now()
     
     # Today stats
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_stats = get_period_stats(start_date=today_start, end_date=now)
+    yesterday = now - timedelta(days=1)
+    yesterday_start = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday_end = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday_stats = get_period_stats(start_date=yesterday_start, end_date=yesterday_end)
     
     # Week stats (Monday start)
     week_start = now - timedelta(days=now.weekday())
@@ -191,7 +193,7 @@ def send_health_report():
     extremes = get_best_worst_day()
     
     # Calculate rates
-    today_wr = calculate_win_rate(today_stats['wins'], today_stats['losses'])
+    yesterday_wr = calculate_win_rate(yesterday_stats['wins'], yesterday_stats['losses'])
     week_wr = calculate_win_rate(week_stats['wins'], week_stats['losses'])
     month_wr = calculate_win_rate(month_stats['wins'], month_stats['losses'])
     alltime_wr = calculate_win_rate(alltime_stats['wins'], alltime_stats['losses'])
@@ -209,7 +211,7 @@ def send_health_report():
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 **💰 UNITS PERFORMANCE**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Today: **{today_stats['units']:+.1f}u** ({today_stats['wins']}-{today_stats['losses']})
+- Yesterday: **{yesterday_stats['units']:+.1f}u** ({yesterday_stats['wins']}-{yesterday_stats['losses']})
 - Week: **{week_stats['units']:+.1f}u** ({week_stats['wins']}-{week_stats['losses']})
 - Month: **{month_stats['units']:+.1f}u** ({month_stats['wins']}-{month_stats['losses']})
 - 90-Day: **{alltime_stats['units']:+.1f}u** ({alltime_stats['wins']}-{alltime_stats['losses']})
@@ -217,7 +219,7 @@ def send_health_report():
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 **📈 SUCCESS RATES**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Today: **{today_wr:.1f}%**
+- Yesterday: **{yesterday_wr:.1f}%**
 - Week: **{week_wr:.1f}%**
 - Month: **{month_wr:.1f}%**
 - 90-Day: **{alltime_wr:.1f}%**

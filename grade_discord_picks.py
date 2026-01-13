@@ -351,7 +351,7 @@ def main():
     # Get pending picks from yesterday
     with engine.connect() as conn:
         result = conn.execute(text("""
-            SELECT id, pick_id, pick_name, pick_type, units, pick_date
+            SELECT id, pick_id, pick_name, pick_type, units, pick_date, odds
             FROM algo_picks_tracking
             WHERE pick_date = :yesterday AND status = 'pending'
             ORDER BY created_at
@@ -365,7 +365,8 @@ def main():
                 'pick_name': r[2],
                 'pick_type': r[3],
                 'units': float(r[4]) if r[4] else 1.0,
-                'pick_date': str(r[5])
+                'pick_date': str(r[5]),
+                'odds': int(r[6]) if r[6] else -110
             })
     
     if not picks:

@@ -390,6 +390,18 @@ class PlayerPropEngine:
     # ========================================================
     
     def get_team_advanced(self, team_name):
+        # Team abbreviation mapping
+        TEAM_ABBREV = {
+            "ATL": "Hawks", "BOS": "Celtics", "BKN": "Nets", "CHA": "Hornets",
+            "CHI": "Bulls", "CLE": "Cavaliers", "DAL": "Mavericks", "DEN": "Nuggets",
+            "DET": "Pistons", "GSW": "Warriors", "HOU": "Rockets", "IND": "Pacers",
+            "LAC": "Clippers", "LAL": "Lakers", "MEM": "Grizzlies", "MIA": "Heat",
+            "MIL": "Bucks", "MIN": "Timberwolves", "NOP": "Pelicans", "NYK": "Knicks",
+            "OKC": "Thunder", "ORL": "Magic", "PHI": "76ers", "PHX": "Suns",
+            "POR": "Trail Blazers", "SAC": "Kings", "SAS": "Spurs", "TOR": "Raptors",
+            "UTA": "Jazz", "WAS": "Wizards"
+        }
+        team_name = TEAM_ABBREV.get(team_name.upper(), team_name)
         """nba_team_advanced_stats"""
         cache_key = f"team_adv_{team_name}"
         if cache_key in self._cache:
@@ -416,6 +428,18 @@ class PlayerPropEngine:
         return None
     
     def get_team_opponent_stats(self, team_name):
+        # Team abbreviation mapping
+        TEAM_ABBREV = {
+            "ATL": "Hawks", "BOS": "Celtics", "BKN": "Nets", "CHA": "Hornets",
+            "CHI": "Bulls", "CLE": "Cavaliers", "DAL": "Mavericks", "DEN": "Nuggets",
+            "DET": "Pistons", "GSW": "Warriors", "HOU": "Rockets", "IND": "Pacers",
+            "LAC": "Clippers", "LAL": "Lakers", "MEM": "Grizzlies", "MIA": "Heat",
+            "MIL": "Bucks", "MIN": "Timberwolves", "NOP": "Pelicans", "NYK": "Knicks",
+            "OKC": "Thunder", "ORL": "Magic", "PHI": "76ers", "PHX": "Suns",
+            "POR": "Trail Blazers", "SAC": "Kings", "SAS": "Spurs", "TOR": "Raptors",
+            "UTA": "Jazz", "WAS": "Wizards"
+        }
+        team_name = TEAM_ABBREV.get(team_name.upper(), team_name)
         """nba_team_opponent_stats - ALREADY PER GAME"""
         cache_key = f"team_opp_{team_name}"
         if cache_key in self._cache:

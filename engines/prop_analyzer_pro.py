@@ -27,7 +27,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from live_odds_connector import LiveOddsConnector
+from engines.live_odds_connector import LiveOddsConnector
+from engines.player_prop_engine import PlayerPropEngine
 from calibration_engine import CalibrationEngine
 from kelly_engine import KellyEngine
 
@@ -55,6 +56,7 @@ class PropAnalyzerPro:
         self.connector = LiveOddsConnector()
         self.calibration = CalibrationEngine()
         self.kelly = KellyEngine(risk_profile='moderate')
+        self.prop_engine = PlayerPropEngine()  # FULL MATH ENGINE
         self.bankroll = bankroll
         self.db = create_engine(DATABASE_URL)
         
@@ -295,15 +297,46 @@ class PropAnalyzerPro:
             return result
         
         # =====================================================================
-        # FILTER 3: Calculate Projection (Weighted L5/L10/L15)
+        # FILTER 3: Calculate Projection (FULL MATH ENGINE)
         # =====================================================================
-        projection = self.calculate_weighted_average(games, stat)
+        # First get basic weighted average for reference
+        basic_projection = self.calculate_weighted_average(games, stat)
+        
+        # Now get REAL projection with pace, defense, usage adjustments
+        math_projection = None
+        if opponent:
+            try:
+                if stat == 'pts':
+                    math_projection = self.prop_engine.predict_points(player_name, opponent)
+                elif stat == 'reb':
+                    math_projection = self.prop_engine.predict_rebounds(player_name, opponent)
+                elif stat == 'ast':
+                    math_projection = self.prop_engine.predict_assists(player_name, opponent)
+                elif stat == '3pm':
+                    math_projection = self.prop_engine.predict_threes(player_name, opponent)
+            except Exception as e:
+                pass
+        
+        # Use math projection if available, otherwise fall back to basic
+        if math_projection and 'expected' in math_projection:
+            model_proj = math_projection['expected']
+            std_dev = math_projection.get('std', basic_projection['std_dev'])
+            projection = {
+                'l5': basic_projection['l5'],
+                'l10': basic_projection['l10'],
+                'l15': basic_projection['l15'],
+                'weighted': basic_projection['weighted'],
+                'math_adjusted': model_proj,
+                'projection': model_proj,
+                'std_dev': std_dev,
+                'adjustments': math_projection.get('adjustments', {}),
+            }
+        else:
+            model_proj = basic_projection['projection']
+            std_dev = basic_projection['std_dev']
+            projection = basic_projection
+        
         result['projection'] = projection
-        
-        model_proj = projection['projection']
-        std_dev = projection['std_dev']
-        
-        # Determine best side
         if model_proj > book_line:
             best_side = 'OVER'
             edge_pct = ((model_proj - book_line) / book_line) * 100
@@ -382,9 +415,9 @@ class PropAnalyzerPro:
         
         # EV calculation - use real odds if provided
         if best_side == 'OVER':
-            odds = over_odds if over_odds else -110
+            odds = -110  # Default odds
         else:
-            odds = under_odds if under_odds else -110
+            odds = -110  # Default odds
         decimal_odds = 1 + (100 / abs(odds))
         ev_pct = (adjusted_prob * (decimal_odds - 1) - (1 - adjusted_prob)) * 100
         

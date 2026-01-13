@@ -42,7 +42,8 @@ class RecheckEngine:
             'odds': -110,  # Default
             'matchup': None,
             'original_line': None,
-            'assumptions': []
+            'assumptions': [],
+            'opponent': None
         }
         
         # Detect bet type
@@ -92,13 +93,18 @@ class RecheckEngine:
                 result['stat'] = stat
                 break
         
+        # Extract opponent (vs XXX or against XXX)
+        opponent_match = re.search(r'(?:vs|against)\s+([A-Za-z]{2,3})', message, re.IGNORECASE)
+        if opponent_match:
+            result['opponent'] = opponent_match.group(1).upper()
+        
         # Extract player name (everything before stat keywords)
         if result['bet_type'] == 'prop':
             # Remove common words and extract player name
             cleaned = message
             for word in ['recheck', 'check', 'over', 'under', 'pts', 'points', 'reb', 'rebounds', 
                         'ast', 'assists', 'pra', '3pt', 'threes', 'stl', 'blk', 'still', 'good',
-                        'value', 'at', 'the', 'line', 'is', 'odds', '-110', '-115', '-105']:
+                        'value', 'at', 'the', 'line', 'is', 'odds', '-110', '-115', '-105', 'vs', 'against', 'lal', 'lac', 'gsw', 'bos', 'nyk', 'mia', 'chi', 'dal', 'hou', 'phx', 'den', 'min', 'mem', 'okc', 'cle', 'mil', 'phi', 'atl', 'tor', 'bkn', 'sas', 'por', 'sac', 'orl', 'ind', 'cha', 'det', 'was', 'nop', 'uta']:
                 cleaned = re.sub(r'\b' + word + r'\b', ' ', cleaned)
             
             # Remove numbers and extra spaces
@@ -121,13 +127,13 @@ class RecheckEngine:
         
         return result
     
-    def recheck_prop(self, player: str, stat: str, line: float, side: str, odds: int = -110) -> dict:
+    def recheck_prop(self, player: str, stat: str, line: float, side: str, odds: int = -110, opponent: str = None) -> dict:
         """Recheck a player prop at current line"""
         print(f"\n🔍 Rechecking: {player} {stat.upper()} {side} {line} ({odds})")
         
         # Get projection from prop engine
         try:
-            projection = self.prop_engine.analyze_prop_full(player, stat, line, None)
+            projection = self.prop_engine.analyze_prop_full(player, stat, line, opponent)
         except Exception as e:
             print(f"   ⚠️ Prop engine error: {e}")
             projection = None
@@ -343,7 +349,8 @@ class RecheckEngine:
                 stat=parsed['stat'],
                 line=parsed['line'],
                 side=parsed['side'],
-                odds=parsed['odds']
+                odds=parsed['odds'],
+                opponent=parsed.get('opponent')
             )
             
             if result.get('error'):
@@ -411,7 +418,8 @@ PUBLIC-READY BLURB
                 matchup=parsed['matchup'],
                 line=parsed['line'],
                 side=parsed['side'],
-                odds=parsed['odds']
+                odds=parsed['odds'],
+                opponent=parsed.get('opponent')
             )
             
             if result.get('error'):

@@ -180,7 +180,7 @@ class MetaMergeEngine:
     # ==========================================================================
     
     def get_team_stats(self, team_name: str) -> Dict:
-        """Get comprehensive team stats with team name normalization"""
+        """Get COMPREHENSIVE team stats from ALL available tables"""
         # Team abbreviation to full name mapping
         TEAM_MAP = {
             'ATL': 'Atlanta Hawks', 'BOS': 'Boston Celtics', 'BKN': 'Brooklyn Nets',
@@ -190,7 +190,7 @@ class MetaMergeEngine:
             'HOU': 'Houston Rockets', 'IND': 'Indiana Pacers',
             'LAC': 'LA Clippers', 'LAL': 'Los Angeles Lakers',
             'MEM': 'Memphis Grizzlies', 'MIA': 'Miami Heat', 'MIL': 'Milwaukee Bucks',
-            'MIN': 'Minnesota Timberwolves', 'NO': 'New Orleans Pelicans', 
+            'MIN': 'Minnesota Timberwolves', 'NO': 'New Orleans Pelicans',
             'NOP': 'New Orleans Pelicans', 'NY': 'New York Knicks', 'NYK': 'New York Knicks',
             'OKC': 'Oklahoma City Thunder', 'ORL': 'Orlando Magic',
             'PHI': 'Philadelphia 76ers', 'PHX': 'Phoenix Suns',
@@ -199,19 +199,76 @@ class MetaMergeEngine:
             'TOR': 'Toronto Raptors', 'UTA': 'Utah Jazz', 'WAS': 'Washington Wizards',
         }
         
-        # Normalize team name
         full_name = TEAM_MAP.get(team_name.upper(), team_name)
+        result = {}
         
         with self.db.connect() as conn:
+            # 1. Advanced Stats (pace, ratings)
             adv = conn.execute(text("""
                 SELECT * FROM nba_team_advanced_stats
-                WHERE "TEAM_NAME" ILIKE :team LIMIT 1
+                WHERE "TEAM_NAME" ILIKE :team ORDER BY pull_date DESC LIMIT 1
             """), {"team": f"%{full_name}%"}).fetchone()
+            if adv:
+                result['advanced'] = dict(adv._mapping)
             
-            if not adv:
-                return None
+            # 2. Four Factors (Dean Oliver's keys to winning)
+            ff = conn.execute(text("""
+                SELECT * FROM nba_team_four_factors
+                WHERE "TEAM_NAME" ILIKE :team ORDER BY pull_date DESC LIMIT 1
+            """), {"team": f"%{full_name}%"}).fetchone()
+            if ff:
+                result['four_factors'] = dict(ff._mapping)
             
-            return {'advanced': dict(adv._mapping)}
+            # 3. Opponent Stats (defensive performance)
+            opp = conn.execute(text("""
+                SELECT * FROM nba_team_opponent_stats
+                WHERE "TEAM_NAME" ILIKE :team ORDER BY pull_date DESC LIMIT 1
+            """), {"team": f"%{full_name}%"}).fetchone()
+            if opp:
+                result['opponent'] = dict(opp._mapping)
+            
+            # 4. Clutch Stats (close game performance)
+            clutch = conn.execute(text("""
+                SELECT * FROM nba_team_clutch
+                WHERE "TEAM_NAME" ILIKE :team ORDER BY pull_date DESC LIMIT 1
+            """), {"team": f"%{full_name}%"}).fetchone()
+            if clutch:
+                result['clutch'] = dict(clutch._mapping)
+            
+            # 5. Hustle Stats (effort metrics)
+            hustle = conn.execute(text("""
+                SELECT * FROM nba_team_hustle
+                WHERE "TEAM_NAME" ILIKE :team ORDER BY pull_date DESC LIMIT 1
+            """), {"team": f"%{full_name}%"}).fetchone()
+            if hustle:
+                result['hustle'] = dict(hustle._mapping)
+            
+            # 6. Base Stats 
+            base = conn.execute(text("""
+                SELECT * FROM nba_team_base_stats
+                WHERE "TEAM_NAME" ILIKE :team ORDER BY pull_date DESC LIMIT 1
+            """), {"team": f"%{full_name}%"}).fetchone()
+            if base:
+                result['base'] = dict(base._mapping)
+            
+            # 7. Scoring breakdown
+            scoring = conn.execute(text("""
+                SELECT * FROM nba_team_scoring
+                WHERE "TEAM_NAME" ILIKE :team ORDER BY pull_date DESC LIMIT 1
+            """), {"team": f"%{full_name}%"}).fetchone()
+            if scoring:
+                result['scoring'] = dict(scoring._mapping)
+
+            
+            # 9. Derived Team Stats
+            derived = conn.execute(text("""
+                SELECT * FROM nba_derived_team_stats
+                WHERE "TEAM_ABBREVIATION" ILIKE :team ORDER BY pull_date DESC LIMIT 1
+            """), {"team": f"%{full_name.split()[-1]}%"}).fetchone()
+            if derived:
+                result['derived'] = dict(derived._mapping)
+        
+        return result if result.get('advanced') else None
 
     # ==========================================================================
     # FULL GAME PREDICTION v4.0
@@ -283,9 +340,8 @@ class MetaMergeEngine:
                 'edge_for': injury_analysis['edge_for'],
             }
             result['engines_used'].append('injury')
-        
         # =====================================================================
-        # STEP 3: BASE PREDICTIONS
+        # STEP 3: BASE PREDICTIONS (USING ALL 8 DATA TABLES)
         # =====================================================================
         home_stats = self.get_team_stats(home_team)
         away_stats = self.get_team_stats(away_team)
@@ -294,36 +350,151 @@ class MetaMergeEngine:
             result['error'] = f"Team data not found"
             return result
         
-        # Net rating based spread
+        # === ADVANCED STATS ===
         home_net = home_stats['advanced'].get('NET_RATING', 0) or 0
         away_net = away_stats['advanced'].get('NET_RATING', 0) or 0
-        
-        # Base prediction
-        home_court = 2.8
-        base_margin = (home_net - away_net) + home_court
-        
-        # Apply injury adjustment
-        predicted_margin = base_margin + injury_spread_adj
-        predicted_spread = -predicted_margin
-        
-        # Pace for total
         home_pace = home_stats['advanced'].get('PACE', 100) or 100
         away_pace = away_stats['advanced'].get('PACE', 100) or 100
-        game_pace = 0.48 * max(home_pace, away_pace) + 0.52 * min(home_pace, away_pace)
-        
-        # Efficiency
         home_off = home_stats['advanced'].get('OFF_RATING', 110) or 110
         home_def = home_stats['advanced'].get('DEF_RATING', 110) or 110
         away_off = away_stats['advanced'].get('OFF_RATING', 110) or 110
         away_def = away_stats['advanced'].get('DEF_RATING', 110) or 110
         
-        expected_possessions = game_pace * 0.96
-        home_pts = expected_possessions * (home_off + (220 - away_def)) / 200
-        away_pts = expected_possessions * (away_off + (220 - home_def)) / 200
+        # === FOUR FACTORS (Dean Oliver's Keys) ===
+        home_ff = home_stats.get('four_factors', {})
+        away_ff = away_stats.get('four_factors', {})
         
+        # Effective FG% differential
+        home_efg = home_ff.get('EFG_PCT', 0.50) or 0.50
+        away_efg = away_ff.get('EFG_PCT', 0.50) or 0.50
+        home_opp_efg = home_ff.get('OPP_EFG_PCT', 0.50) or 0.50
+        away_opp_efg = away_ff.get('OPP_EFG_PCT', 0.50) or 0.50
+        
+        # Turnover differential
+        home_tov = home_ff.get('TM_TOV_PCT', 0.14) or 0.14
+        away_tov = away_ff.get('TM_TOV_PCT', 0.14) or 0.14
+        home_opp_tov = home_ff.get('OPP_TOV_PCT', 0.14) or 0.14
+        away_opp_tov = away_ff.get('OPP_TOV_PCT', 0.14) or 0.14
+        
+        # Rebounding
+        home_oreb = home_ff.get('OREB_PCT', 0.25) or 0.25
+        away_oreb = away_ff.get('OREB_PCT', 0.25) or 0.25
+        
+        # FT Rate
+        home_fta = home_ff.get('FTA_RATE', 0.25) or 0.25
+        away_fta = away_ff.get('FTA_RATE', 0.25) or 0.25
+        
+        # Four Factors Score (weighted by importance)
+        # Shooting (40%), Turnovers (25%), Rebounding (20%), FT (15%)
+        home_ff_score = (home_efg - away_opp_efg) * 40 + (away_tov - home_tov) * 25 + (home_oreb - 0.25) * 20 + (home_fta - 0.25) * 15
+        away_ff_score = (away_efg - home_opp_efg) * 40 + (home_tov - away_tov) * 25 + (away_oreb - 0.25) * 20 + (away_fta - 0.25) * 15
+        ff_adjustment = (home_ff_score - away_ff_score) * 0.1  # Scale to points
+        
+        # === OPPONENT STATS (Defensive Quality) ===
+        home_opp = home_stats.get('opponent', {})
+        away_opp = away_stats.get('opponent', {})
+        
+        home_opp_pts = home_opp.get('OPP_PTS', 110) or 110
+        away_opp_pts = away_opp.get('OPP_PTS', 110) or 110
+        home_opp_fg3 = home_opp.get('OPP_FG3_PCT', 0.36) or 0.36
+        away_opp_fg3 = away_opp.get('OPP_FG3_PCT', 0.36) or 0.36
+        
+        # Defense adjustment (better defense = lower opponent points)
+        league_avg_pts = 114
+        home_def_factor = home_opp_pts / league_avg_pts
+        away_def_factor = away_opp_pts / league_avg_pts
+        
+        # === CLUTCH STATS ===
+        home_clutch = home_stats.get('clutch', {})
+        away_clutch = away_stats.get('clutch', {})
+        
+        home_clutch_wp = home_clutch.get('W_PCT', 0.50) or 0.50
+        away_clutch_wp = away_clutch.get('W_PCT', 0.50) or 0.50
+        home_clutch_pm = home_clutch.get('PLUS_MINUS', 0) or 0
+        away_clutch_pm = away_clutch.get('PLUS_MINUS', 0) or 0
+        
+        # Clutch adjustment (for close games / spread)
+        clutch_adjustment = (home_clutch_wp - away_clutch_wp) * 3  # Up to 1.5 pts
+        
+        # === HUSTLE STATS ===
+        home_hustle = home_stats.get('hustle', {})
+        away_hustle = away_stats.get('hustle', {})
+        
+        home_deflections = home_hustle.get('DEFLECTIONS', 14) or 14
+        away_deflections = away_hustle.get('DEFLECTIONS', 14) or 14
+        home_contested = home_hustle.get('CONTESTED_SHOTS', 50) or 50
+        away_contested = away_hustle.get('CONTESTED_SHOTS', 50) or 50
+        home_loose = home_hustle.get('LOOSE_BALLS_RECOVERED', 5) or 5
+        away_loose = away_hustle.get('LOOSE_BALLS_RECOVERED', 5) or 5
+        
+        # Hustle score (effort = extra possessions)
+        home_hustle_score = (home_deflections - 14) * 0.3 + (home_contested - 50) * 0.05 + (home_loose - 5) * 0.4
+        away_hustle_score = (away_deflections - 14) * 0.3 + (away_contested - 50) * 0.05 + (away_loose - 5) * 0.4
+        hustle_adjustment = (home_hustle_score - away_hustle_score) * 0.5
+        
+        # === SCORING BREAKDOWN ===
+        home_scoring = home_stats.get('scoring', {})
+        away_scoring = away_stats.get('scoring', {})
+        
+        # Fast break and paint points indicate pace/style
+        home_fb = home_scoring.get('PCT_PTS_FB', 0.12) or 0.12
+        away_fb = away_scoring.get('PCT_PTS_FB', 0.12) or 0.12
+        home_paint = home_scoring.get('PCT_PTS_PAINT', 0.45) or 0.45
+        away_paint = away_scoring.get('PCT_PTS_PAINT', 0.45) or 0.45
+        
+        # === DERIVED STATS (Rest, Travel, B2B) ===
+        home_derived = home_stats.get('derived', {})
+        away_derived = away_stats.get('derived', {})
+        
+        home_rest = home_derived.get('REST_DAYS', 1) or 1
+        away_rest = away_derived.get('REST_DAYS', 1) or 1
+        home_b2b = home_derived.get('IS_B2B', False) or False
+        away_b2b = away_derived.get('IS_B2B', False) or False
+        
+        # Rest advantage (each rest day = ~1 pt advantage, B2B = -2.5 pts)
+        rest_adjustment = (home_rest - away_rest) * 1.0
+        if home_b2b:
+            rest_adjustment -= 2.5
+        if away_b2b:
+            rest_adjustment += 2.5
+        
+        # =====================================================================
+        # FINAL CALCULATIONS
+        # =====================================================================
+        
+        # Home court advantage
+        home_court = 2.8
+        
+        # Base margin from net rating
+        base_margin = (home_net - away_net) + home_court
+        
+        # Apply ALL adjustments
+        predicted_margin = (
+            base_margin 
+            + injury_spread_adj 
+            + ff_adjustment 
+            + clutch_adjustment 
+            + hustle_adjustment 
+            + rest_adjustment
+        )
+        predicted_spread = -predicted_margin
+        
+        # === TOTAL CALCULATION ===
+        game_pace = 0.48 * max(home_pace, away_pace) + 0.52 * min(home_pace, away_pace)
+        expected_possessions = game_pace * 0.96
+        
+        # Points adjusted by opponent defense
+        home_pts = expected_possessions * (home_off * away_def_factor + (220 - away_def)) / 200
+        away_pts = expected_possessions * (away_off * home_def_factor + (220 - home_def)) / 200
+        
+        # Apply injury and pace adjustments
         predicted_total = home_pts + away_pts + injury_total_adj
         
-        # Standard deviations
+        # Fast break teams in fast-paced games = more points
+        if (home_fb > 0.14 or away_fb > 0.14) and game_pace > 100:
+            predicted_total += 2.0
+        
+        # Standard deviations (adjusted by data quality)
         spread_std = 11.5
         total_std = 10.0
         
@@ -336,6 +507,22 @@ class MetaMergeEngine:
             'pace': round(game_pace, 1),
         }
         
+        result['adjustments'] = {
+            'base_margin': round(base_margin, 2),
+            'injury': round(injury_spread_adj, 2),
+            'four_factors': round(ff_adjustment, 2),
+            'clutch': round(clutch_adjustment, 2),
+            'hustle': round(hustle_adjustment, 2),
+            'rest': round(rest_adjustment, 2),
+            'home_def_factor': round(home_def_factor, 3),
+            'away_def_factor': round(away_def_factor, 3),
+        }
+        
+        result['data_sources'] = {
+            'tables_used': list(home_stats.keys()),
+            'total_tables': len(home_stats.keys()),
+        }
+
         # =====================================================================
         # STEP 4: EDGE CALCULATION vs BOOK
         # =====================================================================

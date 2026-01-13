@@ -225,7 +225,10 @@ class MetaMergeEngine:
                      injuries_home: List[Dict] = None,
                      injuries_away: List[Dict] = None,
                      b2b_home: bool = False,
-                     b2b_away: bool = False) -> Dict:
+                     b2b_away: bool = False,
+                     spread_odds: int = -110,
+                     over_odds: int = -110,
+                     under_odds: int = -110) -> Dict:
         """
         Complete game prediction with all engines integrated.
         
@@ -371,7 +374,7 @@ class MetaMergeEngine:
             should_bet = False
             
             if self.kelly and calibrated_prob > 0.52 and edge >= EDGE_THRESHOLDS['spread']:
-                kelly_result = self.kelly.calculate_bet(calibrated_prob, -110, self.bankroll)
+                kelly_result = self.kelly.calculate_bet(calibrated_prob, spread_odds, self.bankroll)
                 if kelly_result.get('should_bet'):
                     # Apply regime multiplier
                     kelly_stake = kelly_result['recommended_amount'] * kelly_multiplier
@@ -389,6 +392,7 @@ class MetaMergeEngine:
                 'grade': grade,
                 'stake': round(kelly_stake, 2),
                 'should_bet': should_bet,
+                'odds': spread_odds,
             }
             
             if should_bet:
@@ -425,7 +429,8 @@ class MetaMergeEngine:
             should_bet = False
             
             if self.kelly and calibrated_prob > 0.52 and edge >= EDGE_THRESHOLDS['total']:
-                kelly_result = self.kelly.calculate_bet(calibrated_prob, -110, self.bankroll)
+                total_odds = over_odds if best_bet.startswith('OVER') else under_odds
+                kelly_result = self.kelly.calculate_bet(calibrated_prob, total_odds, self.bankroll)
                 if kelly_result.get('should_bet'):
                     kelly_stake = kelly_result['recommended_amount'] * kelly_multiplier
                     grade = kelly_result['grade']
@@ -441,6 +446,7 @@ class MetaMergeEngine:
                 'grade': grade,
                 'stake': round(kelly_stake, 2),
                 'should_bet': should_bet,
+                'odds': total_odds if 'total_odds' in dir() else (over_odds if best_bet.startswith('OVER') else under_odds),
             }
             
             if should_bet:
@@ -643,6 +649,9 @@ class MetaMergeEngine:
                 away_ml=game.get('away_ml'),
                 b2b_home=game.get('b2b_home', False),
                 b2b_away=game.get('b2b_away', False),
+                spread_odds=game.get('spread_odds', -110),
+                over_odds=game.get('over_odds', -110),
+                under_odds=game.get('under_odds', -110),
             )
             
             game_results.append(result)

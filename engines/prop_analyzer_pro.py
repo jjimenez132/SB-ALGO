@@ -380,8 +380,11 @@ class PropAnalyzerPro:
         
         adjusted_prob = calibrated_prob * confidence_adj
         
-        # EV calculation (assuming -110 odds)
-        odds = -110
+        # EV calculation - use real odds if provided
+        if best_side == 'OVER':
+            odds = over_odds if over_odds else -110
+        else:
+            odds = under_odds if under_odds else -110
         decimal_odds = 1 + (100 / abs(odds))
         ev_pct = (adjusted_prob * (decimal_odds - 1) - (1 - adjusted_prob)) * 100
         
@@ -663,8 +666,11 @@ class PropAnalyzerPro:
             
             adjusted_prob = calibrated_prob * conf_adj
             
-            # EV
-            odds = -110
+            # EV - Use real odds from book
+            if best_side == 'OVER':
+                odds = prop.get('over_odds', -110) or -110
+            else:
+                odds = prop.get('under_odds', -110) or -110
             decimal_odds = 1 + (100 / abs(odds))
             ev_pct = (adjusted_prob * (decimal_odds - 1) - (1 - adjusted_prob)) * 100
             
@@ -703,6 +709,9 @@ class PropAnalyzerPro:
                     },
                     'stake': round(kelly_result.get('recommended_amount', 0), 2),
                     'grade': kelly_result.get('grade', 'N/A'),
+                    'odds': odds,  # Real odds from book
+                    'over_odds': prop.get('over_odds', -110),
+                    'under_odds': prop.get('under_odds', -110),
                 })
         
         print(f"   ✅ Analyzed {analyzed} props, {len(qualified)} passed ALL filters")

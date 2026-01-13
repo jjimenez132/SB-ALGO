@@ -467,7 +467,8 @@ def send_morning_report():
             # Save for grading
             pick_id = pick.get('id', f'G{sent_games:02d}')
             pick_name = f"{pick.get('matchup', 'Unknown')} {pick.get('pick', '')}"
-            save_pick_for_grading(pick_id, pick_name, 'game', 2.0)
+            real_odds = pick.get('odds', -110)
+            save_pick_for_grading(pick_id, pick_name, 'game', 2.0, odds=real_odds)
     
     print(f"   ✅ Sent {sent_games} game picks")
     
@@ -491,7 +492,8 @@ def send_morning_report():
             # Save for grading
             pick_id = pick.get('id', f'P{sent_props:02d}')
             pick_name = f"{pick.get('player', 'Unknown')} {pick.get('prop', '')}"
-            save_pick_for_grading(pick_id, pick_name, 'prop', 1.5)
+            real_odds = pick.get('odds', -110)
+            save_pick_for_grading(pick_id, pick_name, 'prop', 1.5, odds=real_odds)
     
     print(f"   ✅ Sent {sent_props} prop picks")
     

@@ -162,6 +162,10 @@ class SBAlgoMaster:
             spread = consensus.get('spread')
             total = consensus.get('total')
             
+            # Get real odds from preferred book (fanduel > draftkings > others)
+            books = g.get('books', {})
+            book_odds = books.get('fanduel') or books.get('draftkings') or books.get('caesars') or books.get('betmgm') or {}
+            
             if spread is not None:
                 formatted_games.append({
                     'game_id': f"{g['away_team']}@{g['home_team']}",
@@ -171,6 +175,10 @@ class SBAlgoMaster:
                     'total': total or 220,
                     'home_ml': consensus.get('home_ml', -110),
                     'away_ml': consensus.get('away_ml', -110),
+                    # Real odds from book
+                    'spread_odds': book_odds.get('spread_odds', -110),
+                    'over_odds': book_odds.get('over_odds', -110),
+                    'under_odds': book_odds.get('under_odds', -110),
                 })
         
         if not formatted_games:
@@ -208,6 +216,7 @@ class SBAlgoMaster:
                 'regime_confidence': p.get('regime_confidence'),
                 'injury_adjustment': p.get('injury_adjustment', 0),
                 'injury_edge': p.get('injury_edge', 'NEUTRAL'),
+                'odds': p.get('odds', -110),
             })
         
         # Apply daily limits

@@ -314,6 +314,9 @@ class SBAlgoAPI:
                 'ev_pct': p.get('_ev_numeric', p.get('ev_pct', 0)),
                 'filters': p.get('filters', {}),
                 'probabilities': p.get('probabilities', {}),
+                'odds': p.get('odds', -110),
+                'over_odds': p.get('over_odds', -110),
+                'under_odds': p.get('under_odds', -110),
             })
         
         # Calculate summary for filtered picks

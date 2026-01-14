@@ -411,3 +411,108 @@ def load_prop_edges():
 def get_all_edges():
     """Get all edges using NEW ENGINE"""
     return load_game_edges(), load_prop_edges()
+
+
+def get_all_edges_relaxed():
+    """Get ALL edges with relaxed filters for dashboard view"""
+    return load_game_edges_relaxed(), load_prop_edges_relaxed()
+
+
+def load_game_edges_relaxed():
+    """Load game edges with RELAXED filters (for dashboard only)"""
+    cache_key = "game_edges_relaxed"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+    
+    try:
+        from sb_algo_api import SBAlgoAPI
+        api = SBAlgoAPI()
+        algo_data = api.get_all_picks_unfiltered()
+        
+        edges = []
+        for pick in algo_data.get('game_picks', []):
+            pick_str = pick.get('pick', '')
+            if 'UNDER' in pick_str or 'OVER' in pick_str:
+                subtype = 'TOTAL'
+            elif '+' in pick_str or '-' in pick_str:
+                subtype = 'SPREAD'
+            else:
+                subtype = 'ML'
+            
+            edge_val = float(str(pick.get('edge', '0')).replace('+', '').replace('%', ''))
+            conf_val = float(str(pick.get('confidence', pick.get('calibrated_prob', 0.5) * 100)).replace('%', ''))
+            
+            # Relaxed filter: edge >= 15% (vs 30% for Discord)
+            if edge_val >= 15:
+                # Mark as OFFICIAL if passes strict filters (30% edge, 55% confidence)
+                is_official = edge_val >= 30 and conf_val >= 55
+                edges.append({
+                    'type': 'GAME',
+                    'subtype': subtype,
+                    'game': pick.get('game', pick.get('matchup', '')),
+                    'pick': pick_str,
+                    'edge': edge_val,
+                    'confidence': conf_val,
+                    'start_time': 'TBD',
+                    'game_date': get_eastern_date(),
+                    'ev': pick.get('ev_pct', 0),
+                    'grade': pick.get('grade', 'N/A'),
+                    'stake': pick.get('stake', 0),
+                    'is_official': is_official,
+                    'tier': '🔥 OFFICIAL' if is_official else '📊 WATCHLIST',
+                })
+        
+        # Sort by edge descending
+        edges.sort(key=lambda x: x['edge'], reverse=True)
+        _set_cached(cache_key, edges[:10])  # Top 10
+        return edges[:10]
+        
+    except Exception as e:
+        print(f"Relaxed game edges error: {e}")
+        return []
+
+
+def load_prop_edges_relaxed():
+    """Load prop edges with RELAXED filters (for dashboard only)"""
+    cache_key = "prop_edges_relaxed"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+    
+    try:
+        from sb_algo_api import SBAlgoAPI
+        api = SBAlgoAPI()
+        algo_data = api.get_all_picks_unfiltered()
+        
+        edges = []
+        for pick in algo_data.get('prop_picks', []):
+            edge_val = float(str(pick.get('edge_pct', pick.get('edge', '0'))).replace('+', '').replace('%', ''))
+            
+            # Relaxed filter: edge >= 20% (vs 30% for Discord)
+            if edge_val >= 20:
+                hit_rate = pick.get('filters', {}).get('hit_rate', {}).get('hit_rate', 0) * 100
+                # Mark as OFFICIAL if passes strict filters (30% edge, 60% hit rate)
+                is_official = edge_val >= 30 and hit_rate >= 60
+                edges.append({
+                    'type': 'PROP',
+                    'subtype': pick.get('stat', 'pts'),
+                    'player': pick.get('player', 'Unknown'),
+                    'pick': f"{pick.get('stat', 'pts').upper()} {pick.get('best_side', 'OVER')} {pick.get('book_line', 0)}",
+                    'edge': edge_val,
+                    'hit_rate': hit_rate,
+                    'projection': pick.get('projection', {}).get('weighted', 0),
+                    'ev': pick.get('ev_pct', 0),
+                    'grade': pick.get('grade', 'N/A'),
+                    'is_official': is_official,
+                    'tier': '🔥 OFFICIAL' if is_official else '📊 WATCHLIST',
+                })
+        
+        # Sort by edge descending
+        edges.sort(key=lambda x: x['edge'], reverse=True)
+        _set_cached(cache_key, edges[:10])  # Top 10
+        return edges[:10]
+        
+    except Exception as e:
+        print(f"Relaxed prop edges error: {e}")
+        return []

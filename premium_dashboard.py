@@ -412,7 +412,8 @@ engine = get_db_engine()
 # ========== SPEED: Load algo edges ONCE ==========
 if "edges_loaded" not in st.session_state:
     try:
-        st.session_state.game_edges, st.session_state.prop_edges = fast_loader.get_all_edges()
+        # Use relaxed filters for dashboard (shows more options)
+        st.session_state.game_edges, st.session_state.prop_edges = fast_loader.get_all_edges_relaxed()
         st.session_state.edges_loaded = True
     except Exception as e:
         st.session_state.game_edges = []
@@ -493,12 +494,16 @@ with tab1:
                 """, unsafe_allow_html=True)
                 
                 if game_edges:
-                    for edge in game_edges[:4]:
+                    for edge in game_edges[:6]:
                         units = "2u" if edge['edge'] >= 7 else "1u" if edge['edge'] >= 4 else "0.5u"
+                        is_official = edge.get('is_official', False)
+                        border_color = "#10b981" if is_official else "#6b7280"
+                        bg_color = "rgba(16, 185, 129, 0.15)" if is_official else "rgba(107, 114, 128, 0.1)"
+                        tier = edge.get('tier', '📊 WATCHLIST')
                         st.markdown(f"""
-                        <div style="background: rgba(16, 185, 129, 0.1); border-left: 3px solid #10b981; padding: 0.5rem 0.8rem; margin-bottom: 0.4rem; border-radius: 0 6px 6px 0;">
-                            <p style="color: #fff; font-size: 0.9rem; margin: 0; font-weight: 600;">{edge['pick']}</p>
-                            <p style="color: #6b7280; font-size: 0.75rem; margin: 0;">{edge['game']} • {edge['edge']:.1f} pts • {units}</p>
+                        <div style="background: {bg_color}; border-left: 3px solid {border_color}; padding: 0.5rem 0.8rem; margin-bottom: 0.4rem; border-radius: 0 6px 6px 0;">
+                            <p style="color: #fff; font-size: 0.9rem; margin: 0; font-weight: 600;">{edge['pick']} <span style="font-size: 0.7rem; color: {'#10b981' if is_official else '#9ca3af'};">{tier}</span></p>
+                            <p style="color: #6b7280; font-size: 0.75rem; margin: 0;">{edge['game']} • {edge['edge']:.1f}% edge • {units}</p>
                         </div>
                         """, unsafe_allow_html=True)
                 else:
@@ -510,11 +515,15 @@ with tab1:
                 """, unsafe_allow_html=True)
                 
                 if prop_edges:
-                    for edge in prop_edges[:4]:
+                    for edge in prop_edges[:6]:
                         units = "1.5u" if edge['edge'] >= 25 else "1u"
+                        is_official = edge.get('is_official', False)
+                        border_color = "#fbbf24" if is_official else "#6b7280"
+                        bg_color = "rgba(251, 191, 36, 0.15)" if is_official else "rgba(107, 114, 128, 0.1)"
+                        tier = edge.get('tier', '📊 WATCHLIST')
                         st.markdown(f"""
-                        <div style="background: rgba(251, 191, 36, 0.1); border-left: 3px solid #fbbf24; padding: 0.5rem 0.8rem; margin-bottom: 0.4rem; border-radius: 0 6px 6px 0;">
-                            <p style="color: #fff; font-size: 0.9rem; margin: 0; font-weight: 600;">{edge['player']}: {edge['pick']}</p>
+                        <div style="background: {bg_color}; border-left: 3px solid {border_color}; padding: 0.5rem 0.8rem; margin-bottom: 0.4rem; border-radius: 0 6px 6px 0;">
+                            <p style="color: #fff; font-size: 0.9rem; margin: 0; font-weight: 600;">{edge['player']}: {edge['pick']} <span style="font-size: 0.7rem; color: {'#fbbf24' if is_official else '#9ca3af'};">{tier}</span></p>
                             <p style="color: #6b7280; font-size: 0.75rem; margin: 0;">{edge['subtype'].replace('player_', '')} • {edge['edge']:.0f}% edge • {units}</p>
                         </div>
                         """, unsafe_allow_html=True)

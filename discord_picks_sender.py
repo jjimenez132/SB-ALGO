@@ -446,7 +446,15 @@ def send_morning_report():
     print(f"📤 SENDING MORNING REPORT - {get_eastern_time().strftime('%I:%M %p ET')}")
     print(f"{'='*60}")
     
-    # Clear old sent picks
+    # CHECK: If morning picks already sent today, don't resend
+    sent_today = get_sent_picks_today()
+    if sent_today:
+        print(f"   ⚠️ MORNING PICKS ALREADY SENT TODAY ({len(sent_today)} picks)")
+        print(f"   ⚠️ Skipping to prevent duplicate/different picks")
+        print(f"   ℹ️ To force resend, manually clear discord_sent_picks table")
+        return False
+    
+    # Clear old sent picks (from previous days)
     clear_sent_picks()
     
     # Get picks

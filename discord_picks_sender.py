@@ -160,27 +160,38 @@ def save_pick_for_grading(pick_id, pick_name, pick_type, units, odds=-110, detai
     
     try:
         from sqlalchemy import create_engine, text
-        engine = create_engine(DATABASE_URL)
+        import os
+        db_url = os.environ.get('DATABASE_URL', DATABASE_URL)
+        engine = create_engine(db_url)
         with engine.connect() as conn:
-            conn.execute(text("""
-                INSERT INTO algo_picks_tracking (pick_date, pick_id, pick_name, pick_type, units, odds, status, pick_details)
-                VALUES (:date, :pick_id, :name, :type, :units, :odds, 'pending', :details)
+            # First try insert
+            result = conn.execute(text("""
+                INSERT INTO algo_picks_tracking (pick_date, pick_id, pick_name, pick_type, units, odds, status, pick_details, created_at)
+                VALUES (:date, :pick_id, :name, :type, :units, :odds, 'pending', :details, NOW())
                 ON CONFLICT (pick_date, pick_type, pick_name) DO UPDATE SET
                     pick_id = EXCLUDED.pick_id,
-                    units = EXCLUDED.units
+                    units = EXCLUDED.units,
+                    odds = EXCLUDED.odds
+                RETURNING id
             """), {
                 'date': today,
                 'pick_id': pick_id,
                 'name': pick_name,
                 'type': pick_type,
-                'units': units,
-                'odds': odds,
+                'units': float(units),
+                'odds': int(odds) if odds else -110,
                 'details': details
             })
+            row = result.fetchone()
             conn.commit()
-            print(f"   📝 Saved {pick_id} for grading")
+            if row:
+                print(f"   📝 Saved {pick_id} for grading (DB id: {row[0]})")
+            else:
+                print(f"   📝 Saved {pick_id} for grading")
     except Exception as e:
+        import traceback
         print(f"   ⚠️ Could not save for grading: {e}")
+        traceback.print_exc()
 
 def create_pick_key(pick, pick_type):
     """Create unique key for a pick - ignores line numbers to avoid duplicates"""

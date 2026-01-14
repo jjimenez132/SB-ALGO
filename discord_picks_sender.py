@@ -154,7 +154,7 @@ def clear_sent_picks():
         pass
 
 
-def save_pick_for_grading(pick_id, pick_name, pick_type, units, odds=-110, details=None):
+def save_pick_for_grading(pick_id, pick_name, pick_type, units, odds=-110, line=None, details=None):
     """Save pick to algo_picks_tracking for later grading"""
     today = get_eastern_date()
     
@@ -166,12 +166,13 @@ def save_pick_for_grading(pick_id, pick_name, pick_type, units, odds=-110, detai
         with engine.connect() as conn:
             # First try insert
             result = conn.execute(text("""
-                INSERT INTO algo_picks_tracking (pick_date, pick_id, pick_name, pick_type, units, odds, status, pick_details, created_at)
-                VALUES (:date, :pick_id, :name, :type, :units, :odds, 'pending', :details, NOW())
+                INSERT INTO algo_picks_tracking (pick_date, pick_id, pick_name, pick_type, units, odds, line, status, pick_details, created_at)
+                VALUES (:date, :pick_id, :name, :type, :units, :odds, :line, 'pending', :details, NOW())
                 ON CONFLICT (pick_date, pick_type, pick_name) DO UPDATE SET
                     pick_id = EXCLUDED.pick_id,
                     units = EXCLUDED.units,
-                    odds = EXCLUDED.odds
+                    odds = EXCLUDED.odds,
+                    line = EXCLUDED.line
                 RETURNING id
             """), {
                 'date': today,
@@ -180,6 +181,7 @@ def save_pick_for_grading(pick_id, pick_name, pick_type, units, odds=-110, detai
                 'type': pick_type,
                 'units': float(units),
                 'odds': int(odds) if odds else -110,
+                'line': float(line) if line else None,
                 'details': details
             })
             row = result.fetchone()
@@ -487,7 +489,11 @@ def send_morning_report():
             pick_id = pick.get('id', f'G{sent_games:02d}')
             pick_name = f"{pick.get('matchup', 'Unknown')} {pick.get('pick', '')}"
             real_odds = pick.get('odds', -110)
-            save_pick_for_grading(pick_id, pick_name, 'game', 2.0, odds=real_odds)
+            # Extract line from pick string (e.g., "UNDER 230.5" -> 230.5)
+            import re
+            line_match = re.search(r'[\d.]+', str(pick.get('pick', '')))
+            line_val = float(line_match.group()) if line_match else None
+            save_pick_for_grading(pick_id, pick_name, 'game', 2.0, odds=real_odds, line=line_val)
     
     print(f"   ✅ Sent {sent_games} game picks")
     
@@ -512,7 +518,8 @@ def send_morning_report():
             pick_id = pick.get('id', f'P{sent_props:02d}')
             pick_name = f"{pick.get('player', 'Unknown')} {pick.get('prop', '')}"
             real_odds = pick.get('odds', -110)
-            save_pick_for_grading(pick_id, pick_name, 'prop', 1.5, odds=real_odds)
+            line_val = pick.get('book_line', pick.get('line'))
+            save_pick_for_grading(pick_id, pick_name, 'prop', 1.5, odds=real_odds, line=line_val)
     
     print(f"   ✅ Sent {sent_props} prop picks")
     
@@ -521,6 +528,182 @@ def send_morning_report():
     print(f"{'='*60}")
     
     return True
+
+
+
+def check_line_movement():
+    """Check if morning picks have significant line movement - compare morning odds vs current odds"""
+    
+    print(f"\n{'='*60}")
+    print(f"📉 CHECKING LINE MOVEMENT - {get_eastern_time().strftime('%I:%M %p ET')}")
+    print(f"{'='*60}")
+    
+    from sqlalchemy import create_engine, text
+    engine = create_engine(DATABASE_URL)
+    
+    # Get today's picks with their morning odds
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT pick_id, pick_name, pick_type, odds, units, line
+                FROM algo_picks_tracking 
+                WHERE pick_date = CURRENT_DATE AND status = 'pending'
+            """)).fetchall()
+            
+            morning_picks = []
+            for r in result:
+                morning_picks.append({
+                    'pick_id': r[0],
+                    'pick_name': r[1],
+                    'pick_type': r[2],
+                    'morning_odds': r[3] or -110,
+                    'units': r[4],
+                    'line': r[5]
+                })
+    except Exception as e:
+        print(f"   ⚠️ Could not load morning picks: {e}")
+        return []
+    
+    if not morning_picks:
+        print("   ℹ️ No pending picks to check for today")
+        return []
+    
+    print(f"   📋 Checking {len(morning_picks)} picks for line movement...")
+    
+    alerts_to_send = []
+    
+    for mp in morning_picks:
+        pick_name = mp['pick_name']
+        pick_type = mp['pick_type']
+        morning_odds = mp['morning_odds']
+        
+        # Parse pick details
+        # Format: "Player Name STAT SIDE LINE" e.g., "Marcus Smart PTS UNDER 12.5"
+        parts = pick_name.split()
+        
+        current_odds = None
+        current_line = None
+        
+        if pick_type == 'prop' and len(parts) >= 4:
+            # Extract player name (first two words), stat, side, line
+            player_name = ' '.join(parts[:-3])  # Everything except last 3
+            stat = parts[-3].lower()  # PTS, REB, AST
+            side = parts[-2].upper()  # OVER, UNDER
+            line = float(parts[-1])  # 12.5
+            
+            # Map stat to market name
+            stat_map = {'pts': 'player_points', 'reb': 'player_rebounds', 'ast': 'player_assists'}
+            market = stat_map.get(stat, f'player_{stat}')
+            
+            # Get current odds from player_props table
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("""
+                        SELECT line, over_odds, under_odds 
+                        FROM player_props 
+                        WHERE game_date = CURRENT_DATE 
+                          AND LOWER(player_name) LIKE :player
+                          AND market = :market
+                        ORDER BY updated_at DESC 
+                        LIMIT 1
+                    """), {
+                        'player': f'%{player_name.lower()}%',
+                        'market': market
+                    }).fetchone()
+                    
+                    if result:
+                        current_line = float(result[0])
+                        current_odds = result[1] if side == 'OVER' else result[2]
+            except Exception as e:
+                print(f"   ⚠️ Error checking {player_name}: {e}")
+                continue
+        
+        elif pick_type == 'game':
+            # Game pick - check betting_odds table
+            # Format: "TEAM @ TEAM OVER/UNDER LINE"
+            try:
+                with engine.connect() as conn:
+                    # Extract teams and direction from pick name
+                    if 'UNDER' in pick_name.upper():
+                        side = 'UNDER'
+                    elif 'OVER' in pick_name.upper():
+                        side = 'OVER'
+                    else:
+                        continue
+                    
+                    result = conn.execute(text("""
+                        SELECT total, over_odds, under_odds
+                        FROM betting_odds 
+                        WHERE game_date = CURRENT_DATE
+                        ORDER BY updated_at DESC 
+                        LIMIT 1
+                    """)).fetchone()
+                    
+                    if result:
+                        current_line = float(result[0]) if result[0] else None
+                        current_odds = result[1] if side == 'OVER' else result[2]
+            except Exception as e:
+                print(f"   ⚠️ Error checking game: {e}")
+                continue
+        
+        # Calculate line movement
+        if current_odds is not None and morning_odds:
+            odds_change = current_odds - morning_odds
+            
+            # Significant movement thresholds
+            # If odds moved against us by 15+ cents, alert
+            if odds_change <= -15:  # Line moved against us (worse odds)
+                movement_desc = f"Odds moved from {morning_odds} to {current_odds} ({odds_change:+d})"
+                alerts_to_send.append({
+                    'pick_id': mp['pick_id'],
+                    'pick_name': pick_name,
+                    'reason': 'ODDS_MOVED_AGAINST',
+                    'morning_odds': morning_odds,
+                    'current_odds': current_odds,
+                    'change': odds_change,
+                    'message': f"⚠️ **LINE MOVED** - {pick_name}\n\n{movement_desc}\n\n💡 **Consider:** Cash out early if available, or hold with reduced confidence."
+                })
+                print(f"   ⚠️ {pick_name} - ODDS MOVED AGAINST ({morning_odds} → {current_odds})")
+            
+            elif odds_change >= 15:  # Line moved in our favor (better value now)
+                print(f"   🟢 {pick_name} - Line moved IN OUR FAVOR ({morning_odds} → {current_odds})")
+            
+            else:
+                print(f"   ✅ {pick_name} - Minimal movement ({morning_odds} → {current_odds})")
+        
+        elif current_line is not None and mp.get('line'):
+            # Check line movement (not just odds)
+            line_change = current_line - float(mp['line'])
+            if abs(line_change) >= 1.5:
+                print(f"   ⚠️ {pick_name} - LINE CHANGED by {line_change:+.1f} points")
+        
+        else:
+            print(f"   ❓ {pick_name} - Could not find current odds (may need odds refresh)")
+    
+    # Send alerts
+    if alerts_to_send:
+        print(f"\n   📤 Sending {len(alerts_to_send)} line movement alerts...")
+        
+        for alert in alerts_to_send:
+            embed = {
+                'title': "📉 LINE MOVEMENT ALERT",
+                'description': alert['message'],
+                'color': 0xFFA500,  # Orange
+                'footer': {'text': f"SB-ALGO Risk Management • {get_eastern_time().strftime('%I:%M %p ET')}"}
+            }
+            
+            # Send to appropriate channel
+            if 'PTS' in alert['pick_name'] or 'REB' in alert['pick_name'] or 'AST' in alert['pick_name']:
+                send_discord_message(PROP_PICKS_CHANNEL, embed=embed)
+            else:
+                send_discord_message(GAME_PICKS_CHANNEL, embed=embed)
+            
+            print(f"   📤 Sent alert for {alert['pick_name']}")
+    else:
+        print("\n   ✅ No significant line movement detected")
+    
+    return alerts_to_send
+
 
 def check_new_picks():
     """Check for NEW picks that weren't in morning report"""
@@ -685,8 +868,10 @@ if __name__ == "__main__":
         send_morning_report()
     elif mode == 'alert':
         check_new_picks()
+    elif mode == 'linecheck':
+        check_line_movement()
     elif mode == 'test':
         test_picks()
     else:
         print(f"Unknown mode: {mode}")
-        print("Usage: python3 discord_picks_sender.py [morning|alert|test]")
+        print("Usage: python3 discord_picks_sender.py [morning|alert|linecheck|test]")

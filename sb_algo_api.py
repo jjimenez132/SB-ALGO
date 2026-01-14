@@ -51,8 +51,17 @@ sys.path.insert(0, ENGINES_DIR)
 # =============================================================================
 # STRICT FILTER THRESHOLDS
 # =============================================================================
-MIN_EDGE_PCT = 30.0          # Minimum edge to consider
-MIN_CONFIDENCE = 70          # Minimum model confidence
+# GAME FILTERS (separate from props)
+MIN_GAME_EDGE_PCT = 25.0     # Minimum edge for games
+MIN_GAME_CONFIDENCE = 90     # Minimum confidence for games (strict)
+
+# PROP FILTERS
+MIN_PROP_EDGE_PCT = 30.0     # Minimum edge for props
+MIN_PROP_HIT_RATE = 0.60     # Minimum hit rate for props
+
+# Legacy (kept for backwards compatibility)
+MIN_EDGE_PCT = 30.0          # Default minimum edge
+MIN_CONFIDENCE = 70          # Default minimum confidence
 MIN_HIT_RATE = 0.60          # Minimum hit rate for props
 MIN_EV = 0                   # EV must be positive
 
@@ -160,7 +169,18 @@ class SBAlgoAPI:
                 ev = float(ev.replace('%', ''))
             
             # Apply filters
-            if edge >= MIN_EDGE_PCT and confidence >= MIN_CONFIDENCE and ev > MIN_EV:
+            # GAME FILTERS: 25% edge, 90% confidence
+            if edge >= MIN_GAME_EDGE_PCT and confidence >= MIN_GAME_CONFIDENCE and ev > MIN_EV:
+                # Add tier
+                if edge >= 30:
+                    p['tier'] = 'S'
+                    p['tier_emoji'] = '🔥'
+                elif edge >= 25:
+                    p['tier'] = 'A'
+                    p['tier_emoji'] = '⭐'
+                else:
+                    p['tier'] = 'B'
+                    p['tier_emoji'] = '📊'
                 p['_edge_numeric'] = edge
                 p['_confidence_numeric'] = confidence
                 p['_ev_numeric'] = ev
@@ -201,7 +221,19 @@ class SBAlgoAPI:
             # gp is a number, already extracted
             
             # Apply filters
-            if edge >= MIN_EDGE_PCT and hit_rate >= (MIN_HIT_RATE * 100) and ev > MIN_EV and gp >= 15:
+            # PROP FILTERS: 30% edge, 60% hit rate
+            if edge >= MIN_PROP_EDGE_PCT and hit_rate >= (MIN_PROP_HIT_RATE * 100) and ev > MIN_EV and gp >= 15:
+                # Add tier
+                if edge >= 40:
+                    p['tier'] = 'S'
+                    p['tier_emoji'] = '🔥'
+                elif edge >= 30:
+                    p['tier'] = 'A'
+                    p['tier_emoji'] = '⭐'
+                else:
+                    p['tier'] = 'B'
+                    p['tier_emoji'] = '📊'
+
                 # Calculate composite score
                 score = (0.5 * edge) + (0.3 * hit_rate) + (0.2 * ev)
                 

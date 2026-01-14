@@ -430,7 +430,10 @@ def generate_explanation(pick_data: dict, pick_type: str) -> str:
 # Test
 if __name__ == "__main__":
     import os
-    os.environ['GOOGLE_API_KEY'] = os.environ.get('GOOGLE_API_KEY', 'AIzaSyDyzh07bhIB2Ml62JyyDv96iKeJAEW1npA')
+    if not os.environ.get('GOOGLE_API_KEY'):
+        print("❌ Set GOOGLE_API_KEY environment variable first")
+        print("   export GOOGLE_API_KEY='your-key-here'")
+        exit(1)
     
     print("🧠 Testing Explanation Engine v5.0 with ADVANCED DATA...\n")
     

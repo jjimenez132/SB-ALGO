@@ -480,12 +480,22 @@ class MetaMergeEngine:
         predicted_spread = -predicted_margin
         
         # === TOTAL CALCULATION ===
-        game_pace = 0.48 * max(home_pace, away_pace) + 0.52 * min(home_pace, away_pace)
-        expected_possessions = game_pace * 0.96
+        # Game pace is weighted average of both teams
+        game_pace = (home_pace + away_pace) / 2
         
-        # Points adjusted by opponent defense
-        home_pts = expected_possessions * (home_off * away_def_factor + (220 - away_def)) / 200
-        away_pts = expected_possessions * (away_off * home_def_factor + (220 - home_def)) / 200
+        # Standard NBA points formula:
+        # Points = Pace * OffRtg / 100, adjusted for opponent defense
+        # League average OffRtg ~114, DefRtg ~114
+        LEAGUE_AVG_DEF = 114.0
+        
+        # Adjust offensive rating based on opponent defense
+        # If opponent defense is worse than avg (higher DefRtg), team scores more
+        home_pts = game_pace * home_off / 100 * (away_def / LEAGUE_AVG_DEF)
+        away_pts = game_pace * away_off / 100 * (home_def / LEAGUE_AVG_DEF)
+        
+        # Apply defense factors from other calculations
+        home_pts *= away_def_factor
+        away_pts *= home_def_factor
         
         # Apply injury and pace adjustments
         predicted_total = home_pts + away_pts + injury_total_adj

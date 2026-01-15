@@ -323,19 +323,51 @@ class InjuryEngine:
         """
         injuries = []
         
+        # Map abbreviations to full team names
+        ABBR_TO_FULL = {
+            'ATL': 'Atlanta Hawks', 'BOS': 'Boston Celtics', 'BKN': 'Brooklyn Nets',
+            'CHA': 'Charlotte Hornets', 'CHI': 'Chicago Bulls', 'CLE': 'Cleveland Cavaliers',
+            'DAL': 'Dallas Mavericks', 'DEN': 'Denver Nuggets', 'DET': 'Detroit Pistons',
+            'GSW': 'Golden State Warriors', 'GS': 'Golden State Warriors',
+            'HOU': 'Houston Rockets', 'IND': 'Indiana Pacers',
+            'LAC': 'LA Clippers', 'LAL': 'Los Angeles Lakers', 'MEM': 'Memphis Grizzlies',
+            'MIA': 'Miami Heat', 'MIL': 'Milwaukee Bucks', 'MIN': 'Minnesota Timberwolves',
+            'NOP': 'New Orleans Pelicans', 'NO': 'New Orleans Pelicans',
+            'NYK': 'New York Knicks', 'NY': 'New York Knicks',
+            'OKC': 'Oklahoma City Thunder', 'ORL': 'Orlando Magic',
+            'PHI': 'Philadelphia 76ers', 'PHX': 'Phoenix Suns', 'PHO': 'Phoenix Suns',
+            'POR': 'Portland Trail Blazers', 'SAC': 'Sacramento Kings',
+            'SAS': 'San Antonio Spurs', 'SA': 'San Antonio Spurs',
+            'TOR': 'Toronto Raptors', 'UTA': 'Utah Jazz',
+            'WAS': 'Washington Wizards'
+        }
+        
+        # Reverse map for getting abbr from full name
+        FULL_TO_ABBR = {v: k for k, v in ABBR_TO_FULL.items()}
+        
         try:
             with self.engine.connect() as conn:
                 query = "SELECT * FROM injuries"
-                if team:
-                    query += " WHERE team_abbr = :team"
+                params = {}
                 
-                result = conn.execute(text(query), {'team': team} if team else {})
+                if team:
+                    # Convert abbreviation to full name if needed
+                    team_upper = team.upper()
+                    team_full = ABBR_TO_FULL.get(team_upper, team)
+                    query += " WHERE team_name = :team"
+                    params['team'] = team_full
+                
+                result = conn.execute(text(query), params)
                 
                 for row in result:
                     r = dict(row._mapping)
+                    team_name = r.get('team_name', '')
+                    team_abbr = FULL_TO_ABBR.get(team_name, r.get('team_abbr', ''))
+                    
                     injuries.append({
                         'player_name': r.get('player_name', '').lower() if r.get('player_name') else None,
-                        'team': r.get('team_abbr'),
+                        'team': team_abbr,
+                        'team_name': team_name,
                         'status': r.get('status', 'unknown').lower() if r.get('status') else 'unknown',
                         'injury_type': r.get('injury_type', 'unspecified').lower() if r.get('injury_type') else 'unspecified',
                         'description': r.get('description'),

@@ -52,7 +52,7 @@ sys.path.insert(0, ENGINES_DIR)
 # STRICT FILTER THRESHOLDS
 # =============================================================================
 # GAME FILTERS (separate from props)
-MIN_GAME_EDGE_PCT = 25.0     # Minimum edge for games
+MIN_GAME_EDGE_PCT = 30.0     # Minimum edge for games (back to strict)
 MIN_GAME_CONFIDENCE = 90     # Minimum confidence for games (strict)
 
 # PROP FILTERS

@@ -302,7 +302,7 @@ def load_game_edges():
             edges.append({
                 'type': 'GAME',
                 'subtype': subtype,
-                'game': pick.get('matchup', ''),
+                'game': pick.get('game_id', pick.get('matchup', '')),
                 'pick': pick_str,
                 'edge': edge_val,
                 'confidence': conf_val,
@@ -450,7 +450,7 @@ def load_game_edges_relaxed():
                 edges.append({
                     'type': 'GAME',
                     'subtype': subtype,
-                    'game': pick.get('game', pick.get('matchup', '')),
+                    'game': pick.get('game_id', pick.get('game', pick.get('matchup', ''))),
                     'pick': pick_str,
                     'edge': edge_val,
                     'confidence': conf_val,

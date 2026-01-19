@@ -44,6 +44,44 @@ DISCORD_TOKEN = os.environ.get('DISCORD_BOT_TOKEN')
 # Database for tracking sent picks
 DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db')
 
+
+def get_recent_players(days=1):
+    """Get players picked in the last N days to avoid repeats"""
+    try:
+        from sqlalchemy import create_engine, text
+        engine = create_engine(DATABASE_URL)
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT DISTINCT 
+                    SPLIT_PART(pick_name, ' ', 1) || ' ' || SPLIT_PART(pick_name, ' ', 2) as player_name
+                FROM algo_picks_tracking 
+                WHERE pick_type = 'prop' 
+                AND pick_date >= CURRENT_DATE - :days
+                AND pick_date < CURRENT_DATE
+            """), {'days': days}).fetchall()
+            return [r[0].lower() for r in result]
+    except Exception as e:
+        print(f"   ⚠️ Could not check recent players: {e}")
+        return []
+
+
+def filter_cooldown_picks(picks, cooldown_days=1):
+    """Remove picks for players that were picked in the last N days"""
+    recent_players = get_recent_players(cooldown_days)
+    if not recent_players:
+        return picks
+    
+    filtered = []
+    for pick in picks:
+        player = pick.get('player', '').lower()
+        if player and not any(recent in player or player in recent for recent in recent_players):
+            filtered.append(pick)
+        else:
+            print(f"   ⏸️ Cooldown: Skipping {pick.get('player')} (picked yesterday)")
+    
+    return filtered
+
+
 # API Base URL
 DISCORD_API = "https://discord.com/api/v10"
 

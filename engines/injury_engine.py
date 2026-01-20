@@ -66,42 +66,102 @@ STATUS_MULTIPLIERS = {
 }
 
 # Player tier classification (based on typical impact)
-# These are approximate - engine will also use actual stats
+# VEGAS-CALIBRATED VALUES (2025 Official Oddsmaker Rankings)
+# Source: Yahoo Sports survey of 7 sportsbooks
 SUPERSTAR_TIER = {
-    # Tier 1 - MVP caliber (10-15 pts impact)
-    'lebron james': 12, 'giannis antetokounmpo': 13, 'nikola jokic': 14,
-    'luka doncic': 13, 'jayson tatum': 11, 'shai gilgeous-alexander': 12,
-    'joel embiid': 13, 'kevin durant': 11, 'stephen curry': 11,
-    'anthony davis': 10, 'jaylen brown': 9, 'donovan mitchell': 9,
-    'devin booker': 9, 'anthony edwards': 10, 'tyrese haliburton': 9,
-    'ja morant': 10, 'trae young': 9, 'damian lillard': 9,
-    'jimmy butler': 8, 'paolo banchero': 8, 'lamelo ball': 8,
-    'cade cunningham': 8, 'victor wembanyama': 10, 'tyrese maxey': 8,
+    # Tier 1 - MVP caliber (5-6 pts spread impact)
+    'nikola jokic': 5.8, 
+    'giannis antetokounmpo': 5.6,
+    # Tier 2 - Elite Star (4-5 pts spread impact)
+    'victor wembanyama': 4.6,
+    'shai gilgeous-alexander': 4.4,
+    'stephen curry': 4.4,
+    'luka doncic': 4.2,
+    'joel embiid': 4.2,
+    # Tier 3 - All-Star (3-4 pts spread impact)
+    'anthony davis': 4.0,
+    'jaylen brown': 3.8,
+    'anthony edwards': 3.6,
+    'donovan mitchell': 3.5,
+    'jayson tatum': 3.5,
+    'jalen brunson': 3.3,
+    'kevin durant': 3.3,
+    'lamelo ball': 3.2,
+    'ja morant': 3.2,
 }
 
 ALL_STAR_TIER = {
-    # Tier 2 - All-Star caliber (5-8 pts impact)
-    'de\'aaron fox': 7, 'domantas sabonis': 6, 'karl-anthony towns': 6,
-    'bam adebayo': 6, 'jalen brunson': 8, 'desmond bane': 5,
-    'mikal bridges': 5, 'fred vanvleet': 5, 'pascal siakam': 6,
-    'zion williamson': 7, 'brandon ingram': 6, 'scottie barnes': 6,
-    'evan mobley': 5, 'alperen sengun': 6, 'jarrett allen': 5,
-    'draymond green': 5, 'khris middleton': 5, 'dejounte murray': 6,
-    'franz wagner': 6, 'jalen williams': 6, 'austin reaves': 5,
-    'derrick white': 5, 'jrue holiday': 5, 'og anunoby': 5,
+    # Tier 4 - Key Starter (2.5-3 pts spread impact)
+    'trae young': 3.1,
+    'de\'aaron fox': 3.0,
+    'cade cunningham': 3.0,
+    'lebron james': 2.8,
+    'darius garland': 2.8,
+    'zion williamson': 2.7,
+    'devin booker': 2.7,
+    'james harden': 2.6,
+    'kawhi leonard': 2.5,
+    'tyrese maxey': 2.5,
+    'tyrese haliburton': 2.5,
+    'damian lillard': 2.5,
+    'jimmy butler': 2.4,
+    # Tier 5 - Solid Starter (2-2.5 pts spread impact)
+    'franz wagner': 2.4,
+    'paolo banchero': 2.3,
+    'scottie barnes': 2.3,
+    'bam adebayo': 2.2,
+    'karl-anthony towns': 2.2,
+    'evan mobley': 2.2,
+    'domantas sabonis': 2.1,
+    'pascal siakam': 2.1,
+    'dejounte murray': 2.1,
+    'jalen williams': 2.0,
+    'alperen sengun': 2.0,
+    'brandon ingram': 2.0,
+    'mikal bridges': 1.9,
+    'jarrett allen': 1.9,
+    'fred vanvleet': 1.8,
+    'austin reaves': 1.8,
+    'og anunoby': 1.8,
+    'rudy gobert': 1.8,
+    'desmond bane': 1.7,
+    'derrick white': 1.7,
+    'jrue holiday': 1.7,
+    'draymond green': 1.6,
+    'aaron gordon': 1.6,
+    'christian braun': 1.5,
+    'cameron johnson': 1.5,
+    'khris middleton': 1.5,
+    'isaiah hartenstein': 1.5,
+    'naz reid': 1.4,
+    'zaccharie risacher': 1.3,
+    'max strus': 1.2,
+    'sam merrill': 1.0,
+    'kristaps porzingis': 2.2,
+    'nikola topic': 0.5,
+    'jonas valanciunas': 1.4,
+    'terrence shannon jr.': 0.8,
+    'joe ingles': 0.5,
+    'tamar bates': 0.3,
+    'rayj dennis': 0.3,
 }
 
 # Default impact by position if player not in tiers
+# VEGAS-CALIBRATED: Much lower than before
 POSITION_DEFAULT_IMPACT = {
-    'PG': 4.0,
-    'SG': 3.5,
-    'SF': 3.5,
-    'PF': 3.5,
-    'C': 4.0,
-    'G': 3.5,
-    'F': 3.5,
-    'default': 3.0,
+    'PG': 1.5,
+    'SG': 1.3,
+    'SF': 1.3,
+    'PF': 1.3,
+    'C': 1.5,
+    'G': 1.3,
+    'F': 1.3,
+    'default': 1.0,
 }
+
+# Maximum team adjustment caps (prevent runaway totals)
+MAX_TEAM_SPREAD_ADJ = 10.0
+MAX_TEAM_TOTAL_ADJ = 8.0
 
 # Injury type modifiers
 INJURY_SEVERITY = {
@@ -583,14 +643,18 @@ class InjuryEngine:
         # Cap confidence penalty at 30
         total_confidence_penalty = min(30, total_confidence_penalty)
         
+        # Apply Vegas-style caps to prevent runaway adjustments
+        capped_spread = min(total_spread_impact, MAX_TEAM_SPREAD_ADJ)
+        capped_total = min(total_total_impact, MAX_TEAM_TOTAL_ADJ)
+        
         return {
             'team': team_abbr,
             'num_injuries': len(injury_impacts),
             'injuries': injury_impacts,
             
             # Aggregate adjustments (negative = team weaker)
-            'spread_adjustment': round(-total_spread_impact, 2),
-            'total_adjustment': round(-total_total_impact, 2),
+            'spread_adjustment': round(-capped_spread, 2),
+            'total_adjustment': round(-capped_total, 2),
             'pace_adjustment': round(-total_pace_impact, 2),
             
             # Confidence

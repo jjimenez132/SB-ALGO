@@ -217,67 +217,72 @@ VEGAS_FILTERS = {
     # Projection Method: 40% L5, 30% L10, 20% L15, 10% Season
     # =========================================================================
     
-    # PTS OVER: Edge>=20%, CV<=0.40, Proj>=20
-    # Result: 22-8 (73.3%) ✅
+    # =========================================================================
+    # PROP FILTERS - BACKTESTED 76% WIN RATE, 2.0 PICKS/DAY (Jan 2026)
+    # Projection Method: 40% L5, 30% L10, 20% L15, 10% Season
+    # =========================================================================
+    
+    # PTS OVER: Edge>=20%, CV<=0.45, Proj>=20
+    # Result: 24-9 (72.7%) 🔥
     'prop_pts_over': {
         'edge_min': 20,           # Projection 20%+ above line
-        'cv_max': 0.40,           # Consistent scorer
+        'cv_max': 0.45,           # Loosened from 0.40
         'min_proj': 20,           # Only high scorers (20+ PPG projection)
         'enabled': True,
     },
     
-    # PTS UNDER: Edge<=-15%, CV<=0.35, Proj>=20
-    # Result: 15-6 (71.4%) ✅
+    # PTS UNDER: Edge>=15%, CV<=0.40, Proj>=20
+    # Result: 19-7 (73.1%) 🔥
     'prop_pts_under': {
         'edge_max': -15,          # Projection 15%+ below line
-        'cv_max': 0.35,           # Consistent scorer
+        'cv_max': 0.40,           # Loosened from 0.35
         'min_proj': 20,           # Only high scorers
         'enabled': True,
     },
     
-    # REB OVER: Edge>=15%, CV<=0.35, Proj>=11
-    # Result: 8-3 (72.7%) ✅
+    # REB OVER: Edge>=15%, CV<=0.40, Proj>=11
+    # Result: 8-3 (72.7%) 🔥
     'prop_reb_over': {
         'edge_min': 15,           # Projection 15%+ above line
-        'cv_max': 0.35,           # Consistent rebounder
+        'cv_max': 0.40,           # Loosened from 0.35
         'min_proj': 11,           # Only high rebounders (11+ RPG projection)
         'enabled': True,
     },
     
-    # REB UNDER: Edge<=-15%, CV<=0.40, Proj>=8
-    # Result: 8-2 (80.0%) 🔥
+    # REB UNDER: Edge>=15%, CV<=0.45, Proj>=8
+    # Result: 11-2 (84.6%) 🔥
     'prop_reb_under': {
         'edge_max': -15,          # Projection 15%+ below line
-        'cv_max': 0.40,           # Consistent rebounder
+        'cv_max': 0.45,           # Loosened from 0.40
         'min_proj': 8,            # Only notable rebounders
         'enabled': True,
     },
     
-    # AST OVER: Edge>=25%, CV<=0.35, Proj>=8
-    # Result: 9-2 (81.8%) 🔥
+    # AST OVER: Edge>=25%, CV<=0.40, Proj>=8
+    # Result: 11-2 (84.6%) 🔥
     'prop_ast_over': {
         'edge_min': 25,           # Projection 25%+ above line
-        'cv_max': 0.35,           # Consistent playmaker
+        'cv_max': 0.40,           # Loosened from 0.35
         'min_proj': 8,            # Only high assist players (8+ APG projection)
         'enabled': True,
     },
     
-    # Legacy filters (kept for backward compatibility, mapped to new)
+    # Legacy filters (updated to match new values)
     'prop_pts': {
         'edge_min': 20,
-        'cv_max': 0.40,
+        'cv_max': 0.45,
         'min_proj': 20,
         'enabled': True,
     },
     'prop_reb': {
         'edge_min': 15,
-        'cv_max': 0.35,
+        'cv_max': 0.40,
         'min_proj': 11,
         'enabled': True,
     },
     'prop_ast': {
         'edge_min': 25,
-        'cv_max': 0.35,
+        'cv_max': 0.40,
         'min_proj': 8,
         'enabled': True,
     },

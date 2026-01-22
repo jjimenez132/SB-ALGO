@@ -73,6 +73,14 @@ import numpy as np
 from scipy import stats
 from datetime import datetime
 from sqlalchemy import create_engine, text
+# CLV Intelligence for confidence adjustments
+try:
+    from engines.clv_intelligence import get_clv_intelligence
+    CLV_INTEL_ENABLED = True
+except ImportError:
+    CLV_INTEL_ENABLED = False
+    print("⚠️ CLV Intelligence not available")
+
 from typing import List, Dict, Optional, Tuple
 import warnings
 warnings.filterwarnings('ignore')
@@ -298,6 +306,14 @@ class MetaMergeEngine:
     def __init__(self, bankroll: float = 10000, risk_profile: str = 'moderate'):
         self.db = create_engine(DATABASE_URL)
         self.bankroll = bankroll
+        
+        # CLV Intelligence
+        self.clv_intel = None
+        if CLV_INTEL_ENABLED:
+            try:
+                self.clv_intel = get_clv_intelligence()
+            except:
+                pass
         self.risk_profile = risk_profile
         
         # Initialize all engines
@@ -1133,6 +1149,14 @@ class MetaMergeEngine:
             cal = self.calibration.adjust_for_kelly(win_prob, 'player_prop')
             calibrated_prob = cal['kelly_safe_probability']
         
+        # CLV Intelligence adjustment
+        clv_adjustment = None
+        if self.clv_intel:
+            clv_adjustment = self.clv_intel.get_confidence_adjustment(stat)
+            if clv_adjustment['clv_rating'] != 'UNKNOWN':
+                # Adjust probability based on historical CLV performance
+                calibrated_prob = min(0.95, calibrated_prob * clv_adjustment['multiplier'])
+        
         # EV and Kelly
         ev_pct = (calibrated_prob * 0.909) - ((1 - calibrated_prob) * 1)
         ev_pct *= 100
@@ -1221,6 +1245,12 @@ class MetaMergeEngine:
             'grade': grade,
             'stake': round(kelly_stake, 2),
             'should_bet': should_bet,
+            
+            # CLV Intelligence data
+            'clv_rating': clv_adjustment.get('clv_rating', 'N/A') if clv_adjustment else 'N/A',
+            'clv_multiplier': clv_adjustment.get('multiplier', 1.0) if clv_adjustment else 1.0,
+            'clv_reason': clv_adjustment.get('reason', 'No CLV data') if clv_adjustment else 'No CLV data',
+            'clv_avg': clv_adjustment.get('avg_clv', 0) if clv_adjustment else 0,
         })
         
         return result

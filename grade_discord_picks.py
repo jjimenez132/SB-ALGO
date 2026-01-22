@@ -344,7 +344,6 @@ def get_closing_odds_for_pick(pick):
         if pick_type == 'prop':
             # Parse pick_name: "Player Name STAT OVER/UNDER X.X"
             # Example: "Shai Gilgeous-Alexander AST UNDER 7.5"
-            import re
             match = re.match(r'^(.+?)\s+(PTS|REB|AST|STL|BLK|TO|3PT|PRA|PR|PA|RA)\s+(OVER|UNDER)\s+([\d.]+)$', pick_name, re.IGNORECASE)
             
             if match:

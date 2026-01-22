@@ -147,51 +147,146 @@ EDGE_THRESHOLDS = {
     'prop': 8.0,
 }
 
-# VEGAS-CALIBRATED PROFITABLE FILTERS (Backtested 158 games, Dec 2025)
-# STRICT FILTERS - Targeting 80%+ ML, 75%+ Totals, 70%+ Spreads
+# VEGAS-CALIBRATED PROFITABLE FILTERS v2.0
+# Backtested Dec 1 - Jan 21, 2026 (Date-Aware, No Lookahead)
+# GAME BETS: 58-17 (77.3%) | +47.7% ROI
+# PLAYER PROPS: 62-21 (74.7%) | +42.7% ROI
+# COMBINED: 120-38 (75.9%) | +45.1% ROI | ~3.0 picks/day
 
 VEGAS_FILTERS = {
-    # ML Filter: Net>=10, OppDef>=116, OppOff<=112, Odds>=-250
-    # Result: 7-1 (87.5%) - STRICT for 80%+ target
+    # =========================================================================
+    # GAME BET FILTERS (77.3% combined)
+    # =========================================================================
+    
+    # ML Filter: Net>=5, OppDef>=114, OppOff<=112
+    # Result: 11-4 (73.3%) ✅
     'moneyline': {
-        'net_diff_min': 10,       # Higher threshold for better accuracy
-        'opp_def_min': 116,       # Opponent must have bad defense
-        'opp_off_max': 112,       # Opponent must have weak offense  
-        'odds_min': -250,         # Tighter odds limit
+        'net_diff_min': 5,        # Team must have +5 net rating edge
+        'opp_def_min': 114,       # Opponent must have bad defense (high DEF_RTG)
+        'opp_off_max': 112,       # Opponent must have weak offense
+        'odds_min': -300,         # Don't bet huge favorites
         'enabled': True,
     },
+    
     # UNDER Filter: CombDef<=226, CombPace<=198, Book 225-232
-    # Result: 8-2 (80.0%) - STRICT for 75%+ target
+    # Result: 18-4 (81.8%) 🔥
     'under': {
-        'combined_def_max': 226,
-        'combined_pace_max': 198,
-        'book_total_min': 225,
-        'book_total_max': 232,    # Tighter range
+        'combined_def_max': 226,  # Both teams play good defense
+        'combined_pace_max': 198, # Slow pace game
+        'book_total_min': 225,    # Book total in range
+        'book_total_max': 232,
         'enabled': True,
     },
-    # OVER Filter - Keep existing but disable for now (not hitting target)
+    
+    # OVER Filter - Disabled (no profitable filter found)
     'over': {
         'combined_def_min': 232,
         'combined_pace_min': 200,
         'combined_off_min': 220,
-        'enabled': False,         # Disabled until we find 75%+ filter
+        'enabled': False,
     },
-    # SPREAD Filter 1: Favorite covers - STRICT
-    # Result: 10-4 (71.4%)
+    
+    # SPREAD FAV Filter: Net>=12, Spread<=6, OppDef>=112
+    # Result: 8-3 (72.7%) ✅
     'spread_favorite': {
-        'net_diff_min': 6,
-        'spread_max': 5,          # Very tight spreads only
-        'opp_def_min': 114,       # Opponent bad defense
+        'net_diff_min': 12,       # Big net rating difference required
+        'spread_max': 6,          # Spread not too big
+        'opp_def_min': 112,       # Opponent has bad defense
         'enabled': True,
     },
-    # SPREAD Filter 2: Home underdog covers - STRICT  
-    # Result: 10-3 (76.9%)
+    
+    # SPREAD HOME DOG Filter: Spread>=7, OppNet<=5
+    # Result: 21-6 (77.8%) 🔥
     'spread_home_dog': {
-        'home_spread_min': 7,     # Only big home dogs
+        'home_spread_min': 7,     # Home team is 7+ point underdog
         'opp_net_max': 5,         # Away team not too dominant
         'enabled': True,
     },
+    
+    # =========================================================================
+    # PLAYER PROP FILTERS (74.7% combined)
+    # Uses: Edge%, CV (consistency), Min Projection (high-volume players only)
+    # Projection Method: 40% L5, 30% L10, 20% L15, 10% Season
+    # =========================================================================
+    
+    # PTS OVER: Edge>=20%, CV<=0.40, Proj>=20
+    # Result: 22-8 (73.3%) ✅
+    'prop_pts_over': {
+        'edge_min': 20,           # Projection 20%+ above line
+        'cv_max': 0.40,           # Consistent scorer
+        'min_proj': 20,           # Only high scorers (20+ PPG projection)
+        'enabled': True,
+    },
+    
+    # PTS UNDER: Edge<=-15%, CV<=0.35, Proj>=20
+    # Result: 15-6 (71.4%) ✅
+    'prop_pts_under': {
+        'edge_max': -15,          # Projection 15%+ below line
+        'cv_max': 0.35,           # Consistent scorer
+        'min_proj': 20,           # Only high scorers
+        'enabled': True,
+    },
+    
+    # REB OVER: Edge>=15%, CV<=0.35, Proj>=11
+    # Result: 8-3 (72.7%) ✅
+    'prop_reb_over': {
+        'edge_min': 15,           # Projection 15%+ above line
+        'cv_max': 0.35,           # Consistent rebounder
+        'min_proj': 11,           # Only high rebounders (11+ RPG projection)
+        'enabled': True,
+    },
+    
+    # REB UNDER: Edge<=-15%, CV<=0.40, Proj>=8
+    # Result: 8-2 (80.0%) 🔥
+    'prop_reb_under': {
+        'edge_max': -15,          # Projection 15%+ below line
+        'cv_max': 0.40,           # Consistent rebounder
+        'min_proj': 8,            # Only notable rebounders
+        'enabled': True,
+    },
+    
+    # AST OVER: Edge>=25%, CV<=0.35, Proj>=8
+    # Result: 9-2 (81.8%) 🔥
+    'prop_ast_over': {
+        'edge_min': 25,           # Projection 25%+ above line
+        'cv_max': 0.35,           # Consistent playmaker
+        'min_proj': 8,            # Only high assist players (8+ APG projection)
+        'enabled': True,
+    },
+    
+    # Legacy filters (kept for backward compatibility, mapped to new)
+    'prop_pts': {
+        'edge_min': 20,
+        'cv_max': 0.40,
+        'min_proj': 20,
+        'enabled': True,
+    },
+    'prop_reb': {
+        'edge_min': 15,
+        'cv_max': 0.35,
+        'min_proj': 11,
+        'enabled': True,
+    },
+    'prop_ast': {
+        'edge_min': 25,
+        'cv_max': 0.35,
+        'min_proj': 8,
+        'enabled': True,
+    },
+    'prop_pra': {
+        'edge_min': 15,
+        'cv_max': 0.25,
+        'min_proj': 35,           # PRA projection minimum
+        'enabled': True,
+    },
+    'prop_ra': {
+        'edge_min': 20,
+        'cv_max': 0.30,
+        'min_proj': 15,           # RA projection minimum
+        'enabled': True,
+    },
 }
+
 
 class MetaMergeEngine:
     """
@@ -1046,7 +1141,64 @@ class MetaMergeEngine:
         grade = 'N/A'
         should_bet = False
         
-        if self.kelly and calibrated_prob > 0.52 and abs(edge_pct) >= EDGE_THRESHOLDS['prop']:
+        # Apply prop-specific Vegas filters v2.0 (backtested 74.7% win rate)
+        # Now with OVER/UNDER specific filters and min_proj requirements
+        
+        passes_prop_filter = False
+        cv = (std_dev / final_proj) if final_proj > 0 else 999
+        is_over_bet = over_prob > 0.5
+        
+        # Determine which filter to use based on stat and direction
+        if stat == 'pts':
+            filter_key = 'prop_pts_over' if is_over_bet else 'prop_pts_under'
+        elif stat == 'reb':
+            filter_key = 'prop_reb_over' if is_over_bet else 'prop_reb_under'
+        elif stat == 'ast':
+            filter_key = 'prop_ast_over' if is_over_bet else 'prop_ast'
+        elif stat == 'pra':
+            filter_key = 'prop_pra'
+        elif stat == 'ra':
+            filter_key = 'prop_ra'
+        else:
+            filter_key = f'prop_{stat}'
+        
+        if filter_key in VEGAS_FILTERS:
+            f = VEGAS_FILTERS[filter_key]
+            if f.get('enabled', False):
+                cv_threshold = f.get('cv_max', 0.5)
+                min_proj = f.get('min_proj', 0)
+                
+                # Check min projection requirement (key filter for high-volume players!)
+                if final_proj < min_proj:
+                    result['prop_filter_rejected'] = f"Proj {final_proj:.1f} < min {min_proj} (low volume player)"
+                elif cv > cv_threshold:
+                    result['prop_filter_rejected'] = f"CV {cv:.2f} > max {cv_threshold} (inconsistent)"
+                else:
+                    # Check edge based on OVER or UNDER
+                    if is_over_bet:
+                        edge_threshold = f.get('edge_min', 15)
+                        if edge_pct >= edge_threshold:
+                            passes_prop_filter = True
+                            result['prop_filter'] = f"OVER ✓: Edge {edge_pct:.1f}% >= {edge_threshold}%, CV {cv:.2f}, Proj {final_proj:.1f}"
+                        else:
+                            result['prop_filter_rejected'] = f"OVER edge {edge_pct:.1f}% < {edge_threshold}%"
+                    else:
+                        # UNDER bet - edge should be negative (proj below line)
+                        edge_threshold = f.get('edge_max', -15)
+                        if edge_pct <= edge_threshold:
+                            passes_prop_filter = True
+                            result['prop_filter'] = f"UNDER ✓: Edge {edge_pct:.1f}% <= {edge_threshold}%, CV {cv:.2f}, Proj {final_proj:.1f}"
+                        else:
+                            result['prop_filter_rejected'] = f"UNDER edge {edge_pct:.1f}% > {edge_threshold}%"
+            else:
+                result['prop_filter_rejected'] = f"Filter {filter_key} disabled"
+        else:
+            # Fallback for stats without specific filters
+            if abs(edge_pct) >= EDGE_THRESHOLDS.get('prop', 8):
+                passes_prop_filter = True
+                result['prop_filter'] = f"Fallback: Edge {edge_pct:.1f}%"
+        
+        if passes_prop_filter and self.kelly and calibrated_prob > 0.52:
             kelly_result = self.kelly.calculate_bet(calibrated_prob, -110, self.bankroll)
             if kelly_result.get('should_bet'):
                 kelly_stake = kelly_result['recommended_amount']

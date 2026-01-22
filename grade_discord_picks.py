@@ -16,6 +16,15 @@ from datetime import datetime, timedelta
 from sqlalchemy import create_engine, text
 import pytz
 
+# CLV Engine
+try:
+    from engines.clv_engine import CLVEngine
+    clv_engine = CLVEngine()
+    CLV_ENABLED = True
+except ImportError:
+    CLV_ENABLED = False
+    print("⚠️ CLV Engine not found - CLV tracking disabled")
+
 DATABASE_URL = os.environ.get('DATABASE_URL',
     "postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db")
 
@@ -314,20 +323,164 @@ def post_daily_recap(pick_date, results):
 # UPDATE DATABASE
 # ============================================================
 
-def update_pick_result(pick_id, result, units_result):
-    """Update pick status in database"""
+
+# ============================================================
+# CLV - GET CLOSING ODDS
+# ============================================================
+
+def get_closing_odds_for_pick(pick):
+    """
+    Get closing odds for a pick to calculate CLV.
+    Returns (closing_odds, closing_line) or (None, None) if not found.
+    """
+    engine = get_engine()
+    pick_type = pick.get('pick_type', '')
+    pick_name = pick.get('pick_name', '')
+    pick_date = pick.get('pick_date')
+    original_odds = pick.get('odds', -110)
+    
+    with engine.connect() as conn:
+        # PROP PICKS - lookup in player_props
+        if pick_type == 'prop':
+            # Parse pick_name: "Player Name STAT OVER/UNDER X.X"
+            # Example: "Shai Gilgeous-Alexander AST UNDER 7.5"
+            import re
+            match = re.match(r'^(.+?)\s+(PTS|REB|AST|STL|BLK|TO|3PT|PRA|PR|PA|RA)\s+(OVER|UNDER)\s+([\d.]+)$', pick_name, re.IGNORECASE)
+            
+            if match:
+                player_name = match.group(1).strip()
+                stat = match.group(2).upper()
+                direction = match.group(3).upper()
+                
+                # Map stat abbreviations to market names
+                stat_map = {
+                    'PTS': 'player_points',
+                    'REB': 'player_rebounds', 
+                    'AST': 'player_assists',
+                    'STL': 'player_steals',
+                    'BLK': 'player_blocks',
+                    'TO': 'player_turnovers',
+                    '3PT': 'player_threes',
+                    'PRA': 'player_points_rebounds_assists',
+                    'PR': 'player_points_rebounds',
+                    'PA': 'player_points_assists',
+                    'RA': 'player_rebounds_assists'
+                }
+                market = stat_map.get(stat, f'player_{stat.lower()}')
+                
+                # Get the LATEST odds for this player/market/date (closing line)
+                result = conn.execute(text("""
+                    SELECT line, over_odds, under_odds
+                    FROM player_props
+                    WHERE game_date = :game_date
+                      AND LOWER(player_name) LIKE LOWER(:player_pattern)
+                      AND market = :market
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                """), {
+                    "game_date": pick_date,
+                    "player_pattern": f"%{player_name}%",
+                    "market": market
+                }).fetchone()
+                
+                if result:
+                    closing_line = result[0]
+                    closing_odds = result[1] if direction == 'OVER' else result[2]
+                    return closing_odds, closing_line
+        
+        # GAME PICKS - lookup in betting_odds
+        elif pick_type == 'game':
+            # Parse pick_name: "TEAM @ TEAM OVER/UNDER X.X" or "TEAM SPREAD"
+            # Example: "OKC @ CLE UNDER 234.5"
+            
+            # Total bet
+            total_match = re.match(r'^(.+?)\s*@\s*(.+?)\s+(OVER|UNDER)\s+([\d.]+)$', pick_name, re.IGNORECASE)
+            if total_match:
+                away = total_match.group(1).strip().upper()
+                home = total_match.group(2).strip().upper()
+                direction = total_match.group(3).upper()
+                
+                result = conn.execute(text("""
+                    SELECT total, over_odds, under_odds
+                    FROM betting_odds
+                    WHERE game_date = :game_date
+                      AND (UPPER(home_team) = :home OR UPPER(away_team) = :away)
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                """), {
+                    "game_date": pick_date,
+                    "home": home,
+                    "away": away
+                }).fetchone()
+                
+                if result:
+                    closing_line = result[0]
+                    closing_odds = result[1] if direction == 'OVER' else result[2]
+                    return closing_odds, closing_line
+            
+            # Spread bet - parse "TEAM -X.X" or "TEAM +X.X"
+            spread_match = re.match(r'^([A-Z]{2,3})\s*([+-][\d.]+)$', pick_name.upper())
+            if spread_match:
+                team = spread_match.group(1)
+                
+                result = conn.execute(text("""
+                    SELECT home_team, home_spread, home_spread_odds, away_spread, away_spread_odds
+                    FROM betting_odds
+                    WHERE game_date = :game_date
+                      AND (UPPER(home_team) = :team OR UPPER(away_team) = :team)
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                """), {
+                    "game_date": pick_date,
+                    "team": team
+                }).fetchone()
+                
+                if result:
+                    if result[0].upper() == team:
+                        return result[2], result[1]  # home spread odds, home spread
+                    else:
+                        return result[4], result[3]  # away spread odds, away spread
+    
+    return None, None
+
+
+def calculate_clv_cents(bet_odds, closing_odds):
+    """Calculate CLV in cents (probability points * 100)"""
+    if not bet_odds or not closing_odds:
+        return None
+    
+    def american_to_implied(odds):
+        if odds > 0:
+            return 100 / (odds + 100)
+        else:
+            return abs(odds) / (abs(odds) + 100)
+    
+    bet_implied = american_to_implied(bet_odds)
+    close_implied = american_to_implied(closing_odds)
+    
+    # CLV = closing implied - bet implied (positive = you got value)
+    clv = (close_implied - bet_implied) * 100
+    return round(clv, 2)
+
+
+def update_pick_result(pick_id, result, units_result, closing_odds=None, clv_cents=None):
+    """Update pick status in database with CLV data"""
     engine = get_engine()
     with engine.connect() as conn:
         conn.execute(text("""
             UPDATE algo_picks_tracking
             SET status = :result,
                 result_units = :units_result,
-                graded_at = CURRENT_TIMESTAMP
+                graded_at = CURRENT_TIMESTAMP,
+                closing_odds = :closing_odds,
+                clv_cents = :clv_cents
             WHERE id = :id
         """), {
             "result": result,
             "units_result": units_result,
-            "id": pick_id
+            "id": pick_id,
+            "closing_odds": closing_odds,
+            "clv_cents": clv_cents
         })
         conn.commit()
 
@@ -406,8 +559,12 @@ def main():
             else:
                 units_result = 0
             
-            # Update database
-            update_pick_result(pick['id'], result, units_result)
+            # Get closing odds and calculate CLV
+            closing_odds, closing_line = get_closing_odds_for_pick(pick)
+            clv = calculate_clv_cents(pick.get('odds'), closing_odds) if closing_odds else None
+            
+            # Update database with CLV
+            update_pick_result(pick['id'], result, units_result, closing_odds, clv)
             
             # Post to Discord
             post_result_to_discord(pick, result)

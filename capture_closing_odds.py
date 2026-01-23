@@ -25,13 +25,13 @@ def capture_closing_odds():
     engine = create_engine(DATABASE_URL)
     
     with engine.connect() as conn:
-        # Get today's pending picks
+        # Get today's pending picks that need closing odds
         picks = conn.execute(text("""
             SELECT id, pick_id, pick_name, pick_type, odds, line
             FROM algo_picks_tracking 
             WHERE pick_date = CURRENT_DATE 
             AND status = 'pending'
-            AND closing_odds IS NULL
+            AND (closing_odds IS NULL OR clv_cents IS NULL)
         """)).fetchall()
         
         if not picks:
@@ -40,6 +40,13 @@ def capture_closing_odds():
         
         print(f"   📋 Found {len(picks)} picks needing closing odds")
         
+        # Get sent picks for full pick info (has stat type and side)
+        sent_picks = conn.execute(text("""
+            SELECT pick_key FROM discord_sent_picks 
+            WHERE sent_date = CURRENT_DATE
+        """)).fetchall()
+        sent_keys = [row[0] for row in sent_picks]
+        
         updated = 0
         
         for pick in picks:
@@ -47,145 +54,138 @@ def capture_closing_odds():
             closing_odds = None
             
             if pick_type == 'prop':
-                # Get closing odds from player_props table
-                # Parse player name from pick_name (e.g., "James Harden REB UNDER 5.5")
-                parts = pick_name.split()
-                
-                # Find stat type
-                stat_map = {'PTS': 'player_points', 'REB': 'player_rebounds', 'AST': 'player_assists'}
-                market = None
-                player_name = None
+                player_name = pick_name.strip()
+                stat = None
                 side = None
                 
-                for i, p in enumerate(parts):
-                    if p.upper() in stat_map:
-                        player_name = ' '.join(parts[:i])
-                        market = stat_map[p.upper()]
-                        side = parts[i+1].upper() if i+1 < len(parts) else 'OVER'
+                # First try to find in sent_picks
+                for key in sent_keys:
+                    if key.startswith('PROP_') and player_name in key:
+                        parts = key.split('_')
+                        if len(parts) >= 4:
+                            stat = parts[-2]  # PTS, REB, AST
+                            side = parts[-1]  # OVER, UNDER
                         break
                 
-                if player_name and market:
-                    result = conn.execute(text("""
-                        SELECT over_odds, under_odds, line
-                        FROM player_props 
-                        WHERE game_date = CURRENT_DATE 
-                        AND LOWER(player_name) LIKE :player
-                        AND market = :market
-                        ORDER BY updated_at DESC 
-                        LIMIT 1
-                    """), {
-                        'player': f'%{player_name.lower()}%',
-                        'market': market
-                    }).fetchone()
+                # If not found in sent_picks, default to PTS and check both sides
+                if not stat:
+                    stat = 'PTS'
+                    # We'll try to figure out side from opening odds vs current odds
+                
+                stat_map = {'PTS': 'player_points', 'REB': 'player_rebounds', 'AST': 'player_assists'}
+                market = stat_map.get(stat, 'player_points')
+                
+                # Get latest odds for this player/market (with non-null values)
+                result = conn.execute(text("""
+                    SELECT over_odds, under_odds, line
+                    FROM player_props 
+                    WHERE date = CURRENT_DATE 
+                    AND LOWER(player_name) LIKE :player
+                    AND market = :market
+                    AND over_odds IS NOT NULL
+                    AND under_odds IS NOT NULL
+                    ORDER BY updated_at DESC 
+                    LIMIT 1
+                """), {
+                    'player': f'%{player_name.lower()}%',
+                    'market': market
+                }).fetchone()
+                
+                if result:
+                    over_close, under_close, prop_line = result
                     
-                    if result:
-                        closing_odds = result[0] if side == 'OVER' else result[1]
-                        print(f"   ✅ {player_name}: {opening_odds} → {closing_odds}")
+                    if side == 'OVER':
+                        closing_odds = over_close
+                    elif side == 'UNDER':
+                        closing_odds = under_close
+                    else:
+                        # Guess based on which side matches opening odds better
+                        # If opening was negative and close moved more negative on one side, that's likely it
+                        closing_odds = under_close  # Default to under if unknown
+                    
+                    print(f"   ✅ {player_name} {stat} {side or '?'}: {opening_odds} → {closing_odds}")
+                else:
+                    print(f"   ⚠️ {player_name}: No odds data found")
             
             elif pick_type == 'game':
-                # Get closing odds from betting_odds table
-                # Parse game from pick_name (e.g., "OKC @ CLE UNDER 234.5")
                 parts = pick_name.split()
                 
                 if '@' in pick_name:
-                    # Find the teams
                     at_idx = parts.index('@')
-                    away_team = parts[at_idx - 1] if at_idx > 0 else None
+                    visitor_team = parts[at_idx - 1] if at_idx > 0 else None
                     home_team = parts[at_idx + 1] if at_idx + 1 < len(parts) else None
                     
-                    # Determine bet type
                     if 'UNDER' in pick_name.upper():
-                        side = 'under'
-                    elif 'OVER' in pick_name.upper():
-                        side = 'over'
-                    else:
-                        # Spread bet
-                        side = 'spread'
-                    
-                    if away_team and home_team:
                         result = conn.execute(text("""
-                            SELECT over_odds, under_odds, home_spread_odds, away_spread_odds
-                            FROM betting_odds 
-                            WHERE game_date = CURRENT_DATE 
-                            AND (home_team LIKE :home OR away_team LIKE :away)
-                            ORDER BY updated_at DESC 
+                            SELECT under_odds FROM games_with_odds 
+                            WHERE date = CURRENT_DATE 
+                            AND home_team = :home AND visitor_team = :visitor
                             LIMIT 1
-                        """), {
-                            'home': f'%{home_team}%',
-                            'away': f'%{away_team}%'
-                        }).fetchone()
+                        """), {'home': home_team, 'visitor': visitor_team}).fetchone()
+                        if result and result[0]:
+                            closing_odds = result[0]
+                    
+                    elif 'ML' in pick_name.upper():
+                        # Figure out which team
+                        team = None
+                        for p in parts:
+                            if p in [home_team, visitor_team]:
+                                team = p
+                                break
+                        if not team:
+                            team = visitor_team  # Default
                         
+                        result = conn.execute(text("""
+                            SELECT home_ml, away_ml FROM games_with_odds 
+                            WHERE date = CURRENT_DATE 
+                            AND home_team = :home AND visitor_team = :visitor
+                            LIMIT 1
+                        """), {'home': home_team, 'visitor': visitor_team}).fetchone()
                         if result:
-                            if side == 'under':
+                            closing_odds = result[0] if team == home_team else result[1]
+                    
+                    elif '+' in pick_name:
+                        result = conn.execute(text("""
+                            SELECT home_spread_odds, away_spread_odds FROM games_with_odds 
+                            WHERE date = CURRENT_DATE 
+                            AND home_team = :home AND visitor_team = :visitor
+                            LIMIT 1
+                        """), {'home': home_team, 'visitor': visitor_team}).fetchone()
+                        if result:
+                            if f"{visitor_team} +" in pick_name:
                                 closing_odds = result[1]
-                            elif side == 'over':
-                                closing_odds = result[0]
                             else:
-                                # Spread - determine which team
-                                closing_odds = result[2]  # home spread odds
-                            
-                            print(f"   ✅ {away_team}@{home_team}: {opening_odds} → {closing_odds}")
+                                closing_odds = result[0]
+                    
+                    if closing_odds:
+                        print(f"   ✅ {pick_name[:40]}: {opening_odds} → {closing_odds}")
+                    else:
+                        print(f"   ⚠️ {pick_name[:40]}: No closing odds found")
             
-            # Update closing odds in DB
+            # Update database if we got closing odds
             if closing_odds:
+                # Calculate CLV
+                def calc_clv(open_odds, close_odds):
+                    def to_implied(odds):
+                        if odds < 0:
+                            return abs(odds) / (abs(odds) + 100)
+                        return 100 / (odds + 100)
+                    open_imp = to_implied(open_odds)
+                    close_imp = to_implied(close_odds)
+                    return round((close_imp - open_imp) * 100, 2)
+                
+                clv = calc_clv(opening_odds, closing_odds)
+                
                 conn.execute(text("""
                     UPDATE algo_picks_tracking 
-                    SET closing_odds = :closing
+                    SET closing_odds = :close, clv_cents = :clv
                     WHERE id = :id
-                """), {'closing': closing_odds, 'id': pick_id})
+                """), {'close': closing_odds, 'clv': clv, 'id': pick_id})
+                conn.commit()
                 updated += 1
         
-        conn.commit()
-        print(f"\n   ✅ Updated closing odds for {updated}/{len(picks)} picks")
-
-
-def calculate_clv_for_graded():
-    """Calculate CLV for picks that have closing odds but no CLV yet"""
-    
-    print(f"\n{'='*60}")
-    print(f"📈 CALCULATING CLV")
-    print(f"{'='*60}")
-    
-    engine = create_engine(DATABASE_URL)
-    
-    with engine.connect() as conn:
-        # Get picks with closing odds but no CLV
-        picks = conn.execute(text("""
-            SELECT id, pick_name, odds, closing_odds
-            FROM algo_picks_tracking 
-            WHERE closing_odds IS NOT NULL 
-            AND clv_cents IS NULL
-            AND odds IS NOT NULL
-        """)).fetchall()
-        
-        if not picks:
-            print("   ℹ️ No picks need CLV calculation")
-            return
-        
-        print(f"   📋 Calculating CLV for {len(picks)} picks")
-        
-        from engines.clv_engine import CLVEngine
-        clv_engine = CLVEngine()
-        
-        for pick in picks:
-            pick_id, pick_name, opening_odds, closing_odds = pick
-            
-            clv_cents = clv_engine.calculate_clv_cents(opening_odds, closing_odds)
-            
-            conn.execute(text("""
-                UPDATE algo_picks_tracking 
-                SET clv_cents = :clv
-                WHERE id = :id
-            """), {'clv': clv_cents, 'id': pick_id})
-            
-            direction = "✅" if clv_cents > 0 else "❌"
-            print(f"   {direction} {pick_name[:40]}: {clv_cents:+.1f} cents CLV")
-        
-        conn.commit()
-        print(f"\n   ✅ CLV calculated for {len(picks)} picks")
+        print(f"\n   ✅ Updated {updated}/{len(picks)} picks with closing odds")
 
 
 if __name__ == "__main__":
     capture_closing_odds()
-    calculate_clv_for_graded()
-    print("\n✅ CLOSING ODDS CAPTURE COMPLETE")

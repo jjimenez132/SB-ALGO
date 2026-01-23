@@ -14,8 +14,34 @@ API_KEY = "ada93da8e5msh75c5342a07b643cp1b45fajsn72f3bfcd3653"
 
 DISCORD_NEWS_WEBHOOK = "https://discord.com/api/webhooks/1459395253936328746/V4E1hQkIPqucYfzrgJIlTCWLskRJ-6Q5q8j547mbIJ5yQ_Mw_6JcguDJM3F1e1KPL-J3"
 
+def is_important_news(title):
+    """Filter for only important news - injuries, trades, suspensions, etc."""
+    title_lower = title.lower()
+    
+    # HIGH PRIORITY - Always send
+    important_keywords = [
+        'injury', 'injured', 'out for', 'out against', 'will not play',
+        'ruled out', 'doubtful', 'questionable', 'day-to-day', 'week-to-week',
+        'surgery', 'sprain', 'strain', 'fracture', 'concussion', 'illness',
+        'knee', 'ankle', 'hamstring', 'shoulder', 'back', 'hip', 'calf',
+        'trade', 'traded', 'trading', 'trade request', 'trade deadline',
+        'waived', 'released', 'signed', 'contract', 'extension',
+        'suspended', 'suspension', 'fine', 'fined',
+        'rest', 'resting', 'load management', 'dnp',
+        'return', 'returning', 'comeback', 'back in lineup',
+        'starting lineup', 'will start', 'benched',
+        'season-ending', 'out indefinitely', 'sidelined'
+    ]
+    
+    # Check if any important keyword is in title
+    for keyword in important_keywords:
+        if keyword in title_lower:
+            return True
+    
+    return False
+
 def send_news_to_discord(news_items):
-    """Send only NEW news headlines to Discord (not already sent)"""
+    """Send only IMPORTANT and NEW news headlines to Discord"""
     import time
     from sqlalchemy import create_engine, text
     
@@ -36,22 +62,56 @@ def send_news_to_discord(news_items):
         unsent = [{'id': r[0], 'title': r[1], 'link': r[2], 'source': r[3]} for r in result]
     
     if not unsent:
-        print("\n📤 No new news to send to Discord")
+        print("
+📤 No new news to send to Discord")
         return
     
-    print(f"\n📤 Sending {len(unsent)} NEW news to Discord...")
+    # Filter for important news only
+    important_news = [item for item in unsent if is_important_news(item.get('title', ''))]
+    skipped = len(unsent) - len(important_news)
+    
+    if skipped > 0:
+        print(f"
+📤 Filtered out {skipped} non-important news items")
+        # Mark non-important as sent so we don't check again
+        with engine.connect() as conn:
+            for item in unsent:
+                if not is_important_news(item.get('title', '')):
+                    conn.execute(text("UPDATE nba_news SET discord_sent = TRUE WHERE id = :id"), {"id": item['id']})
+            conn.commit()
+    
+    if not important_news:
+        print("📤 No important news to send to Discord")
+        return
+    
+    print(f"
+📤 Sending {len(important_news)} IMPORTANT news to Discord...")
     sent = 0
     
-    for item in unsent:
+    for item in important_news:
         title = item.get("title", "")
         link = item.get("link", "")
         source = item.get("source", "NBA News")
         news_id = item.get("id")
         
+        # Color based on type
+        if any(word in title.lower() for word in ['out', 'injury', 'injured', 'ruled out', 'will not play']):
+            color = 0xff4444  # Red for injuries/out
+            emoji = "🚨"
+        elif any(word in title.lower() for word in ['trade', 'traded', 'waived', 'signed']):
+            color = 0xffaa00  # Orange for trades/roster moves
+            emoji = "📢"
+        elif any(word in title.lower() for word in ['return', 'back', 'cleared']):
+            color = 0x44ff44  # Green for returns
+            emoji = "✅"
+        else:
+            color = 0x667eea  # Blue default
+            emoji = "📰"
+        
         embed = {
-            "title": f"📰 {title[:200]}",
+            "title": f"{emoji} {title[:200]}",
             "url": link,
-            "color": 0x667eea,
+            "color": color,
             "footer": {"text": f"Source: {source} | SB-ALGO News"}
         }
         
@@ -63,13 +123,14 @@ def send_news_to_discord(news_items):
                     conn.execute(text("UPDATE nba_news SET discord_sent = TRUE WHERE id = :id"), {"id": news_id})
                     conn.commit()
                 sent += 1
+                print(f"   ✅ Sent: {title[:50]}...")
             elif r.status_code == 429:
                 time.sleep(2)
             time.sleep(0.5)
         except Exception as e:
             print(f"   ⚠️ Discord error: {e}")
     
-    print(f"   ✅ Sent {sent} news items to Discord")
+    print(f"   ✅ Sent {sent} important news items to Discord")
 DATABASE_URL = os.environ.get('DATABASE_URL',
     "postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db?sslmode=require")
 

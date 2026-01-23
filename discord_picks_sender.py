@@ -45,6 +45,56 @@ DISCORD_TOKEN = os.environ.get('DISCORD_BOT_TOKEN')
 DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db')
 
 
+
+def calculate_ev(edge, odds):
+    """Calculate EV% from edge and American odds"""
+    if odds < 0:
+        implied_prob = abs(odds) / (abs(odds) + 100)
+        decimal_odds = 1 + (100 / abs(odds))
+    else:
+        implied_prob = 100 / (odds + 100)
+        decimal_odds = 1 + (odds / 100)
+    our_prob = implied_prob + (edge / 100)
+    ev = (our_prob * (decimal_odds - 1)) - (1 - our_prob)
+    return round(ev * 100, 1)
+
+def calculate_hit_rate(player_name, stat_type, line, side):
+    """Calculate hit rate from last 10 games in player_boxscores"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect('postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db')
+        cur = conn.cursor()
+        
+        # Map stat type to column
+        stat_col = {'pts': 'pts', 'reb': 'reb', 'ast': 'ast', 'stl': 'stl', 'blk': 'blk'}.get(stat_type.lower(), 'pts')
+        
+        cur.execute(f"""
+            SELECT {stat_col} FROM player_boxscores 
+            WHERE player_name ILIKE %s 
+            AND {stat_col} IS NOT NULL
+            ORDER BY game_date DESC 
+            LIMIT 10
+        """, (f"%{player_name}%",))
+        
+        rows = cur.fetchall()
+        conn.close()
+        
+        if not rows:
+            return 0
+        
+        hits = 0
+        for row in rows:
+            val = float(row[0]) if row[0] else 0
+            if side == 'OVER' and val > line:
+                hits += 1
+            elif side == 'UNDER' and val < line:
+                hits += 1
+        
+        return round((hits / len(rows)) * 100)
+    except Exception as e:
+        print(f"   ⚠️ Hit rate calc error: {e}")
+        return 0
+
 def get_recent_players(days=1):
     """Get players picked in the last N days to avoid repeats"""
     try:
@@ -234,25 +284,39 @@ def save_pick_for_grading(pick_id, pick_name, pick_type, units, odds=-110, line=
         traceback.print_exc()
 
 def create_pick_key(pick, pick_type):
-    """Create unique key for a pick - ignores line numbers to avoid duplicates"""
-    import re
+    """Create unique key for a pick - uses PLAYER NAME as the key to prevent same player different lines"""
     if pick_type == 'game':
         matchup = pick.get('matchup', '')
         pick_str = pick.get('pick', '')
-        # Extract just OVER/UNDER direction, ignore the number
+        # For games: use matchup + pick type (ML, OVER, UNDER, SPREAD direction)
+        if 'ML' in pick_str.upper():
+            # Extract team for ML
+            return f"GAME_{matchup}_{pick_str}"
         direction = 'OVER' if 'OVER' in pick_str.upper() else 'UNDER' if 'UNDER' in pick_str.upper() else pick_str
         return f"GAME_{matchup}_{direction}"
     else:
+        # For props: use PLAYER + STAT TYPE + DIRECTION
+        # This prevents sending different lines for same player
         player = pick.get('player', '')
-        prop = pick.get('prop', '')
-        # Extract stat type and direction, ignore the number
-        # e.g., "PTS OVER 25.5" -> "PTS_OVER"
-        parts = prop.upper().split()
-        if len(parts) >= 2:
-            stat = parts[0]  # PTS, REB, AST, etc.
-            direction = 'OVER' if 'OVER' in prop.upper() else 'UNDER' if 'UNDER' in prop.upper() else ''
-            return f"PROP_{player}_{stat}_{direction}"
-        return f"PROP_{player}_{prop}"
+        # Get prop from 'pick' key (not 'prop' key)
+        prop_str = pick.get('pick', pick.get('prop', ''))
+        
+        # Extract stat type and direction
+        prop_upper = prop_str.upper()
+        if 'PTS' in prop_upper:
+            stat = 'PTS'
+        elif 'REB' in prop_upper:
+            stat = 'REB'
+        elif 'AST' in prop_upper:
+            stat = 'AST'
+        elif '3PT' in prop_upper or '3PM' in prop_upper:
+            stat = '3PT'
+        else:
+            stat = 'OTHER'
+        
+        direction = 'OVER' if 'OVER' in prop_upper else 'UNDER' if 'UNDER' in prop_upper else ''
+        
+        return f"PROP_{player}_{stat}_{direction}"
 
 def send_discord_message(channel_id, content=None, embed=None):
     """Send a message to Discord channel"""
@@ -312,70 +376,62 @@ def create_game_pick_embed(pick, is_alert=False):
     
     matchup = pick.get('matchup', 'Unknown')
     pick_str = pick.get('pick', '')
+    subtype = pick.get('subtype', 'ML')
+    odds = pick.get('odds', -110)
+    
+    # Calculate EV from edge and odds
+    ev_val = calculate_ev(edge_val, odds)
     
     title = f"🏀 {matchup}"
     if is_alert:
         title = f"🚨 NEW EDGE: {matchup}"
     
-    # Determine units - CONSERVATIVE (start small, only go big on locks)
-    # 2.0u = LOCK (edge 40%+, confidence 95%+)
-    # 1.0u = Strong edge (edge 30%+, confidence 90%+)
-    # 0.5u = Standard (everything else)
-    confidence = float(str(pick.get('confidence', '80')).replace('%', ''))
-    if edge_val >= 40 and confidence >= 95:
-        units = "2.0u"
-    elif edge_val >= 30 and confidence >= 90:
+    # Determine units - CONSERVATIVE
+    confidence = 80
+    if edge_val >= 40:
         units = "1.0u"
+        confidence = 90
+    elif edge_val >= 20:
+        units = "0.5u"
+        confidence = 85
     else:
         units = "0.5u"
+        confidence = 80
     
-    # Generate explanation if available
+    # Generate explanation using explanation engine
     explanation = ""
     if EXPLANATION_ENABLED:
         try:
-            # Build pick data for explanation engine - use numeric values
-            pick_data = {
-                'game_id': pick.get('game_id', matchup),
+            explanation = generate_game_explanation({
+                'matchup': matchup,
                 'pick': pick_str,
-                'type': pick.get('type', 'TOTAL'),
-                'edge': pick.get('edge_numeric', edge_val),
-                'ev_pct': pick.get('ev_pct', float(str(pick.get('ev', '0')).replace('%', ''))),
-                'confidence': pick.get('confidence_numeric', confidence),
-                'grade': pick.get('grade', 'A+'),
-                # Model data for explanation engine
-                'model_total': pick.get('model_total'),
-                'model_home_pts': pick.get('model_home_pts'),
-                'model_away_pts': pick.get('model_away_pts'),
-                'model_pace': pick.get('model_pace'),
-                'model_margin': pick.get('model_margin'),
-                'regime_status': pick.get('regime_status', 'NORMAL'),
-                'regime_confidence': pick.get('regime_confidence', 0),
-                'injury_adjustment': pick.get('injury_adjustment', 0),
-                'injury_edge': pick.get('injury_edge', 'NEUTRAL'),
-            }
-            explanation = generate_game_explanation(pick_data)
+                'subtype': subtype,
+                'edge': edge_val,
+                'odds': odds
+            })
         except Exception as e:
-            print(f"   ⚠️ Explanation failed: {e}")
+            print(f"   ⚠️ Game explanation error: {e}")
             explanation = ""
+    
+    # Fallback if no explanation generated
+    if not explanation:
+        explanation = f"• Net rating edge: +{edge_val:.1f} points"
     
     fields = [
         {"name": "Expected Value", "value": f"+{edge_val:.1f} pts", "inline": True},
-        {"name": "EV %", "value": pick.get('ev', 'N/A'), "inline": True},
+        {"name": "EV %", "value": f"{ev_val}%", "inline": True},
         {"name": "Grade", "value": pick.get('grade', 'A+'), "inline": True},
         {"name": "AI Stake", "value": units, "inline": True},
         {"name": "Risk Class", "value": "High" if edge_val >= 25 else "Medium", "inline": True},
-        {"name": "Confidence", "value": f"{pick.get('confidence', '80')}%", "inline": True},
+        {"name": "Confidence", "value": f"{confidence}%", "inline": True},
     ]
     
-    # Add explanation as a field if available (truncate if needed)
-    if explanation:
-        # Discord field value limit is 1024 chars
-        explanation_truncated = explanation[:1000] + "..." if len(explanation) > 1000 else explanation
-        fields.append({"name": "🔒 Why This Bet Has Edge", "value": explanation_truncated, "inline": False})
+    # Add explanation
+    fields.append({"name": "🔒 Why This Bet Has Edge", "value": explanation, "inline": False})
     
     embed = {
         "title": title,
-        "description": f"**{pick_str}** — {units} 🔥🔥",
+        "description": f"**{pick_str}** — {units} 🔥",
         "color": color,
         "fields": fields,
         "footer": {"text": f"SB-ALGO Terminal • {get_eastern_time().strftime('%I:%M %p ET')}"}
@@ -383,11 +439,52 @@ def create_game_pick_embed(pick, is_alert=False):
     
     return embed
 
+def create_header_embed():
+    """Create header embed for daily picks"""
+    eastern = pytz.timezone('US/Eastern')
+    now = datetime.now(eastern)
+    
+    embed = {
+        "title": "🔥 SB-ALGO DAILY PICKS",
+        "description": f"**{now.strftime('%A, %B %d, %Y')}**  15-Engine Analysis • Meta-Merge v4.0\n*Algorithmically generated with edge analysis*",
+        "color": 0x00AA00,
+    }
+    return embed
+
 def create_prop_pick_embed(pick, is_alert=False):
     """Create embed dict for prop pick"""
     
     edge_val = float(str(pick.get('edge', '0')).replace('+', '').replace('%', ''))
-    hit_rate = pick.get('hit_rate', '0%')
+    odds = pick.get('odds', -110)
+    
+    # Calculate EV from edge and odds
+    ev_val = calculate_ev(edge_val, odds)
+    
+    # Calculate EV from edge and odds
+    ev_val = calculate_ev(edge_val, odds)
+    
+    # Extract line, stat, side from pick string for hit rate calc
+    import re
+    prop_str = pick.get('pick', pick.get('prop', ''))
+    line_match = re.search(r'[\d.]+', prop_str)
+    line = float(line_match.group()) if line_match else 0
+    
+    prop_upper = prop_str.upper()
+    if 'PTS' in prop_upper:
+        stat_type = 'pts'
+    elif 'REB' in prop_upper:
+        stat_type = 'reb'
+    elif 'AST' in prop_upper:
+        stat_type = 'ast'
+    else:
+        stat_type = 'pts'
+    
+    side = 'OVER' if 'OVER' in prop_upper else 'UNDER'
+    player = pick.get('player', 'Unknown')
+    
+    # Calculate hit rate from last 10 games
+    hit_rate_val = calculate_hit_rate(player, stat_type, line, side)
+    hit_rate = f"{hit_rate_val}%"
     
     # Color based on edge
     if edge_val >= 40:
@@ -398,16 +495,35 @@ def create_prop_pick_embed(pick, is_alert=False):
         color = 0x00AA00  # Green
     
     player = pick.get('player', 'Unknown')
-    prop = pick.get('prop', '')
+    # FIX: Get prop from 'pick' key, not 'prop' key
+    prop = pick.get('pick', pick.get('prop', ''))
+    
+    # Extract line and stat from prop string (e.g., "PTS OVER 29.5")
+    import re
+    line_match = re.search(r'[\d.]+', prop)
+    line = float(line_match.group()) if line_match else 0
+    
+    # Extract stat type and side
+    prop_upper = prop.upper()
+    if 'PTS' in prop_upper:
+        stat = 'pts'
+    elif 'REB' in prop_upper:
+        stat = 'reb'
+    elif 'AST' in prop_upper:
+        stat = 'ast'
+    else:
+        stat = 'pts'
+    
+    side = 'OVER' if 'OVER' in prop_upper else 'UNDER'
+    
+    # Get projection value
+    projection = pick.get('projection', 0)
     
     title = f"🎯 {player}"
     if is_alert:
         title = f"🚨 NEW EDGE: {player}"
     
     # Conservative prop sizing
-    # 1.5u = LOCK (edge 50%+, hit rate 80%+)
-    # 1.0u = Strong (edge 35%+, hit rate 70%+)
-    # 0.5u = Standard (everything else)
     hit_rate_val = float(str(hit_rate).replace('%', '')) if hit_rate else 0
     if edge_val >= 50 and hit_rate_val >= 80:
         units = "1.5u"
@@ -416,11 +532,35 @@ def create_prop_pick_embed(pick, is_alert=False):
     else:
         units = "0.5u"
     
-    # Generate explanation if available
+    # Generate explanation if available - pass enriched data
     explanation = ""
     if EXPLANATION_ENABLED:
         try:
-            explanation = generate_prop_explanation(pick)
+            # Build enriched pick data for explanation engine
+            enriched_pick = {
+                'player': player,
+                'stat': stat,
+                'line': line,
+                'book_line': line,
+                'best_side': side,
+                'edge': edge_val,
+                'edge_pct': edge_val,
+                'projection': {
+                    'weighted': projection,
+                    'l5': projection,
+                    'l10': projection,
+                    'l15': projection
+                },
+                'cv': pick.get('cv', 0),
+                'matchup': pick.get('matchup', ''),
+                'filters': {
+                    'gp': 10,
+                    'mpg': 30,
+                    'hit_rate': {'hit_rate': hit_rate_val, 'hits': 0}
+                },
+                'probabilities': {'adjusted': 0}
+            }
+            explanation = generate_prop_explanation(enriched_pick)
         except Exception as e:
             print(f"   ⚠️ Explanation failed: {e}")
             explanation = ""
@@ -428,9 +568,9 @@ def create_prop_pick_embed(pick, is_alert=False):
     fields = [
         {"name": "Hit Rate", "value": hit_rate, "inline": True},
         {"name": "Edge", "value": f"+{edge_val:.1f}%", "inline": True},
-        {"name": "EV", "value": pick.get('ev', 'N/A'), "inline": True},
-        {"name": "Model Proj", "value": f"{pick.get('model', 'N/A')}", "inline": True},
-        {"name": "Line", "value": f"{pick.get('line', 'N/A')}", "inline": True},
+        {"name": "EV", "value": f"{ev_val}%", "inline": True},
+        {"name": "Model Proj", "value": f"{projection:.1f}" if projection else "N/A", "inline": True},
+        {"name": "Line", "value": f"{line}" if line else "N/A", "inline": True},
         {"name": "Grade", "value": pick.get('grade', 'A+'), "inline": True},
     ]
     
@@ -448,8 +588,6 @@ def create_prop_pick_embed(pick, is_alert=False):
     }
     
     return embed
-
-def create_header_embed():
     """Create header embed for daily report"""
     now = get_eastern_time()
     

@@ -1,15 +1,33 @@
 #!/usr/bin/env python3
 """
-SB-ALGO PICKS API v3.0 - NEW BACKTESTED FILTERS (76% Win Rate)
+================================================================================
+SB-ALGO PICKS API v3.2 - BACKTESTED FILTERS (76% Win Rate)
+================================================================================
+VERIFIED: Jan 23, 2026
+
+PROP FILTERS (76% backtest):
+  PTS OVER:   Edge≥20%, CV≤0.45, Proj≥20
+  PTS UNDER:  Edge≥15%, CV≤0.40, Proj≥20
+  REB OVER:   Edge≥15%, CV≤0.40, Proj≥11
+  REB UNDER:  Edge≥15%, CV≤0.45, Proj≥8
+  AST OVER:   Edge≥25%, CV≤0.40, Proj≥8
+
+GAME FILTERS (77% backtest):
+  ML:         Net≥5, OppDef≥114, OppOff≤112
+  UNDER:      CombDef≤226, Pace≤198, Book 225-232
+  SPREAD DOG: Spread≥7, OppNet≤5
+
+PROJECTION: 40% L5 + 30% L10 + 20% L15 + 10% Season
+DATA SOURCE: nba_team_advanced_stats (official NBA data)
+================================================================================
 """
 
+import psycopg2
 import os
 import statistics
-from datetime import datetime
 from collections import defaultdict
-from typing import Dict, List, Tuple, Optional
+from datetime import datetime, date
 import pytz
-from sqlalchemy import create_engine, text
 
 DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db')
 
@@ -18,20 +36,18 @@ _cache_time = None
 CACHE_DURATION = 300
 
 PROP_FILTERS = {
-    'pts_over':  {'edge_min': 0.20, 'cv_max': 0.45, 'proj_min': 20},
+    'pts_over': {'edge_min': 0.20, 'cv_max': 0.45, 'proj_min': 20},
     'pts_under': {'edge_max': 0.15, 'cv_max': 0.40, 'proj_min': 20},
-    'reb_over':  {'edge_min': 0.15, 'cv_max': 0.40, 'proj_min': 11},
+    'reb_over': {'edge_min': 0.15, 'cv_max': 0.40, 'proj_min': 11},
     'reb_under': {'edge_max': 0.15, 'cv_max': 0.45, 'proj_min': 8},
-    'ast_over':  {'edge_min': 0.25, 'cv_max': 0.40, 'proj_min': 8},
+    'ast_over': {'edge_min': 0.25, 'cv_max': 0.40, 'proj_min': 8},
 }
 
 VEGAS_FILTERS = {
-    'moneyline':  {'net_min': 5, 'opp_def_min': 114, 'opp_off_max': 112},
-    'under':      {'comb_def_max': 226, 'comb_pace_max': 198, 'book_min': 225, 'book_max': 232},
+    'moneyline': {'net_min': 5, 'opp_def_min': 114, 'opp_off_max': 112},
+    'under': {'comb_def_max': 226, 'comb_pace_max': 198, 'book_min': 225, 'book_max': 232},
     'spread_dog': {'spread_min': 7, 'opp_net_max': 5},
 }
-
-NEAR_MISS = {'edge_tolerance': 0.03, 'cv_tolerance': 0.05, 'proj_tolerance': 2}
 
 NAME_TO_ABBR = {
     'Atlanta Hawks': 'ATL', 'Boston Celtics': 'BOS', 'Brooklyn Nets': 'BKN', 'Charlotte Hornets': 'CHA',
@@ -50,55 +66,83 @@ def get_eastern_date():
     eastern = pytz.timezone('US/Eastern')
     return datetime.now(eastern).date()
 
-def get_engine():
-    return create_engine(DATABASE_URL)
-
-def get_weighted_projection(games_list, stat):
+def get_proj(player_games, player, stat, game_date):
+    if player not in player_games:
+        return None, None
+    games_list = sorted([g for g in player_games[player] if g['date'] < game_date], key=lambda x: x['date'], reverse=True)
     if len(games_list) < 5:
         return None, None
-    games_sorted = sorted(games_list, key=lambda x: x['date'], reverse=True)
-    values = [g[stat] for g in games_sorted[:15]]
-    l5 = sum(values[:5]) / 5
-    l10 = sum(values[:10]) / min(10, len(values))
-    l15 = sum(values[:15]) / min(15, len(values))
-    season = sum(g[stat] for g in games_sorted) / len(games_sorted)
-    proj = 0.40 * l5 + 0.30 * l10 + 0.20 * l15 + 0.10 * season
+    values = [g[stat] for g in games_list[:15]]
+    l5 = sum(values[:5])/5
+    l10 = sum(values[:10])/min(10,len(values))
+    l15 = sum(values[:15])/min(15,len(values))
+    season = sum(g[stat] for g in games_list) / len(games_list)
+    proj = 0.40*l5 + 0.30*l10 + 0.20*l15 + 0.10*season
     std = statistics.stdev(values[:10]) if len(values) >= 10 else statistics.stdev(values[:5])
     cv = std / proj if proj > 0 else 1
     return proj, cv
 
-def get_todays_picks(force_refresh=False):
+def get_todays_picks(force_refresh=False, target_date=None):
     global _picks_cache, _cache_time
-    if not force_refresh and _cache_time and _picks_cache:
-        if (datetime.now() - _cache_time).seconds < CACHE_DURATION:
-            return _picks_cache
     
-    today = get_eastern_date()
-    today_str = today.strftime('%Y-%m-%d')
-    engine = get_engine()
+    if target_date:
+        today = target_date
+    else:
+        today = get_eastern_date()
     
-    with engine.connect() as conn:
-        result = conn.execute(text("SELECT player_name, game_date, pts, reb, ast FROM player_boxscores WHERE game_date >= '2024-10-01' AND game_date < :today"), {"today": today_str})
-        player_games = defaultdict(list)
-        for row in result:
-            player, gdate, pts, reb, ast = row
-            player_games[player].append({'date': gdate, 'pts': float(pts or 0), 'reb': float(reb or 0), 'ast': float(ast or 0)})
+    today_str = str(today)
     
-    with engine.connect() as conn:
-        props = conn.execute(text("SELECT player_name, market, line, over_odds, under_odds FROM player_props WHERE game_date = :today AND sportsbook = 'DraftKings' AND market IN ('player_points', 'player_rebounds', 'player_assists')"), {"today": today_str}).fetchall()
+    if not force_refresh and today_str in _picks_cache:
+        if _cache_time and (datetime.now() - _cache_time).seconds < CACHE_DURATION:
+            return _picks_cache[today_str]
     
-    with engine.connect() as conn:
-        games = conn.execute(text("SELECT g.home_team, g.visitor_team, b.total, b.home_spread, b.home_ml, b.away_ml FROM games g JOIN betting_odds b ON g.date = b.game_date AND g.home_team = b.home_team WHERE g.date = :today AND b.sportsbook = 'draftkings'"), {"today": today_str}).fetchall()
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
     
-    with engine.connect() as conn:
-        result = conn.execute(text('SELECT "TEAM_NAME", "OFF_RATING", "DEF_RATING", "NET_RATING", "PACE" FROM nba_team_advanced_stats WHERE pull_date = (SELECT MAX(pull_date) FROM nba_team_advanced_stats)'))
-        team_stats = {}
-        for row in result:
-            name, off, def_, net, pace = row
-            abbr = NAME_TO_ABBR.get(name)
-            if abbr:
-                team_stats[abbr] = {'off': float(off or 0), 'def': float(def_ or 0), 'net': float(net or 0), 'pace': float(pace or 0)}
+    # Load player boxscores
+    cur.execute("""
+        SELECT player_name, game_date, pts, reb, ast
+        FROM player_boxscores WHERE game_date >= '2024-10-01' AND game_date < %s
+    """, (today,))
+    player_games = defaultdict(list)
+    for row in cur.fetchall():
+        player, gdate, pts, reb, ast = row
+        player_games[player].append({'date': gdate, 'pts': float(pts or 0), 'reb': float(reb or 0), 'ast': float(ast or 0)})
     
+    # Load today's props
+    cur.execute("""
+        SELECT player_name, market, line, over_odds, under_odds
+        FROM player_props
+        WHERE game_date = %s AND sportsbook = 'DraftKings'
+        AND market IN ('player_points', 'player_rebounds', 'player_assists')
+    """, (today,))
+    props = cur.fetchall()
+    
+    # Load today's games
+    cur.execute("""
+        SELECT g.home_team, g.visitor_team, b.total, b.home_spread, b.home_ml, b.away_ml
+        FROM games g
+        JOIN betting_odds b ON g.date = b.game_date AND g.home_team = b.home_team
+        WHERE g.date = %s AND b.sportsbook = 'draftkings'
+    """, (today,))
+    games = cur.fetchall()
+    
+    # Load team stats from nba_team_advanced_stats
+    cur.execute("""
+        SELECT "TEAM_NAME", "OFF_RATING", "DEF_RATING", "NET_RATING", "PACE"
+        FROM nba_team_advanced_stats
+        WHERE pull_date = (SELECT MAX(pull_date) FROM nba_team_advanced_stats)
+    """)
+    team_stats = {}
+    for row in cur.fetchall():
+        name, off, def_, net, pace = row
+        abbr = NAME_TO_ABBR.get(name)
+        if abbr:
+            team_stats[abbr] = {'off': float(off or 0), 'def': float(def_ or 0), 'net': float(net or 0), 'pace': float(pace or 0)}
+    
+    conn.close()
+    
+    # GAME PICKS
     game_picks = []
     for row in games:
         home, away, total, spread, home_ml, away_ml = row
@@ -106,89 +150,139 @@ def get_todays_picks(force_refresh=False):
         spread = float(spread) if spread else None
         if not total or not spread:
             continue
-        home_s, away_s = team_stats.get(home, {}), team_stats.get(away, {})
+        home_s = team_stats.get(home, {})
+        away_s = team_stats.get(away, {})
         if not home_s or not away_s:
             continue
-        matchup = f"{away} @ {home}"
         
+        # ML Filter
         f = VEGAS_FILTERS['moneyline']
         if home_s.get('net', 0) >= f['net_min'] and away_s.get('def', 0) >= f['opp_def_min'] and away_s.get('off', 999) <= f['opp_off_max']:
-            game_picks.append({'type': 'GAME', 'subtype': 'ML', 'matchup': matchup, 'pick': f"{home} ML", 'odds': home_ml, 'edge': home_s.get('net', 0) * 2, 'grade': 'A', 'tier': '🔥 OFFICIAL', 'reason': f"Net +{home_s.get('net', 0):.1f}"})
+            game_picks.append({'type': 'GAME', 'subtype': 'ML', 'pick': f"{home} ML", 'matchup': f"{away} @ {home}", 'odds': home_ml, 'edge': round(home_s['net'] - away_s['net'], 1)})
         if away_s.get('net', 0) >= f['net_min'] and home_s.get('def', 0) >= f['opp_def_min'] and home_s.get('off', 999) <= f['opp_off_max']:
-            game_picks.append({'type': 'GAME', 'subtype': 'ML', 'matchup': matchup, 'pick': f"{away} ML", 'odds': away_ml, 'edge': away_s.get('net', 0) * 2, 'grade': 'A', 'tier': '🔥 OFFICIAL', 'reason': f"Net +{away_s.get('net', 0):.1f}"})
+            game_picks.append({'type': 'GAME', 'subtype': 'ML', 'pick': f"{away} ML", 'matchup': f"{away} @ {home}", 'odds': away_ml, 'edge': round(away_s['net'] - home_s['net'], 1)})
         
+        # UNDER Filter
         f = VEGAS_FILTERS['under']
-        comb_def, comb_pace = home_s.get('def', 0) + away_s.get('def', 0), home_s.get('pace', 0) + away_s.get('pace', 0)
+        comb_def = home_s.get('def', 0) + away_s.get('def', 0)
+        comb_pace = home_s.get('pace', 0) + away_s.get('pace', 0)
         if comb_def <= f['comb_def_max'] and comb_pace <= f['comb_pace_max'] and f['book_min'] <= total <= f['book_max']:
-            game_picks.append({'type': 'GAME', 'subtype': 'TOTAL', 'matchup': matchup, 'pick': f"UNDER {total}", 'odds': -110, 'edge': 15, 'grade': 'A+', 'tier': '🔥 OFFICIAL', 'reason': f"DefRtg {comb_def:.0f}"})
+            game_picks.append({'type': 'GAME', 'subtype': 'UNDER', 'pick': f"UNDER {total}", 'matchup': f"{away} @ {home}", 'odds': -110, 'edge': round(f['comb_def_max'] - comb_def, 1)})
         
+        # SPREAD DOG Filter
         f = VEGAS_FILTERS['spread_dog']
-        if spread < 0 and abs(spread) >= f['spread_min'] and home_s.get('net', 0) <= f['opp_net_max']:
-            game_picks.append({'type': 'GAME', 'subtype': 'SPREAD', 'matchup': matchup, 'pick': f"{away} +{abs(spread)}", 'odds': -110, 'edge': 12, 'grade': 'A', 'tier': '🔥 OFFICIAL', 'reason': f"Dog vs Net {home_s.get('net', 0):.1f}"})
-        elif spread > 0 and spread >= f['spread_min'] and away_s.get('net', 0) <= f['opp_net_max']:
-            game_picks.append({'type': 'GAME', 'subtype': 'SPREAD', 'matchup': matchup, 'pick': f"{home} +{spread}", 'odds': -110, 'edge': 12, 'grade': 'A', 'tier': '🔥 OFFICIAL', 'reason': f"Dog vs Net {away_s.get('net', 0):.1f}"})
+        if spread < 0 and abs(spread) >= f['spread_min']:
+            if home_s.get('net', 0) <= f['opp_net_max']:
+                game_picks.append({'type': 'GAME', 'subtype': 'SPREAD', 'pick': f"{away} +{abs(spread)}", 'matchup': f"{away} @ {home}", 'odds': -110, 'edge': round(abs(spread), 1)})
+        elif spread > 0 and spread >= f['spread_min']:
+            if away_s.get('net', 0) <= f['opp_net_max']:
+                game_picks.append({'type': 'GAME', 'subtype': 'SPREAD', 'pick': f"{home} +{spread}", 'matchup': f"{away} @ {home}", 'odds': -110, 'edge': round(spread, 1)})
     
-    official_props, watchlist_props = [], []
+    # PROP PICKS
+    official_props = []
+    watchlist_props = []
+    
     for row in props:
         player, market, line, over_odds, under_odds = row
         stat = MARKET_TO_STAT.get(market)
         if not stat:
             continue
         line = float(line)
-        if line == 0 or player not in player_games:
+        if line == 0:
             continue
-        games_before = [g for g in player_games[player] if g['date'] < today]
-        proj, cv = get_weighted_projection(games_before, stat)
+        proj, cv = get_proj(player_games, player, stat, today)
         if proj is None:
             continue
         
+        # OVER
         edge = (proj - line) / line
         fkey = f"{stat}_over"
         if fkey in PROP_FILTERS:
             f = PROP_FILTERS[fkey]
-            e_pass, c_pass, p_pass = edge >= f['edge_min'], cv <= f['cv_max'], proj >= f['proj_min']
+            e_pass = edge >= f['edge_min']
+            c_pass = cv <= f['cv_max']
+            p_pass = proj >= f['proj_min']
             if e_pass and c_pass and p_pass:
-                official_props.append({'type': 'PROP', 'subtype': market, 'player': player, 'pick': f"{stat.upper()} OVER {line}", 'line': line, 'odds': over_odds or -110, 'projection': round(proj, 1), 'edge': round(edge * 100, 1), 'cv': round(cv, 2), 'grade': 'A+' if edge >= 0.25 else 'A', 'tier': '🔥 OFFICIAL', 'hit_rate': '76%', 'reason': f"Proj {proj:.1f} vs {line}"})
+                official_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} OVER {line}", 'projection': round(proj, 1), 'edge': round(edge * 100, 1), 'cv': round(cv, 2), 'odds': over_odds or -110})
             elif sum([e_pass, c_pass, p_pass]) == 2:
                 near, reason = False, ""
-                if not e_pass and edge >= (f['edge_min'] - 0.03): near, reason = True, f"Edge {edge*100:.1f}%"
-                elif not c_pass and cv <= (f['cv_max'] + 0.05): near, reason = True, f"CV {cv:.2f}"
-                elif not p_pass and proj >= (f['proj_min'] - 2): near, reason = True, f"Proj {proj:.1f}"
+                if not e_pass and edge >= (f['edge_min'] - 0.03):
+                    near, reason = True, f"Edge {edge*100:.1f}%"
+                elif not c_pass and cv <= (f['cv_max'] + 0.05):
+                    near, reason = True, f"CV {cv:.2f}"
+                elif not p_pass and proj >= (f['proj_min'] - 2):
+                    near, reason = True, f"Proj {proj:.1f}"
                 if near:
-                    watchlist_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} OVER {line}", 'projection': round(proj, 1), 'edge': round(edge * 100, 1), 'cv': round(cv, 2), 'tier': '👀 WATCHLIST', 'near_miss': reason})
+                    watchlist_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} OVER {line}", 'projection': round(proj, 1), 'edge': round(edge * 100, 1), 'cv': round(cv, 2), 'near_miss': reason})
         
+        # UNDER
         edge_u = (line - proj) / line
         fkey = f"{stat}_under"
         if fkey in PROP_FILTERS:
             f = PROP_FILTERS[fkey]
-            e_pass, c_pass, p_pass = edge_u >= f.get('edge_max', 999), cv <= f['cv_max'], proj >= f['proj_min']
+            e_pass = edge_u >= f.get('edge_max', 999)
+            c_pass = cv <= f['cv_max']
+            p_pass = proj >= f['proj_min']
             if e_pass and c_pass and p_pass:
-                official_props.append({'type': 'PROP', 'subtype': market, 'player': player, 'pick': f"{stat.upper()} UNDER {line}", 'line': line, 'odds': under_odds or -110, 'projection': round(proj, 1), 'edge': round(edge_u * 100, 1), 'cv': round(cv, 2), 'grade': 'A+' if edge_u >= 0.20 else 'A', 'tier': '🔥 OFFICIAL', 'hit_rate': '76%', 'reason': f"Proj {proj:.1f} vs {line}"})
+                official_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} UNDER {line}", 'projection': round(proj, 1), 'edge': round(edge_u * 100, 1), 'cv': round(cv, 2), 'odds': under_odds or -110})
             elif sum([e_pass, c_pass, p_pass]) == 2:
                 near, reason = False, ""
-                if not e_pass and edge_u >= (f['edge_max'] - 0.03): near, reason = True, f"Edge {edge_u*100:.1f}%"
-                elif not c_pass and cv <= (f['cv_max'] + 0.05): near, reason = True, f"CV {cv:.2f}"
-                elif not p_pass and proj >= (f['proj_min'] - 2): near, reason = True, f"Proj {proj:.1f}"
+                if not e_pass and edge_u >= (f['edge_max'] - 0.03):
+                    near, reason = True, f"Edge {edge_u*100:.1f}%"
+                elif not c_pass and cv <= (f['cv_max'] + 0.05):
+                    near, reason = True, f"CV {cv:.2f}"
+                elif not p_pass and proj >= (f['proj_min'] - 2):
+                    near, reason = True, f"Proj {proj:.1f}"
                 if near:
-                    watchlist_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} UNDER {line}", 'projection': round(proj, 1), 'edge': round(edge_u * 100, 1), 'cv': round(cv, 2), 'tier': '👀 WATCHLIST', 'near_miss': reason})
+                    watchlist_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} UNDER {line}", 'projection': round(proj, 1), 'edge': round(edge_u * 100, 1), 'cv': round(cv, 2), 'near_miss': reason})
     
     watchlist_props.sort(key=lambda x: -abs(x['edge']))
-    result = {'date': today_str, 'game_picks': game_picks, 'prop_picks': official_props, 'watchlist_props': watchlist_props[:5], 'summary': {'games': len(game_picks), 'props': len(official_props), 'watchlist': len(watchlist_props)}}
-    _picks_cache, _cache_time = result, datetime.now()
+    
+    result = {
+        'date': today_str,
+        'game_picks': game_picks,
+        'prop_picks': official_props,
+        'watchlist_props': watchlist_props[:7],
+        'summary': {'games': len(game_picks), 'props': len(official_props), 'watchlist': len(watchlist_props)}
+    }
+    
+    _picks_cache[today_str] = result
+    _cache_time = datetime.now()
+    
     return result
 
-def get_game_picks(): return get_todays_picks().get('game_picks', [])
-def get_prop_picks(): return get_todays_picks().get('prop_picks', [])
-def get_watchlist_picks(): return get_todays_picks().get('watchlist_props', [])
+def get_game_picks():
+    return get_todays_picks().get('game_picks', [])
+
+def get_prop_picks():
+    return get_todays_picks().get('prop_picks', [])
+
+def get_watchlist_picks():
+    return get_todays_picks().get('watchlist_props', [])
 
 if __name__ == "__main__":
     picks = get_todays_picks(force_refresh=True)
-    print("\n🔥 OFFICIAL PICKS")
-    print("=" * 50)
-    print("\n🏀 GAMES:")
-    for p in picks['game_picks']: print(f"  • {p['pick']} | {p['matchup']}")
-    print("\n🎯 PROPS:")
-    for p in picks['prop_picks']: print(f"  • {p['player']} {p['pick']} | Proj: {p['projection']} | Edge: {p['edge']}%")
-    print("\n👀 WATCHLIST:")
-    for p in picks['watchlist_props']: print(f"  • {p['player']} {p['pick']} | Edge: {p['edge']}% | ⚠️ {p['near_miss']}")
-    print(f"\nTotal: {picks['summary']['games']} games + {picks['summary']['props']} props")
+    
+    print("=" * 70)
+    print(f"🔥 OFFICIAL PICKS - {picks['date']}")
+    print("=" * 70)
+    
+    print("\n🏀 GAMES (1u each)")
+    print("-" * 70)
+    for p in picks['game_picks']:
+        print(f"  • {p['pick']} | {p['matchup']}")
+    
+    print("\n🎯 PROPS (1u each)")
+    print("-" * 70)
+    for p in picks['prop_picks']:
+        print(f"  • {p['player']} {p['pick']}")
+        print(f"    Proj: {p['projection']} | Edge: +{p['edge']}% | CV: {p['cv']}")
+    
+    print("\n👀 WATCHLIST (0.5u max)")
+    print("-" * 70)
+    for p in picks['watchlist_props'][:5]:
+        print(f"  • {p['player']} {p['pick']} | Edge: {p['edge']}% | ⚠️ {p['near_miss']}")
+    
+    print("\n" + "=" * 70)
+    print(f"Total: {picks['summary']['games']} games + {picks['summary']['props']} props")
+    print("=" * 70)

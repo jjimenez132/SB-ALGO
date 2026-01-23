@@ -164,87 +164,160 @@ def extract_opponent_from_matchup(matchup: str, player_team: str = None) -> str:
 
 
 def generate_game_explanation(pick_data: dict) -> str:
-    """Generate institutional explanation using REAL model data"""
+    """Generate institutional explanation by fetching team stats from DB"""
     try:
         model = genai.GenerativeModel(
             'gemini-2.0-flash',
             system_instruction=SYSTEM_PROMPT
         )
         
-        game_id = pick_data.get('game_id', pick_data.get('matchup', 'Unknown'))
+        # Extract basic data we have
+        matchup = pick_data.get('matchup', pick_data.get('game_id', 'Unknown'))
         pick = pick_data.get('pick', '')
+        subtype = pick_data.get('subtype', pick_data.get('type', 'ML'))
         edge = pick_data.get('edge', 0)
         if isinstance(edge, str):
             edge = float(edge.replace('+', '').replace('%', ''))
+        odds = pick_data.get('odds', -110)
         
-        confidence = pick_data.get('confidence', 0)
-        if isinstance(confidence, str):
-            confidence = float(confidence.replace('%', ''))
-        
-        # REAL MODEL DATA
-        model_total = pick_data.get('model_total')
-        model_home_pts = pick_data.get('model_home_pts')
-        model_away_pts = pick_data.get('model_away_pts')
-        model_pace = pick_data.get('model_pace')
-        model_margin = pick_data.get('model_margin')
-        regime_status = pick_data.get('regime_status', 'NORMAL')
-        regime_confidence = pick_data.get('regime_confidence', 0)
-        injury_adjustment = pick_data.get('injury_adjustment', 0)
-        injury_edge = pick_data.get('injury_edge', 'NEUTRAL')
-        
+        # Parse teams from matchup (e.g., "BOS @ BKN")
         import re
-        line_match = re.search(r'[\d.]+', str(pick))
-        line_value = float(line_match.group()) if line_match else 0
+        teams = matchup.replace(' ', '').split('@')
+        away_team = teams[0] if len(teams) >= 1 else 'Away'
+        home_team = teams[1] if len(teams) >= 2 else 'Home'
         
-        direction = 'UNDER' if 'UNDER' in str(pick).upper() else 'OVER'
-        cushion = abs(line_value - model_total) if model_total else edge / 3
-        
-        teams = game_id.replace(' ', '').split('@')
-        away_team = teams[0] if len(teams) == 2 else 'Away'
-        home_team = teams[1] if len(teams) == 2 else 'Home'
-        
-        # Get defense stats for both teams
+        # FETCH REAL TEAM STATS FROM DATABASE
+        home_stats = get_team_advanced_stats(home_team)
+        away_stats = get_team_advanced_stats(away_team)
         home_def = get_team_defense_stats(home_team)
         away_def = get_team_defense_stats(away_team)
-
-        prompt = f"""Write an institutional-grade explanation for this NBA totals bet using ONLY the model data below.
+        
+        # Build context based on bet type
+        if subtype == 'ML':
+            # Moneyline bet
+            # Determine which team we're betting on
+            if home_team in pick:
+                bet_team = home_team
+                bet_stats = home_stats
+                opp_team = away_team
+                opp_stats = away_stats
+                opp_def = away_def
+            else:
+                bet_team = away_team
+                bet_stats = away_stats
+                opp_team = home_team
+                opp_stats = home_stats
+                opp_def = home_def
+            
+            prompt = f"""Write 4-5 bullet points explaining this NBA moneyline bet.
 
 === BET ===
-{game_id}: {direction} {line_value}
+{matchup}: {pick} (odds: {odds})
+Net Rating Edge: {edge:.1f} points
 
-=== REAL MODEL PREDICTIONS ===
-Model Projected Total: {model_total} points
-Book Line: {line_value} points
-Cushion: {cushion:.1f} points {direction.lower()}
+=== TEAM STATS (from database) ===
+{bet_team}:
+- Net Rating: {bet_stats.get('net_rating', 'N/A')}
+- Offensive Rating: {bet_stats.get('off_rating', 'N/A')}
+- Defensive Rating: {bet_stats.get('def_rating', 'N/A')}
+- Pace: {bet_stats.get('pace', 'N/A')}
 
-Team Projections:
-- {home_team}: {model_home_pts} points (DEF Rating: {home_def.get('def_rating', 'N/A')}, Rank #{home_def.get('def_rank', 'N/A')})
-- {away_team}: {model_away_pts} points (DEF Rating: {away_def.get('def_rating', 'N/A')}, Rank #{away_def.get('def_rank', 'N/A')})
-- Projected Pace: {model_pace}
-- Projected Margin: {model_margin:+.1f}
-
-Model Assessment:
-- Edge: {edge:.1f}%
-- Confidence: {confidence:.1f}%
-- Regime: {regime_status}
-- Injury Impact: {injury_adjustment} pts ({injury_edge})
+{opp_team}:
+- Net Rating: {opp_stats.get('net_rating', 'N/A')}
+- Offensive Rating: {opp_stats.get('off_rating', 'N/A')}
+- Defensive Rating: {opp_stats.get('def_rating', 'N/A')}
+- Opp 3PT%: {opp_def.get('opp_3pt_pct', 'N/A')}
 
 === YOUR TASK ===
-Write 5-6 bullets explaining why {direction} {line_value} has edge.
+Explain why {bet_team} ML has edge. Focus on:
+1. Net rating differential ({edge:.1f} pts)
+2. Offensive vs defensive matchup
+3. Why opponent's defense is exploitable
+4. Brief risk factor
 
-FOCUS ON:
-1. Model projection vs line gap ({cushion:.1f} pts cushion)
-2. Team point projections breakdown
-3. Pace factor ({model_pace})
-4. Defensive matchup implications
-5. Risk acknowledgment
+Be direct, data-focused, no fluff."""
 
-CRITICAL: Use ONLY the numbers above. Be direct and data-focused."""
+        elif subtype == 'UNDER':
+            # Under bet
+            line_match = re.search(r'[\d.]+', pick)
+            line = float(line_match.group()) if line_match else 0
+            
+            prompt = f"""Write 4-5 bullet points explaining this NBA UNDER bet.
+
+=== BET ===
+{matchup}: UNDER {line}
+Edge: {edge:.1f} points
+
+=== TEAM STATS (from database) ===
+{home_team}:
+- Defensive Rating: {home_stats.get('def_rating', 'N/A')}
+- Pace: {home_stats.get('pace', 'N/A')}
+
+{away_team}:
+- Defensive Rating: {away_stats.get('def_rating', 'N/A')}
+- Pace: {away_stats.get('pace', 'N/A')}
+
+Combined Pace: {(home_stats.get('pace', 100) + away_stats.get('pace', 100)) / 2:.1f}
+Combined Def Rating: {(home_stats.get('def_rating', 110) + away_stats.get('def_rating', 110)):.1f}
+
+=== YOUR TASK ===
+Explain why UNDER {line} has edge. Focus on:
+1. Combined defensive strength
+2. Pace factors limiting possessions
+3. Book line vs expected scoring
+4. Brief risk factor
+
+Be direct, data-focused, no fluff."""
+
+        elif subtype == 'SPREAD':
+            # Spread dog bet
+            line_match = re.search(r'[\d.]+', pick)
+            spread = float(line_match.group()) if line_match else 0
+            
+            # Determine underdog
+            if '+' in pick:
+                dog_team = home_team if home_team in pick else away_team
+                fav_team = away_team if dog_team == home_team else home_team
+                dog_stats = home_stats if dog_team == home_team else away_stats
+                fav_stats = away_stats if dog_team == home_team else home_stats
+            else:
+                dog_team = away_team
+                fav_team = home_team
+                dog_stats = away_stats
+                fav_stats = home_stats
+            
+            prompt = f"""Write 4-5 bullet points explaining this NBA spread bet.
+
+=== BET ===
+{matchup}: {pick}
+Edge: {edge:.1f} points
+
+=== TEAM STATS (from database) ===
+{dog_team} (underdog):
+- Net Rating: {dog_stats.get('net_rating', 'N/A')}
+- Offensive Rating: {dog_stats.get('off_rating', 'N/A')}
+
+{fav_team} (favorite):
+- Net Rating: {fav_stats.get('net_rating', 'N/A')}
+- Defensive Rating: {fav_stats.get('def_rating', 'N/A')}
+
+=== YOUR TASK ===
+Explain why {dog_team} +{spread} has edge. Focus on:
+1. Spread too large vs actual net rating gap
+2. Underdog's offensive capability
+3. Favorite's limitations
+4. Brief risk factor
+
+Be direct, data-focused, no fluff."""
+
+        else:
+            # Generic fallback
+            prompt = f"""Write 3-4 bullet points explaining this bet: {matchup} {pick} with {edge:.1f}% edge."""
 
         response = model.generate_content(
             prompt,
             generation_config=genai.types.GenerationConfig(
-                max_output_tokens=500,
+                max_output_tokens=400,
                 temperature=0.2
             )
         )
@@ -258,12 +331,50 @@ CRITICAL: Use ONLY the numbers above. Be direct and data-focused."""
                 if len(clean_line) > 15:
                     lines.append(clean_line)
         
-        return '\n'.join(lines[:6]) if lines else f"• Model projects {model_total} total, {cushion:.1f} pts {direction.lower()} the {line_value} line"
+        return '\n'.join(lines[:5]) if lines else f"• Net rating edge: +{edge:.1f} points"
         
     except Exception as e:
         print(f"   ⚠️ Game explanation error: {e}")
-        return f"• Model projects {cushion:.1f} point cushion on {direction}"
+        return f"• Net rating edge: +{edge:.1f} points"
 
+
+def get_team_advanced_stats(team_abbr: str) -> dict:
+    """Get team advanced stats from nba_team_advanced_stats"""
+    try:
+        engine = create_engine(DATABASE_URL)
+        with engine.connect() as conn:
+            # Map abbreviation to full name
+            team_map = {
+                'ATL': 'Atlanta Hawks', 'BOS': 'Boston Celtics', 'BKN': 'Brooklyn Nets',
+                'CHA': 'Charlotte Hornets', 'CHI': 'Chicago Bulls', 'CLE': 'Cleveland Cavaliers',
+                'DAL': 'Dallas Mavericks', 'DEN': 'Denver Nuggets', 'DET': 'Detroit Pistons',
+                'GSW': 'Golden State Warriors', 'HOU': 'Houston Rockets', 'IND': 'Indiana Pacers',
+                'LAC': 'LA Clippers', 'LAL': 'Los Angeles Lakers', 'MEM': 'Memphis Grizzlies',
+                'MIA': 'Miami Heat', 'MIL': 'Milwaukee Bucks', 'MIN': 'Minnesota Timberwolves',
+                'NOP': 'New Orleans Pelicans', 'NYK': 'New York Knicks', 'OKC': 'Oklahoma City Thunder',
+                'ORL': 'Orlando Magic', 'PHI': 'Philadelphia 76ers', 'PHX': 'Phoenix Suns',
+                'POR': 'Portland Trail Blazers', 'SAC': 'Sacramento Kings', 'SAS': 'San Antonio Spurs',
+                'TOR': 'Toronto Raptors', 'UTA': 'Utah Jazz', 'WAS': 'Washington Wizards'
+            }
+            team_name = team_map.get(team_abbr, team_abbr)
+            
+            result = conn.execute(text('''
+                SELECT "OFF_RATING", "DEF_RATING", "NET_RATING", "PACE"
+                FROM nba_team_advanced_stats 
+                WHERE "TEAM_NAME" = :team
+                ORDER BY pull_date DESC LIMIT 1
+            '''), {"team": team_name}).fetchone()
+            
+            if result:
+                return {
+                    'off_rating': round(float(result[0] or 0), 1),
+                    'def_rating': round(float(result[1] or 0), 1),
+                    'net_rating': round(float(result[2] or 0), 1),
+                    'pace': round(float(result[3] or 0), 1),
+                }
+    except Exception as e:
+        print(f"   ⚠️ Team stats error: {e}")
+    return {'off_rating': 110, 'def_rating': 110, 'net_rating': 0, 'pace': 100}
 
 def generate_prop_explanation(pick_data: dict) -> str:
     """Generate institutional explanation for player prop using REAL data + advanced stats"""

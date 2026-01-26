@@ -222,21 +222,21 @@ VEGAS_FILTERS = {
     # Projection Method: 40% L5, 30% L10, 20% L15, 10% Season
     # =========================================================================
     
-    # PTS OVER: Edge>=20%, CV<=0.45, Proj>=20
-    # Result: 24-9 (72.7%) 🔥
+    # PTS OVER: Edge>=25%, CV<=0.40, Proj>=22 (STRICT)
+    # Result: 13-3 (81.2%) 🔥 OPTIMIZED
     'prop_pts_over': {
-        'edge_min': 20,           # Projection 20%+ above line
-        'cv_max': 0.45,           # Loosened from 0.40
-        'min_proj': 20,           # Only high scorers (20+ PPG projection)
+        'edge_min': 25,           # Strict: 25%+ edge required
+        'cv_max': 0.40,           # Strict: consistent scorers only
+        'min_proj': 22,           # Strict: high volume scorers only
         'enabled': True,
     },
     
-    # PTS UNDER: Edge>=15%, CV<=0.40, Proj>=20
-    # Result: 19-7 (73.1%) 🔥
+    # PTS UNDER: Edge>=18%, CV<=0.35, Proj>=20 (STRICT)
+    # Result: 10-2 (83.3%) 🔥 OPTIMIZED
     'prop_pts_under': {
-        'edge_max': -15,          # Projection 15%+ below line
-        'cv_max': 0.40,           # Loosened from 0.35
-        'min_proj': 20,           # Only high scorers
+        'edge_max': -18,          # Strict: 18%+ edge required
+        'cv_max': 0.35,           # Strict: very consistent scorers
+        'min_proj': 20,           # High volume scorers
         'enabled': True,
     },
     
@@ -290,13 +290,13 @@ VEGAS_FILTERS = {
         'edge_min': 15,
         'cv_max': 0.25,
         'min_proj': 35,           # PRA projection minimum
-        'enabled': True,
+        'enabled': False,  # DISABLED - 44.4% backtest
     },
     'prop_ra': {
-        'edge_min': 18,           # Optimized: was 20
-        'cv_max': 0.38,           # Optimized: was 0.30
-        'min_proj': 11,           # Optimized: was 15
-        'enabled': True,          # 66.7% (18-9) in Jan backtest
+        'edge_min': 18,
+        'cv_max': 0.38,
+        'min_proj': 11,
+        'enabled': False,  # DISABLED - 56.2% backtest
     },
 }
 

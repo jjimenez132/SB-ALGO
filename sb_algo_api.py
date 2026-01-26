@@ -251,12 +251,10 @@ def get_todays_picks(force_refresh=False, target_date=None):
                 if spread <= f['spread_max'] and net_diff_away >= f['net_min'] and home_s.get('def', 0) >= f['opp_def_min']:
                     game_picks.append({'type': 'GAME', 'subtype': 'SPREAD', 'pick': f"{away} -{spread}", 'matchup': f"{away} @ {home}", 'odds': -110, 'edge': round(net_diff_away, 1)})
         
-        # SPREAD DOG Filter
+        # SPREAD HOME DOG Filter (75% backtest) - HOME DOGS ONLY
         f = VEGAS_FILTERS['spread_dog']
-        if spread < 0 and abs(spread) >= f['spread_min']:
-            if home_s.get('net', 0) <= f['opp_net_max']:
-                game_picks.append({'type': 'GAME', 'subtype': 'SPREAD', 'pick': f"{away} +{abs(spread)}", 'matchup': f"{away} @ {home}", 'odds': -110, 'edge': round(abs(spread), 1)})
-        elif spread > 0 and spread >= f['spread_min']:
+        # Only bet HOME underdogs (spread > 0 means home is getting points)
+        if spread and spread > 0 and spread >= f['spread_min']:
             if away_s.get('net', 0) <= f['opp_net_max']:
                 game_picks.append({'type': 'GAME', 'subtype': 'SPREAD', 'pick': f"{home} +{spread}", 'matchup': f"{away} @ {home}", 'odds': -110, 'edge': round(spread, 1)})
     

@@ -40,10 +40,22 @@ DATABASE_URL = "postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dp
 MIN_GP = 15                  # Minimum games played
 IDEAL_GP = 20                # Ideal games played
 MIN_MPG = 22                 # Minimum minutes per game
-MIN_HIT_RATE = 0.60          # Must hit line 60% of games
+MIN_HIT_RATE = 0.0  # Disabled - using CV instead          # Must hit line 60% of games
 IDEAL_HIT_RATE = 0.65        # Ideal hit rate
-MIN_EDGE_PCT = 8.0           # Minimum edge to bet
+MIN_EDGE_PCT = 0.0  # Disabled - using per-stat edge thresholds           # Minimum edge to bet
 LINE_BUFFER = 1.0            # Would bet still work if line moves 1pt?
+
+# =============================================================================
+# BACKTESTED FILTERS (76% Win Rate) - Jan 2026
+# =============================================================================
+PROP_FILTERS = {
+    'pts_over':  {'edge_min': 20, 'cv_max': 0.45, 'proj_min': 20},
+    'pts_under': {'edge_min': 15, 'cv_max': 0.40, 'proj_min': 20},
+    'reb_over':  {'edge_min': 15, 'cv_max': 0.40, 'proj_min': 11},
+    'reb_under': {'edge_min': 15, 'cv_max': 0.45, 'proj_min': 8},
+    'ast_over':  {'edge_min': 25, 'cv_max': 0.40, 'proj_min': 8},
+}
+
 MAX_PROPS_PER_DAY = 5        # Maximum prop bets per day
 
 
@@ -200,7 +212,8 @@ class PropAnalyzerPro:
         l15 = np.mean(values[:15]) if len(values) >= 15 else np.mean(values)
         
         # Weighted average (L5 = 50%, L10 = 30%, L15 = 20%)
-        weighted = l5 * 0.50 + l10 * 0.30 + l15 * 0.20
+        season = np.mean(values)
+        weighted = l5 * 0.40 + l10 * 0.30 + l15 * 0.20 + season * 0.10
         
         # Trimmed mean (remove top and bottom 10%)
         if len(values) >= 10:
@@ -646,7 +659,8 @@ class PropAnalyzerPro:
             l5 = np.mean(values[:5]) if len(values) >= 5 else np.mean(values)
             l10 = np.mean(values[:10]) if len(values) >= 10 else np.mean(values)
             l15 = np.mean(values[:15]) if len(values) >= 15 else np.mean(values)
-            weighted = l5 * 0.50 + l10 * 0.30 + l15 * 0.20
+            season = np.mean(values)
+            weighted = l5 * 0.40 + l10 * 0.30 + l15 * 0.20 + season * 0.10
             std_dev = np.std(values) if len(values) > 1 else values[0] * 0.25
             
             # Determine side and edge
@@ -661,15 +675,34 @@ class PropAnalyzerPro:
             
             hit_rate = hits / min(15, len(games))
             
-            # Filter 4: Hit rate
-            if hit_rate < MIN_HIT_RATE:
+            # Calculate CV (coefficient of variation)
+            cv = std_dev / weighted if weighted > 0 else 999
+            
+            # Get filter for this stat/direction
+            filter_key = f"{stat}_{'over' if best_side == 'OVER' else 'under'}"
+            f = PROP_FILTERS.get(filter_key, {})
+            
+            if not f:
                 continue
             
-            # Filter 5: Minimum edge
-            if edge_pct < MIN_EDGE_PCT:
+            # Apply backtested filters
+            edge_min = f.get('edge_min', 15)
+            cv_max = f.get('cv_max', 0.45)
+            proj_min = f.get('proj_min', 10)
+            
+            # Filter: Projection minimum (high-volume players only)
+            if weighted < proj_min:
                 continue
             
-            # Filter 6: Line buffer test
+            # Filter: CV (consistency)
+            if cv > cv_max:
+                continue
+            
+            # Filter: Edge threshold
+            if edge_pct < edge_min:
+                continue
+            
+            # Line buffer (kept for safety)
             if best_side == 'OVER':
                 buffer_ok = weighted > (line + LINE_BUFFER)
             else:

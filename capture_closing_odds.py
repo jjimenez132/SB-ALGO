@@ -79,7 +79,7 @@ def capture_closing_odds():
                 result = conn.execute(text("""
                     SELECT over_odds, under_odds, line
                     FROM player_props 
-                    WHERE date = CURRENT_DATE 
+                    WHERE game_date = CURRENT_DATE 
                     AND LOWER(player_name) LIKE :player
                     AND market = :market
                     AND over_odds IS NOT NULL
@@ -115,10 +115,15 @@ def capture_closing_odds():
                     visitor_team = parts[at_idx - 1] if at_idx > 0 else None
                     home_team = parts[at_idx + 1] if at_idx + 1 < len(parts) else None
                     
+                    # Normalize team names for database lookup
+                    team_map = {'GSW': 'GS', 'PHX': 'PHO', 'NOP': 'NO', 'NYK': 'NY', 'SAS': 'SA', 'BKN': 'BK'}
+                    visitor_team = team_map.get(visitor_team, visitor_team)
+                    home_team = team_map.get(home_team, home_team)
+                    
                     if 'UNDER' in pick_name.upper():
                         result = conn.execute(text("""
                             SELECT under_odds FROM games_with_odds 
-                            WHERE date = CURRENT_DATE 
+                            WHERE game_date = CURRENT_DATE 
                             AND home_team = :home AND visitor_team = :visitor
                             LIMIT 1
                         """), {'home': home_team, 'visitor': visitor_team}).fetchone()
@@ -137,25 +142,28 @@ def capture_closing_odds():
                         
                         result = conn.execute(text("""
                             SELECT home_ml, away_ml FROM games_with_odds 
-                            WHERE date = CURRENT_DATE 
+                            WHERE game_date = CURRENT_DATE 
                             AND home_team = :home AND visitor_team = :visitor
                             LIMIT 1
                         """), {'home': home_team, 'visitor': visitor_team}).fetchone()
                         if result:
                             closing_odds = result[0] if team == home_team else result[1]
                     
-                    elif '+' in pick_name:
+                    elif '+' in pick_name or '-' in pick_name.split()[-1]:
+                        # Spread bet - use betting_odds table
                         result = conn.execute(text("""
-                            SELECT home_spread_odds, away_spread_odds FROM games_with_odds 
-                            WHERE date = CURRENT_DATE 
-                            AND home_team = :home AND visitor_team = :visitor
+                            SELECT home_spread_odds, away_spread_odds FROM betting_odds 
+                            WHERE game_date = CURRENT_DATE 
+                            AND home_team = :home AND away_team = :visitor
+                            ORDER BY updated_at DESC
                             LIMIT 1
                         """), {'home': home_team, 'visitor': visitor_team}).fetchone()
                         if result:
+                            # Check if picked team is visitor (getting points) or home
                             if f"{visitor_team} +" in pick_name:
-                                closing_odds = result[1]
+                                closing_odds = result[1]  # away_spread_odds
                             else:
-                                closing_odds = result[0]
+                                closing_odds = result[0]  # home_spread_odds
                     
                     if closing_odds:
                         print(f"   ✅ {pick_name[:40]}: {opening_odds} → {closing_odds}")

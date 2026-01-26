@@ -62,8 +62,7 @@ def send_news_to_discord(news_items):
         unsent = [{'id': r[0], 'title': r[1], 'link': r[2], 'source': r[3]} for r in result]
     
     if not unsent:
-        print("
-📤 No new news to send to Discord")
+        print("\n📤 No new news to send to Discord")
         return
     
     # Filter for important news only
@@ -71,8 +70,7 @@ def send_news_to_discord(news_items):
     skipped = len(unsent) - len(important_news)
     
     if skipped > 0:
-        print(f"
-📤 Filtered out {skipped} non-important news items")
+        print(f"📤 Filtered out {skipped} non-important news items")
         # Mark non-important as sent so we don't check again
         with engine.connect() as conn:
             for item in unsent:
@@ -84,8 +82,7 @@ def send_news_to_discord(news_items):
         print("📤 No important news to send to Discord")
         return
     
-    print(f"
-📤 Sending {len(important_news)} IMPORTANT news to Discord...")
+    print(f"\n📤 Sending {len(important_news)} IMPORTANT news to Discord...")
     sent = 0
     
     for item in important_news:
@@ -199,20 +196,3 @@ def main():
                 inserted += 1
             except Exception as e:
                 print(f"   ⚠️ {e}")
-        
-        conn.commit()
-    
-    # Count total
-    with engine.connect() as conn:
-        result = conn.execute(text("SELECT COUNT(*) FROM nba_news")).fetchone()
-        total = result[0]
-    
-    print(f"\n{'='*60}")
-    print(f"✅ COMPLETE: {inserted} processed, {total} total in DB")
-    print(f"{'='*60}")
-
-    # Send NEW news to Discord
-    send_news_to_discord(data)
-
-if __name__ == "__main__":
-    main()

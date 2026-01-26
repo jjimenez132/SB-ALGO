@@ -118,25 +118,103 @@ def grade_pick(pick, game_scores, player_stats):
     Grade a single pick against actual results.
     Returns: 'win', 'loss', 'push', or None if can't grade
     """
-    pick_name = pick['pick_name'].upper()
+    pick_name = pick['pick_name'].strip().upper()
     pick_type = pick['pick_type']
+    pick_date = pick.get('pick_date')
+    
+    # Get full pick info from discord_sent_picks if pick_name is incomplete
+    engine = get_engine()
+    full_pick_key = None
+    
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT pick_key FROM discord_sent_picks 
+            WHERE sent_date = :pick_date AND UPPER(pick_key) LIKE UPPER(:pattern)
+        """), {"pick_date": pick_date, "pattern": f"%{pick_name.split()[0]}%"}).fetchone()
+        if result:
+            full_pick_key = result[0]
     
     if pick_type == 'game':
-        # Parse game pick: "LAL @ NO UNDER 244.0" or "MIA @ MIN UNDER 238.5"
-        # Look for OVER/UNDER pattern
-        match = re.search(r'(.+?)\s+(UNDER|OVER)\s+([\d.]+)', pick_name)
-        if match:
-            matchup = match.group(1).strip()
-            direction = match.group(2)
-            line = float(match.group(3))
+        # Handle different game pick formats
+        
+        # Format 1: "BOS @ BKN BOS ML" - Moneyline
+        ml_match = re.search(r'(.+?)\s*@\s*(.+?)\s+(\w+)\s+ML', pick_name)
+        if ml_match:
+            away = ml_match.group(1).strip()
+            home = ml_match.group(2).strip()
+            team_picked = ml_match.group(3).strip()
             
-            # Find the game
             for key, score in game_scores.items():
-                if matchup in key or key in matchup:
-                    actual_total = score['total']
+                if (away in key and home in key) or (home in key and away in key):
+                    home_score = score.get('home_pts', 0)
+                    away_score = score.get('away_pts', 0)
+                    
+                    if home_score == 0 and away_score == 0:
+                        return None  # Game not finished
+                    
+                    # Determine winner
+                    if home_score > away_score:
+                        winner = home
+                    else:
+                        winner = away
+                    
+                    if team_picked in winner or winner in team_picked:
+                        return 'win'
+                    else:
+                        return 'loss'
+            
+            print(f"   ⚠️ Could not find game for ML: {away} @ {home}")
+            return None
+        
+        # Format 2: "DEN @ MIL DEN +7.5" or "WAS @ CHA WAS +10.5" - Spread
+        spread_match = re.search(r'(.+?)\s*@\s*(.+?)\s+(\w+)\s+([+-][\d.]+)', pick_name)
+        if spread_match:
+            away = spread_match.group(1).strip()
+            home = spread_match.group(2).strip()
+            team_picked = spread_match.group(3).strip()
+            spread = float(spread_match.group(4))
+            
+            for key, score in game_scores.items():
+                if (away in key and home in key) or (home in key and away in key):
+                    home_score = score.get('home_pts', 0)
+                    away_score = score.get('away_pts', 0)
+                    
+                    if home_score == 0 and away_score == 0:
+                        return None
+                    
+                    # Calculate margin from picked team's perspective
+                    if team_picked in away or away in team_picked:
+                        margin = away_score - home_score
+                    else:
+                        margin = home_score - away_score
+                    
+                    # Add spread to margin (spread is negative for favorites, positive for dogs)
+                    adjusted_margin = margin + spread
+                    
+                    if adjusted_margin > 0:
+                        return 'win'
+                    elif adjusted_margin < 0:
+                        return 'loss'
+                    else:
+                        return 'push'
+            
+            print(f"   ⚠️ Could not find game for spread: {away} @ {home}")
+            return None
+        
+        # Format 3: "LAL @ NO UNDER 244.0" - Total
+        total_match = re.search(r'(.+?)\s*@\s*(.+?)\s+(UNDER|OVER)\s+([\d.]+)', pick_name)
+        if total_match:
+            away = total_match.group(1).strip()
+            home = total_match.group(2).strip()
+            direction = total_match.group(3)
+            line = float(total_match.group(4))
+            
+            for key, score in game_scores.items():
+                if (away in key and home in key) or (home in key and away in key):
+                    actual_total = score.get('total', 0)
                     
                     if actual_total == 0:
-                        return None  # Game not finished
+                        return None
                     
                     if direction == 'UNDER':
                         if actual_total < line:
@@ -145,7 +223,7 @@ def grade_pick(pick, game_scores, player_stats):
                             return 'loss'
                         else:
                             return 'push'
-                    else:  # OVER
+                    else:
                         if actual_total > line:
                             return 'win'
                         elif actual_total < line:
@@ -153,40 +231,84 @@ def grade_pick(pick, game_scores, player_stats):
                         else:
                             return 'push'
             
-            print(f"   ⚠️ Could not find game for: {matchup}")
+            print(f"   ⚠️ Could not find game for total: {away} @ {home}")
             return None
+        
+        print(f"   ⚠️ Could not parse game pick format: {pick_name}")
+        return None
     
     elif pick_type == 'prop':
-        # Parse prop pick: "EVAN MOBLEY PTS UNDER 20.5" or "NAJI MARSHALL REB UNDER 5.5"
-        match = re.search(r'(.+?)\s+(PTS|REB|AST|STL|BLK|PRA)\s+(UNDER|OVER)\s+([\d.]+)', pick_name)
-        if match:
-            player_name = match.group(1).strip()
-            stat_type = match.group(2).lower()
-            direction = match.group(3)
-            line = float(match.group(4))
-            
-            # Find player stats
-            for name, stats in player_stats.items():
-                if player_name in name or name in player_name:
-                    actual_value = stats.get(stat_type, 0)
-                    
-                    if direction == 'UNDER':
-                        if actual_value < line:
-                            return 'win'
-                        elif actual_value > line:
-                            return 'loss'
-                        else:
-                            return 'push'
-                    else:  # OVER
-                        if actual_value > line:
-                            return 'win'
-                        elif actual_value < line:
-                            return 'loss'
-                        else:
-                            return 'push'
-            
-            print(f"   ⚠️ Could not find player stats for: {player_name}")
+        # Try to get full info from discord_sent_picks
+        # Format in discord_sent_picks: "PROP_Giannis Antetokounmpo_PTS_UNDER"
+        stat_type = None
+        direction = None
+        line = None
+        player_name = pick_name.strip()
+        
+        # First try parsing the pick_name itself
+        prop_match = re.search(r'(.+?)\s+(PTS|REB|AST|STL|BLK|PRA)\s+(UNDER|OVER)\s+([\d.]+)', pick_name)
+        if prop_match:
+            player_name = prop_match.group(1).strip()
+            stat_type = prop_match.group(2).lower()
+            direction = prop_match.group(3)
+            line = float(prop_match.group(4))
+        elif full_pick_key:
+            # Parse from discord_sent_picks key: "PROP_Player Name_PTS_UNDER"
+            parts = full_pick_key.split('_')
+            if len(parts) >= 4:
+                player_name = parts[1].upper()
+                stat_type = parts[2].lower()
+                direction = parts[3].upper()
+                
+                # Need to get line from player_props
+                with engine.connect() as conn:
+                    result = conn.execute(text("""
+                        SELECT line FROM player_props 
+                        WHERE game_date = :pick_date 
+                        AND UPPER(player_name) LIKE :player
+                        AND market = :market
+                        LIMIT 1
+                    """), {
+                        "pick_date": pick_date,
+                        "player": f"%{player_name}%",
+                        "market": {"pts": "player_points", "reb": "player_rebounds", "ast": "player_assists"}.get(stat_type, f"player_{stat_type}")
+                    }).fetchone()
+                    if result:
+                        line = float(result[0])
+        
+        if not stat_type or not direction:
+            print(f"   ⚠️ Could not parse prop format: {pick_name}")
             return None
+        
+        # Find player stats
+        for name, stats in player_stats.items():
+            if player_name in name.upper() or name.upper() in player_name:
+                actual_value = stats.get(stat_type, 0)
+                
+                # If we don't have a line, we can't grade
+                if line is None:
+                    print(f"   ⚠️ No line found for: {player_name}")
+                    return None
+                
+                print(f"   📊 {player_name} {stat_type.upper()}: Actual={actual_value}, Line={line}, Dir={direction}")
+                
+                if direction == 'UNDER':
+                    if actual_value < line:
+                        return 'win'
+                    elif actual_value > line:
+                        return 'loss'
+                    else:
+                        return 'push'
+                else:
+                    if actual_value > line:
+                        return 'win'
+                    elif actual_value < line:
+                        return 'loss'
+                    else:
+                        return 'push'
+        
+        print(f"   ⚠️ Could not find player stats for: {player_name}")
+        return None
     
     return None
 

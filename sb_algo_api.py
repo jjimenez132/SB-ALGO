@@ -35,20 +35,72 @@ _picks_cache = {}
 _cache_time = None
 CACHE_DURATION = 300
 
-PROP_FILTERS = {
-    'pts_over': {'edge_min': 0.20, 'cv_max': 0.45, 'proj_min': 20},
-    'pts_under': {'edge_min': 0.15, 'cv_max': 0.40, 'proj_min': 20},
-    'reb_over': {'edge_min': 0.15, 'cv_max': 0.40, 'proj_min': 11},
-    'reb_under': {'edge_min': 0.15, 'cv_max': 0.45, 'proj_min': 8},
-    'ast_over': {'edge_min': 0.25, 'cv_max': 0.40, 'proj_min': 8},
-}
+# =============================================================================
+# FILTERS - Imported from meta_merge_engine_v4.py (SINGLE SOURCE OF TRUTH)
+# =============================================================================
+from engines.meta_merge_engine_v4 import VEGAS_FILTERS as MASTER_FILTERS
 
-VEGAS_FILTERS = {
-    'moneyline': {'net_min': 5, 'opp_def_min': 114, 'opp_off_max': 112, 'odds_min': -300},
-    'under': {'comb_def_max': 226, 'comb_pace_max': 198, 'book_min': 225, 'book_max': 232},
-    'spread_favorite': {'net_min': 12, 'spread_max': 6, 'opp_def_min': 112},
-    'spread_dog': {'spread_min': 7, 'opp_net_max': 5},
-}
+# Convert from meta_merge format to sb_algo_api format
+def _convert_filters():
+    """Convert meta_merge filter format to sb_algo_api format"""
+    prop_filters = {}
+    vegas_filters = {}
+    
+    # Prop filters - convert edge from int to decimal, rename keys
+    prop_mappings = {
+        'prop_pts_over': 'pts_over',
+        'prop_pts_under': 'pts_under', 
+        'prop_reb_over': 'reb_over',
+        'prop_reb_under': 'reb_under',
+        'prop_ast_over': 'ast_over',
+    }
+    
+    for master_key, api_key in prop_mappings.items():
+        if master_key in MASTER_FILTERS and MASTER_FILTERS[master_key].get('enabled', True):
+            f = MASTER_FILTERS[master_key]
+            prop_filters[api_key] = {
+                'edge_min': abs(f.get('edge_min', f.get('edge_max', 15))) / 100,  # Convert 20 -> 0.20
+                'cv_max': f.get('cv_max', 0.45),
+                'proj_min': f.get('min_proj', 0),
+            }
+    
+    # Game filters - rename keys
+    if 'moneyline' in MASTER_FILTERS and MASTER_FILTERS['moneyline'].get('enabled', True):
+        f = MASTER_FILTERS['moneyline']
+        vegas_filters['moneyline'] = {
+            'net_min': f.get('net_diff_min', 5),
+            'opp_def_min': f.get('opp_def_min', 114),
+            'opp_off_max': f.get('opp_off_max', 112),
+            'odds_min': f.get('odds_min', -300),
+        }
+    
+    if 'under' in MASTER_FILTERS and MASTER_FILTERS['under'].get('enabled', True):
+        f = MASTER_FILTERS['under']
+        vegas_filters['under'] = {
+            'comb_def_max': f.get('combined_def_max', 226),
+            'comb_pace_max': f.get('combined_pace_max', 198),
+            'book_min': f.get('book_total_min', 225),
+            'book_max': f.get('book_total_max', 232),
+        }
+    
+    if 'spread_favorite' in MASTER_FILTERS and MASTER_FILTERS['spread_favorite'].get('enabled', True):
+        f = MASTER_FILTERS['spread_favorite']
+        vegas_filters['spread_favorite'] = {
+            'net_min': f.get('net_diff_min', 12),
+            'spread_max': f.get('spread_max', 6),
+            'opp_def_min': f.get('opp_def_min', 112),
+        }
+    
+    if 'spread_home_dog' in MASTER_FILTERS and MASTER_FILTERS['spread_home_dog'].get('enabled', True):
+        f = MASTER_FILTERS['spread_home_dog']
+        vegas_filters['spread_dog'] = {
+            'spread_min': f.get('home_spread_min', 7),
+            'opp_net_max': f.get('opp_net_max', 5),
+        }
+    
+    return prop_filters, vegas_filters
+
+PROP_FILTERS, VEGAS_FILTERS = _convert_filters()
 
 NAME_TO_ABBR = {
     'Atlanta Hawks': 'ATL', 'Boston Celtics': 'BOS', 'Brooklyn Nets': 'BKN', 'Charlotte Hornets': 'CHA',

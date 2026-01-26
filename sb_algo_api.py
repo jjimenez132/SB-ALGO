@@ -37,15 +37,16 @@ CACHE_DURATION = 300
 
 PROP_FILTERS = {
     'pts_over': {'edge_min': 0.20, 'cv_max': 0.45, 'proj_min': 20},
-    'pts_under': {'edge_max': 0.15, 'cv_max': 0.40, 'proj_min': 20},
+    'pts_under': {'edge_min': 0.15, 'cv_max': 0.40, 'proj_min': 20},
     'reb_over': {'edge_min': 0.15, 'cv_max': 0.40, 'proj_min': 11},
-    'reb_under': {'edge_max': 0.15, 'cv_max': 0.45, 'proj_min': 8},
+    'reb_under': {'edge_min': 0.15, 'cv_max': 0.45, 'proj_min': 8},
     'ast_over': {'edge_min': 0.25, 'cv_max': 0.40, 'proj_min': 8},
 }
 
 VEGAS_FILTERS = {
-    'moneyline': {'net_min': 5, 'opp_def_min': 114, 'opp_off_max': 112},
+    'moneyline': {'net_min': 5, 'opp_def_min': 114, 'opp_off_max': 112, 'odds_min': -300},
     'under': {'comb_def_max': 226, 'comb_pace_max': 198, 'book_min': 225, 'book_max': 232},
+    'spread_favorite': {'net_min': 12, 'spread_max': 6, 'opp_def_min': 112},
     'spread_dog': {'spread_min': 7, 'opp_net_max': 5},
 }
 
@@ -155,12 +156,15 @@ def get_todays_picks(force_refresh=False, target_date=None):
         if not home_s or not away_s:
             continue
         
-        # ML Filter
+        # ML Filter (73.3% backtest) - Added odds_min check
         f = VEGAS_FILTERS['moneyline']
+        odds_min = f.get('odds_min', -300)
         if home_s.get('net', 0) >= f['net_min'] and away_s.get('def', 0) >= f['opp_def_min'] and away_s.get('off', 999) <= f['opp_off_max']:
-            game_picks.append({'type': 'GAME', 'subtype': 'ML', 'pick': f"{home} ML", 'matchup': f"{away} @ {home}", 'odds': home_ml, 'edge': round(home_s['net'] - away_s['net'], 1)})
+            if home_ml and home_ml >= odds_min:  # Don't bet huge favorites
+                game_picks.append({'type': 'GAME', 'subtype': 'ML', 'pick': f"{home} ML", 'matchup': f"{away} @ {home}", 'odds': home_ml, 'edge': round(home_s['net'] - away_s['net'], 1)})
         if away_s.get('net', 0) >= f['net_min'] and home_s.get('def', 0) >= f['opp_def_min'] and home_s.get('off', 999) <= f['opp_off_max']:
-            game_picks.append({'type': 'GAME', 'subtype': 'ML', 'pick': f"{away} ML", 'matchup': f"{away} @ {home}", 'odds': away_ml, 'edge': round(away_s['net'] - home_s['net'], 1)})
+            if away_ml and away_ml >= odds_min:  # Don't bet huge favorites
+                game_picks.append({'type': 'GAME', 'subtype': 'ML', 'pick': f"{away} ML", 'matchup': f"{away} @ {home}", 'odds': away_ml, 'edge': round(away_s['net'] - home_s['net'], 1)})
         
         # UNDER Filter
         f = VEGAS_FILTERS['under']
@@ -168,6 +172,20 @@ def get_todays_picks(force_refresh=False, target_date=None):
         comb_pace = home_s.get('pace', 0) + away_s.get('pace', 0)
         if comb_def <= f['comb_def_max'] and comb_pace <= f['comb_pace_max'] and f['book_min'] <= total <= f['book_max']:
             game_picks.append({'type': 'GAME', 'subtype': 'UNDER', 'pick': f"UNDER {total}", 'matchup': f"{away} @ {home}", 'odds': -110, 'edge': round(f['comb_def_max'] - comb_def, 1)})
+        
+        # SPREAD FAVORITE Filter (72.7% backtest) - NEW
+        if 'spread_favorite' in VEGAS_FILTERS:
+            f = VEGAS_FILTERS['spread_favorite']
+            net_diff = home_s.get('net', 0) - away_s.get('net', 0)
+            # Home team is favorite (spread < 0)
+            if spread and spread < 0 and abs(spread) <= f['spread_max']:
+                if net_diff >= f['net_min'] and away_s.get('def', 0) >= f['opp_def_min']:
+                    game_picks.append({'type': 'GAME', 'subtype': 'SPREAD', 'pick': f"{home} {spread}", 'matchup': f"{away} @ {home}", 'odds': -110, 'edge': round(net_diff, 1)})
+            # Away team is favorite (spread > 0 means home is dog)
+            elif spread and spread > 0:
+                net_diff_away = away_s.get('net', 0) - home_s.get('net', 0)
+                if spread <= f['spread_max'] and net_diff_away >= f['net_min'] and home_s.get('def', 0) >= f['opp_def_min']:
+                    game_picks.append({'type': 'GAME', 'subtype': 'SPREAD', 'pick': f"{away} -{spread}", 'matchup': f"{away} @ {home}", 'odds': -110, 'edge': round(net_diff_away, 1)})
         
         # SPREAD DOG Filter
         f = VEGAS_FILTERS['spread_dog']
@@ -220,14 +238,14 @@ def get_todays_picks(force_refresh=False, target_date=None):
         fkey = f"{stat}_under"
         if fkey in PROP_FILTERS:
             f = PROP_FILTERS[fkey]
-            e_pass = edge_u >= f.get('edge_max', 999)
+            e_pass = edge_u >= f.get('edge_min', 0.15)
             c_pass = cv <= f['cv_max']
             p_pass = proj >= f['proj_min']
             if e_pass and c_pass and p_pass:
                 official_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} UNDER {line}", 'projection': round(proj, 1), 'edge': round(edge_u * 100, 1), 'cv': round(cv, 2), 'odds': under_odds or -110})
             elif sum([e_pass, c_pass, p_pass]) == 2:
                 near, reason = False, ""
-                if not e_pass and edge_u >= (f['edge_max'] - 0.03):
+                if not e_pass and edge_u >= (f['edge_min'] - 0.03):
                     near, reason = True, f"Edge {edge_u*100:.1f}%"
                 elif not c_pass and cv <= (f['cv_max'] + 0.05):
                     near, reason = True, f"CV {cv:.2f}"

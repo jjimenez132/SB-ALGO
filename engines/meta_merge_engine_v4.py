@@ -293,10 +293,10 @@ VEGAS_FILTERS = {
         'enabled': True,
     },
     'prop_ra': {
-        'edge_min': 20,
-        'cv_max': 0.30,
-        'min_proj': 15,           # RA projection minimum
-        'enabled': True,
+        'edge_min': 18,           # Optimized: was 20
+        'cv_max': 0.38,           # Optimized: was 0.30
+        'min_proj': 11,           # Optimized: was 15
+        'enabled': True,          # 66.7% (18-9) in Jan backtest
     },
 }
 

@@ -53,6 +53,8 @@ def _convert_filters():
         'prop_reb_over': 'reb_over',
         'prop_reb_under': 'reb_under',
         'prop_ast_over': 'ast_over',
+        'prop_pra': 'pra_over',
+        'prop_ra': 'ra_over',
     }
     
     for master_key, api_key in prop_mappings.items():
@@ -113,7 +115,7 @@ NAME_TO_ABBR = {
     'Utah Jazz': 'UTA', 'Washington Wizards': 'WAS'
 }
 
-MARKET_TO_STAT = {'player_points': 'pts', 'player_rebounds': 'reb', 'player_assists': 'ast'}
+MARKET_TO_STAT = {'player_points': 'pts', 'player_rebounds': 'reb', 'player_assists': 'ast', 'player_points_rebounds_assists': 'pra', 'player_rebounds_assists': 'ra'}
 
 def get_eastern_date():
     eastern = pytz.timezone('US/Eastern')
@@ -125,11 +127,21 @@ def get_proj(player_games, player, stat, game_date):
     games_list = sorted([g for g in player_games[player] if g['date'] < game_date], key=lambda x: x['date'], reverse=True)
     if len(games_list) < 5:
         return None, None
-    values = [g[stat] for g in games_list[:15]]
+    
+    # Handle combined stats
+    def get_stat_value(g, stat):
+        if stat == 'pra':
+            return g['pts'] + g['reb'] + g['ast']
+        elif stat == 'ra':
+            return g['reb'] + g['ast']
+        else:
+            return g[stat]
+    
+    values = [get_stat_value(g, stat) for g in games_list[:15]]
     l5 = sum(values[:5])/5
     l10 = sum(values[:10])/min(10,len(values))
     l15 = sum(values[:15])/min(15,len(values))
-    season = sum(g[stat] for g in games_list) / len(games_list)
+    season = sum(get_stat_value(g, stat) for g in games_list) / len(games_list)
     proj = 0.40*l5 + 0.30*l10 + 0.20*l15 + 0.10*season
     std = statistics.stdev(values[:10]) if len(values) >= 10 else statistics.stdev(values[:5])
     cv = std / proj if proj > 0 else 1
@@ -167,7 +179,7 @@ def get_todays_picks(force_refresh=False, target_date=None):
         SELECT player_name, market, line, over_odds, under_odds
         FROM player_props
         WHERE game_date = %s AND sportsbook = 'DraftKings'
-        AND market IN ('player_points', 'player_rebounds', 'player_assists')
+        AND market IN ('player_points', 'player_rebounds', 'player_assists', 'player_points_rebounds_assists', 'player_rebounds_assists')
     """, (today,))
     props = cur.fetchall()
     

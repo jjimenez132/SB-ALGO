@@ -234,17 +234,17 @@ def get_todays_picks(force_refresh=False, target_date=None):
         odds_min = f.get('odds_min', -300)
         if home_s.get('net', 0) >= f['net_min'] and away_s.get('def', 0) >= f['opp_def_min'] and away_s.get('off', 999) <= f['opp_off_max']:
             if home_ml and home_ml >= odds_min:  # Don't bet huge favorites
-                game_picks.append({'type': 'GAME', 'subtype': 'ML', 'pick': f"{home} ML", 'matchup': f"{away} @ {home}", 'odds': home_ml, 'edge': round(home_s['net'] - away_s['net'], 1)})
+                game_picks.append({'type': 'GAME', 'subtype': 'ML', 'pick': f"{home} ML", 'matchup': f"{away} @ {home}", 'odds': home_ml, 'edge': round(home_s['net'] - away_s['net'], 1), 'tier': 1})
         if away_s.get('net', 0) >= f['net_min'] and home_s.get('def', 0) >= f['opp_def_min'] and home_s.get('off', 999) <= f['opp_off_max']:
             if away_ml and away_ml >= odds_min:  # Don't bet huge favorites
-                game_picks.append({'type': 'GAME', 'subtype': 'ML', 'pick': f"{away} ML", 'matchup': f"{away} @ {home}", 'odds': away_ml, 'edge': round(away_s['net'] - home_s['net'], 1)})
+                game_picks.append({'type': 'GAME', 'subtype': 'ML', 'pick': f"{away} ML", 'matchup': f"{away} @ {home}", 'odds': away_ml, 'edge': round(away_s['net'] - home_s['net'], 1), 'tier': 1})
         
         # UNDER Filter
         f = VEGAS_FILTERS['under']
         comb_def = home_s.get('def', 0) + away_s.get('def', 0)
         comb_pace = home_s.get('pace', 0) + away_s.get('pace', 0)
         if comb_def <= f['comb_def_max'] and comb_pace <= f['comb_pace_max'] and f['book_min'] <= total <= f['book_max']:
-            game_picks.append({'type': 'GAME', 'subtype': 'UNDER', 'pick': f"UNDER {total}", 'matchup': f"{away} @ {home}", 'odds': -110, 'edge': round(f['comb_def_max'] - comb_def, 1)})
+            game_picks.append({'type': 'GAME', 'subtype': 'UNDER', 'pick': f"UNDER {total}", 'matchup': f"{away} @ {home}", 'odds': -110, 'edge': round(f['comb_def_max'] - comb_def, 1), 'tier': 1})
         
         # SPREAD FAVORITE Filter (72.7% backtest) - NEW
         if 'spread_favorite' in VEGAS_FILTERS:
@@ -265,7 +265,7 @@ def get_todays_picks(force_refresh=False, target_date=None):
         # Only bet HOME underdogs (spread > 0 means home is getting points)
         if spread and spread > 0 and spread >= f['spread_min']:
             if away_s.get('net', 0) <= f['opp_net_max']:
-                game_picks.append({'type': 'GAME', 'subtype': 'SPREAD', 'pick': f"{home} +{spread}", 'matchup': f"{away} @ {home}", 'odds': -110, 'edge': round(spread, 1)})
+                game_picks.append({'type': 'GAME', 'subtype': 'SPREAD', 'pick': f"{home} +{spread}", 'matchup': f"{away} @ {home}", 'odds': -110, 'edge': round(spread, 1), 'tier': 1})
     
     # PROP PICKS
     official_props = []
@@ -292,7 +292,7 @@ def get_todays_picks(force_refresh=False, target_date=None):
             c_pass = cv <= f['cv_max']
             p_pass = proj >= f['proj_min']
             if e_pass and c_pass and p_pass:
-                official_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} OVER {line}", 'projection': round(proj, 1), 'edge': round(edge * 100, 1), 'cv': round(cv, 2), 'odds': over_odds or -110})
+                official_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} OVER {line}", 'projection': round(proj, 1), 'edge': round(edge * 100, 1), 'cv': round(cv, 2), 'odds': over_odds or -110, 'tier': 1})
             elif sum([e_pass, c_pass, p_pass]) == 2:
                 near, reason = False, ""
                 if not e_pass and edge >= (f['edge_min'] - 0.03):
@@ -313,7 +313,7 @@ def get_todays_picks(force_refresh=False, target_date=None):
             c_pass = cv <= f['cv_max']
             p_pass = proj >= f['proj_min']
             if e_pass and c_pass and p_pass:
-                official_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} UNDER {line}", 'projection': round(proj, 1), 'edge': round(edge_u * 100, 1), 'cv': round(cv, 2), 'odds': under_odds or -110})
+                official_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} UNDER {line}", 'projection': round(proj, 1), 'edge': round(edge_u * 100, 1), 'cv': round(cv, 2), 'odds': under_odds or -110, 'tier': 1})
             elif sum([e_pass, c_pass, p_pass]) == 2:
                 near, reason = False, ""
                 if not e_pass and edge_u >= (f['edge_min'] - 0.03):

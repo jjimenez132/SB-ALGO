@@ -23,11 +23,11 @@ import requests
 
 # Import explanation engine
 try:
-    from explanation_engine import generate_game_explanation, generate_prop_explanation
+    from real_explanation_engine import get_player_explanation
     EXPLANATION_ENABLED = True
 except ImportError:
     EXPLANATION_ENABLED = False
-    print("⚠️ Explanation engine not available")
+    print("⚠️ Real explanation engine not available")
 import json
 from datetime import datetime
 import pytz

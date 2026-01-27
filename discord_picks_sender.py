@@ -604,9 +604,23 @@ def create_prop_pick_embed(pick, is_alert=False):
     }
 
 def create_summary_embed(picks_data):
-    """Create summary embed"""
+    """Create summary embed with engine health status"""
     game_picks = picks_data.get('game_picks', [])
     prop_picks = picks_data.get('prop_picks', [])
+    summary = picks_data.get('summary', {})
+    
+    # Engine health status
+    engine_used = summary.get('engine_used', 0)
+    fallback_used = summary.get('fallback_used', 0)
+    engine_available = summary.get('engine_available', False)
+    
+    if engine_available:
+        if fallback_used > 0:
+            engine_status = f"⚠️ {engine_used}/{engine_used + fallback_used} full engine"
+        else:
+            engine_status = f"✅ Full engine ({engine_used} props)"
+    else:
+        engine_status = "❌ Engine offline (fallback mode)"
     
     return {
         "title": "📊 TODAY'S SUMMARY",
@@ -616,10 +630,10 @@ def create_summary_embed(picks_data):
             {"name": "🎯 Prop Picks", "value": str(len(prop_picks)), "inline": True},
             {"name": "💰 Total Stake", "value": picks_data.get('total_stake', '$0'), "inline": True},
             {"name": "📈 Avg EV", "value": f"{picks_data.get('avg_ev', '0')}%", "inline": True},
-            {"name": "🎯 Total Picks", "value": str(picks_data.get('total_picks', 0)), "inline": True},
+            {"name": "⚙️ Engine", "value": engine_status, "inline": True},
             {"name": "⏰ Generated", "value": get_eastern_time().strftime('%I:%M %p ET'), "inline": True},
         ],
-        "footer": {"text": "SB-ALGO v4.0 • Meta-Merge Engine • 15 Sub-Engines"}
+        "footer": {"text": "SB-ALGO v4.0 • Full Math Engine Integration"}
     }
 
 def send_morning_report():

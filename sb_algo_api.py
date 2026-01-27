@@ -55,6 +55,14 @@ except ImportError:
     MATH_ENGINE_AVAILABLE = False
     print("⚠️ NBAMathEngine not available - using fallback")
 
+# KellyEngine - Bet sizing with fractional Kelly
+try:
+    from kelly_engine import KellyEngine
+    KELLY_ENGINE_AVAILABLE = True
+except ImportError:
+    KELLY_ENGINE_AVAILABLE = False
+    print("⚠️ KellyEngine not available - using 1 unit default")
+
 # Initialize engines (lazy load)
 _prop_engine = None
 _math_engine = None
@@ -89,6 +97,14 @@ def get_math_engine():
     if _math_engine is None and MATH_ENGINE_AVAILABLE:
         _math_engine = NBAMathEngine()
     return _math_engine
+
+# Kelly engine (conservative profile for safe bet sizing)
+_kelly_engine = None
+def get_kelly_engine():
+    global _kelly_engine
+    if _kelly_engine is None and KELLY_ENGINE_AVAILABLE:
+        _kelly_engine = KellyEngine(risk_profile='conservative')
+    return _kelly_engine
 
 # =============================================================================
 # FILTERS - Imported from meta_merge_engine_v4.py (SINGLE SOURCE OF TRUTH)
@@ -182,6 +198,45 @@ MARKET_TO_STAT = {'player_points': 'pts', 'player_rebounds': 'reb', 'player_assi
 def get_eastern_date():
     eastern = pytz.timezone('US/Eastern')
     return datetime.now(eastern).date()
+
+def calculate_kelly_grade(over_prob, odds=-110, edge=0.0):
+    """
+    Calculate Kelly bet sizing and grade.
+    Uses fractional Kelly with conservative risk profile.
+    
+    Returns: (units, grade)
+      - units: 0.5 to 2.0 units
+      - grade: 'A+', 'A', 'B+', 'B', 'C'
+    """
+    kelly = get_kelly_engine()
+    
+    if kelly and over_prob and over_prob > 0.5:
+        try:
+            result = kelly.calculate_bet(over_prob, odds, 1000)  # using 1000 as bankroll reference
+            kelly_pct = result.get('kelly_stake', 0.01)
+            grade = result.get('grade', 'C')
+            
+            # Convert kelly percentage to units (0.5 to 2.0)
+            if kelly_pct >= 0.04:  # 4%+ = 2 units
+                units = 2.0
+            elif kelly_pct >= 0.03:  # 3%+ = 1.5 units
+                units = 1.5
+            elif kelly_pct >= 0.02:  # 2%+ = 1 unit
+                units = 1.0
+            else:
+                units = 0.5
+            
+            return units, grade
+        except:
+            pass
+    
+    # Fallback based on edge
+    if edge >= 0.25:
+        return 1.5, 'B+'
+    elif edge >= 0.15:
+        return 1.0, 'B'
+    else:
+        return 0.5, 'C'
 
 def get_proj(player_games, player, stat, game_date):
     """
@@ -486,7 +541,18 @@ def get_todays_picks(force_refresh=False, target_date=None):
             c_pass = cv <= f['cv_max']
             p_pass = proj >= f['proj_min']
             if e_pass and c_pass and p_pass:
-                official_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} OVER {line}", 'projection': round(proj, 1), 'edge': round(edge * 100, 1), 'cv': round(cv, 2), 'odds': over_odds or -110, 'tier': 1})
+                units, grade = calculate_kelly_grade(over_prob, over_odds or -110, edge)
+                official_props.append({
+                    'type': 'PROP', 'player': player, 
+                    'pick': f"{stat.upper()} OVER {line}", 
+                    'projection': round(proj, 1), 
+                    'edge': round(edge * 100, 1), 
+                    'cv': round(cv, 2), 
+                    'odds': over_odds or -110, 
+                    'tier': 1,
+                    'units': units,
+                    'grade': grade
+                })
             elif sum([e_pass, c_pass, p_pass]) == 2:
                 near, reason = False, ""
                 if not e_pass and edge >= (f['edge_min'] - 0.03):
@@ -507,7 +573,18 @@ def get_todays_picks(force_refresh=False, target_date=None):
             c_pass = cv <= f['cv_max']
             p_pass = proj >= f['proj_min']
             if e_pass and c_pass and p_pass:
-                official_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} UNDER {line}", 'projection': round(proj, 1), 'edge': round(edge_u * 100, 1), 'cv': round(cv, 2), 'odds': under_odds or -110, 'tier': 1})
+                units, grade = calculate_kelly_grade(under_prob, under_odds or -110, edge_u)
+                official_props.append({
+                    'type': 'PROP', 'player': player, 
+                    'pick': f"{stat.upper()} UNDER {line}", 
+                    'projection': round(proj, 1), 
+                    'edge': round(edge_u * 100, 1), 
+                    'cv': round(cv, 2), 
+                    'odds': under_odds or -110, 
+                    'tier': 1,
+                    'units': units,
+                    'grade': grade
+                })
             elif sum([e_pass, c_pass, p_pass]) == 2:
                 near, reason = False, ""
                 if not e_pass and edge_u >= (f['edge_min'] - 0.03):

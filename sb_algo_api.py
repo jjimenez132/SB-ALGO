@@ -53,6 +53,8 @@ def _convert_filters():
         'prop_reb_over': 'reb_over',
         'prop_reb_under': 'reb_under',
         'prop_ast_over': 'ast_over',
+        'prop_ast_under': 'ast_under',
+        'prop_3pm_under': '3pm_under',
         'prop_pra': 'pra_over',
         'prop_ra': 'ra_over',
     }
@@ -115,7 +117,7 @@ NAME_TO_ABBR = {
     'Utah Jazz': 'UTA', 'Washington Wizards': 'WAS'
 }
 
-MARKET_TO_STAT = {'player_points': 'pts', 'player_rebounds': 'reb', 'player_assists': 'ast', 'player_points_rebounds_assists': 'pra', 'player_rebounds_assists': 'ra'}
+MARKET_TO_STAT = {'player_points': 'pts', 'player_rebounds': 'reb', 'player_assists': 'ast', 'player_points_rebounds_assists': 'pra', 'player_rebounds_assists': 'ra', 'player_threes': '3pm'}
 
 def get_eastern_date():
     eastern = pytz.timezone('US/Eastern')
@@ -134,6 +136,8 @@ def get_proj(player_games, player, stat, game_date):
             return g['pts'] + g['reb'] + g['ast']
         elif stat == 'ra':
             return g['reb'] + g['ast']
+        elif stat == '3pm':
+            return g['3pm']
         else:
             return g[stat]
     
@@ -166,20 +170,20 @@ def get_todays_picks(force_refresh=False, target_date=None):
     
     # Load player boxscores
     cur.execute("""
-        SELECT player_name, game_date, pts, reb, ast
+        SELECT player_name, game_date, pts, reb, ast, fg3m
         FROM player_boxscores WHERE game_date >= '2024-10-01' AND game_date < %s
     """, (today,))
     player_games = defaultdict(list)
     for row in cur.fetchall():
-        player, gdate, pts, reb, ast = row
-        player_games[player].append({'date': gdate, 'pts': float(pts or 0), 'reb': float(reb or 0), 'ast': float(ast or 0)})
+        player, gdate, pts, reb, ast, fg3m = row
+        player_games[player].append({'date': gdate, 'pts': float(pts or 0), 'reb': float(reb or 0), 'ast': float(ast or 0), '3pm': float(fg3m or 0)})
     
     # Load today's props
     cur.execute("""
         SELECT player_name, market, line, over_odds, under_odds
         FROM player_props
         WHERE game_date = %s AND sportsbook = 'DraftKings'
-        AND market IN ('player_points', 'player_rebounds', 'player_assists', 'player_points_rebounds_assists', 'player_rebounds_assists')
+        AND market IN ('player_points', 'player_rebounds', 'player_assists', 'player_points_rebounds_assists', 'player_rebounds_assists', 'player_threes')
     """, (today,))
     props = cur.fetchall()
     

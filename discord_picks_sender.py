@@ -21,13 +21,13 @@ USAGE:
 import os
 import requests
 
-# Import explanation engine
+# Import GEMINI explanation engine for rich narrative explanations
 try:
-    from real_explanation_engine import get_player_explanation
+    from explanation_engine import generate_prop_explanation, generate_game_explanation
     EXPLANATION_ENABLED = True
 except ImportError:
     EXPLANATION_ENABLED = False
-    print("⚠️ Real explanation engine not available")
+    print("⚠️ Gemini explanation engine not available")
 import json
 from datetime import datetime
 import pytz
@@ -530,21 +530,41 @@ def create_prop_pick_embed(pick, is_alert=False):
     else:
         units = "0.5u"  # Tier 2: 74.1% backtest
     
-    # Clean explanation - just the facts
+    # Generate GEMINI explanation with rich narrative
     cv = pick.get('cv', 0.3)
     direction = "OVER" if "OVER" in prop else "UNDER"
     
-    lines = []
-    if direction == "UNDER":
-        diff = line - projection
-        lines.append(f"• Projection: {projection:.1f} vs Line: {line} (edge {edge_val:.1f}%)")
-        lines.append(f"• CV: {cv:.2f} - {'Very consistent' if cv < 0.35 else 'Consistent' if cv < 0.45 else 'Moderate variance'}")
+    explanation = ""
+    if EXPLANATION_ENABLED:
+        try:
+            # Build pick_data for Gemini engine
+            pick_data = {
+                'player': player,
+                'stat': stat,
+                'book_line': line,
+                'matchup': pick.get('matchup', ''),
+                'projection': {
+                    'weighted': projection,
+                    'l5': pick.get('l5', projection),
+                    'l10': pick.get('l10', projection),
+                    'l15': pick.get('l15', projection),
+                },
+                'best_side': direction,
+                'edge_pct': edge_val,
+                'filters': {
+                    'gp': pick.get('gp', 20),
+                    'mpg': pick.get('mpg', 30),
+                    'hit_rate': {'hit_rate': pick.get('hit_rate', 0.70), 'hits': 10}
+                },
+                'probabilities': {'adjusted': 0.75 + (edge_val / 100)}
+            }
+            explanation = generate_prop_explanation(pick_data)
+        except Exception as e:
+            print(f"   ⚠️ Gemini explanation error: {e}")
+            explanation = f"• Projection: {projection:.1f} vs Line: {line} (edge {edge_val:.1f}%)"
     else:
-        diff = projection - line
-        lines.append(f"• Projection: {projection:.1f} vs Line: {line} (edge {edge_val:.1f}%)")
-        lines.append(f"• CV: {cv:.2f} - {'Very consistent' if cv < 0.35 else 'Consistent' if cv < 0.45 else 'Moderate variance'}")
-    
-    explanation = "\n".join(lines)
+        explanation = f"• Projection: {projection:.1f} vs Line: {line} (edge {edge_val:.1f}%)"
+
     
     # Show tier instead of fake hit rate
     tier = pick.get('tier', 1)

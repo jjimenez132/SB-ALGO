@@ -47,16 +47,21 @@ def _convert_filters():
     vegas_filters = {}
     
     # Prop filters - convert edge from int to decimal, rename keys
+    # TIERED SYSTEM v2.1 - Use T1 filters (80.4% win rate)
     prop_mappings = {
-        'prop_pts_over': 'pts_over',
-        'prop_pts_under': 'pts_under', 
-        'prop_reb_over': 'reb_over',
-        'prop_reb_under': 'reb_under',
-        'prop_ast_over': 'ast_over',
-        'prop_ast_under': 'ast_under',
-        'prop_3pm_under': '3pm_under',
-        'prop_pra': 'pra_over',
-        'prop_ra': 'ra_over',
+        'prop_pts_over_t1': 'pts_over',
+        'prop_pts_under_t1': 'pts_under', 
+        'prop_reb_over_t1': 'reb_over',
+        'prop_reb_under_t1': 'reb_under',
+        'prop_ast_over_t1': 'ast_over',
+        'prop_ast_under_t1': 'ast_under',
+        'prop_3pm_under_t1': '3pm_under',
+    }
+    
+    # T2 filters (add volume at 0.5 units) - only enabled ones
+    t2_mappings = {
+        'prop_reb_under_t2': 'reb_under_t2',
+        'prop_ast_under_t2': 'ast_under_t2',
     }
     
     for master_key, api_key in prop_mappings.items():
@@ -69,8 +74,8 @@ def _convert_filters():
             }
     
     # Game filters - rename keys
-    if 'moneyline' in MASTER_FILTERS and MASTER_FILTERS['moneyline'].get('enabled', True):
-        f = MASTER_FILTERS['moneyline']
+    if 'game_moneyline' in MASTER_FILTERS and MASTER_FILTERS['game_moneyline'].get('enabled', True):
+        f = MASTER_FILTERS['game_moneyline']
         vegas_filters['moneyline'] = {
             'net_min': f.get('net_diff_min', 5),
             'opp_def_min': f.get('opp_def_min', 114),
@@ -78,8 +83,8 @@ def _convert_filters():
             'odds_min': f.get('odds_min', -300),
         }
     
-    if 'under' in MASTER_FILTERS and MASTER_FILTERS['under'].get('enabled', True):
-        f = MASTER_FILTERS['under']
+    if 'game_under' in MASTER_FILTERS and MASTER_FILTERS['game_under'].get('enabled', True):
+        f = MASTER_FILTERS['game_under']
         vegas_filters['under'] = {
             'comb_def_max': f.get('combined_def_max', 226),
             'comb_pace_max': f.get('combined_pace_max', 198),
@@ -95,8 +100,8 @@ def _convert_filters():
             'opp_def_min': f.get('opp_def_min', 112),
         }
     
-    if 'spread_home_dog' in MASTER_FILTERS and MASTER_FILTERS['spread_home_dog'].get('enabled', True):
-        f = MASTER_FILTERS['spread_home_dog']
+    if 'game_home_dog' in MASTER_FILTERS and MASTER_FILTERS['game_home_dog'].get('enabled', True):
+        f = MASTER_FILTERS['game_home_dog']
         vegas_filters['spread_dog'] = {
             'spread_min': f.get('home_spread_min', 7),
             'opp_net_max': f.get('opp_net_max', 5),

@@ -530,32 +530,28 @@ def create_prop_pick_embed(pick, is_alert=False):
     else:
         units = "0.5u"  # Tier 2: 74.1% backtest
     
-    # Generate explanation with REAL logic (not AI garbage)
+    # Clean explanation - just the facts
     cv = pick.get('cv', 0.3)
     direction = "OVER" if "OVER" in prop else "UNDER"
     
     lines = []
     if direction == "UNDER":
         diff = line - projection
-        lines.append(f"• Model projection of {projection:.1f} is {diff:.1f} points below the line of {line}.")
-        lines.append(f"• Edge of +{edge_val:.1f}% with CV of {cv:.2f} indicates consistent performance.")
-        if edge_val >= 15:
-            lines.append(f"• Line appears inflated - true value closer to {projection:.0f}.")
+        lines.append(f"• Projection: {projection:.1f} vs Line: {line} (edge {edge_val:.1f}%)")
+        lines.append(f"• CV: {cv:.2f} - {'Very consistent' if cv < 0.35 else 'Consistent' if cv < 0.45 else 'Moderate variance'}")
     else:
         diff = projection - line
-        lines.append(f"• Model projection of {projection:.1f} is {diff:.1f} points above the line of {line}.")
-        lines.append(f"• Edge of +{edge_val:.1f}% with CV of {cv:.2f} indicates consistent performance.")
-        if edge_val >= 20:
-            lines.append(f"• Line appears deflated - true value closer to {projection:.0f}.")
+        lines.append(f"• Projection: {projection:.1f} vs Line: {line} (edge {edge_val:.1f}%)")
+        lines.append(f"• CV: {cv:.2f} - {'Very consistent' if cv < 0.35 else 'Consistent' if cv < 0.45 else 'Moderate variance'}")
     
     explanation = "\n".join(lines)
     
-    # Use real backtest hit rate based on tier
+    # Show tier instead of fake hit rate
     tier = pick.get('tier', 1)
-    real_hit_rate = "80%" if tier == 1 else "74%"
+    tier_label = "TIER 1" if tier == 1 else "TIER 2"
     
     fields = [
-        {"name": "Hit Rate", "value": real_hit_rate, "inline": True},
+        {"name": "Tier", "value": tier_label, "inline": True},
         {"name": "Edge", "value": f"+{edge_val:.1f}%", "inline": True},
         {"name": "EV", "value": f"{ev_val}%", "inline": True},
         {"name": "Model Proj", "value": f"{projection:.1f}" if projection else "N/A", "inline": True},

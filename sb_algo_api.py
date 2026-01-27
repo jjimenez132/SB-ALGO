@@ -175,13 +175,23 @@ def get_todays_picks(force_refresh=False, target_date=None):
     
     # Load player boxscores
     cur.execute("""
-        SELECT player_name, game_date, pts, reb, ast, fg3m
+        SELECT player_name, game_date, pts, reb, ast, fg3m, min
         FROM player_boxscores WHERE game_date >= '2024-10-01' AND game_date < %s
     """, (today,))
     player_games = defaultdict(list)
     for row in cur.fetchall():
-        player, gdate, pts, reb, ast, fg3m = row
-        player_games[player].append({'date': gdate, 'pts': float(pts or 0), 'reb': float(reb or 0), 'ast': float(ast or 0), '3pm': float(fg3m or 0)})
+        player, gdate, pts, reb, ast, fg3m, mins = row
+        # Parse minutes (handles "39:00" format)
+        min_val = 0
+        if mins:
+            if ':' in str(mins):
+                min_val = float(str(mins).split(':')[0])
+            else:
+                try: min_val = float(mins)
+                except: min_val = 0
+        # ONLY include games with 20+ minutes (filter injury exits)
+        if min_val >= 20:
+            player_games[player].append({'date': gdate, 'pts': float(pts or 0), 'reb': float(reb or 0), 'ast': float(ast or 0), '3pm': float(fg3m or 0), 'min': min_val})
     
     # Load today's props
     cur.execute("""

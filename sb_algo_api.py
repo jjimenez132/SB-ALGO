@@ -106,6 +106,20 @@ def get_kelly_engine():
         _kelly_engine = KellyEngine(risk_profile='conservative')
     return _kelly_engine
 
+# InjuryEngine - Team injury impact analysis
+try:
+    from injury_engine import InjuryEngine
+    INJURY_ENGINE_AVAILABLE = True
+except ImportError:
+    INJURY_ENGINE_AVAILABLE = False
+
+_injury_engine = None
+def get_injury_engine():
+    global _injury_engine
+    if _injury_engine is None and INJURY_ENGINE_AVAILABLE:
+        _injury_engine = InjuryEngine()
+    return _injury_engine
+
 # =============================================================================
 # FILTERS - Imported from meta_merge_engine_v4.py (SINGLE SOURCE OF TRUTH)
 # =============================================================================
@@ -459,15 +473,32 @@ def get_todays_picks(force_refresh=False, target_date=None):
         if not home_s or not away_s:
             continue
         
+        # Get injury context for this game
+        injury_note = ""
+        if INJURY_ENGINE_AVAILABLE:
+            try:
+                inj_engine = get_injury_engine()
+                home_injuries = inj_engine.get_team_injury_report(home)
+                away_injuries = inj_engine.get_team_injury_report(away)
+                notes = []
+                if home_injuries and home_injuries.get('total_spread_impact', 0) > 1:
+                    notes.append(f"{home} -{home_injuries['total_spread_impact']:.1f}")
+                if away_injuries and away_injuries.get('total_spread_impact', 0) > 1:
+                    notes.append(f"{away} -{away_injuries['total_spread_impact']:.1f}")
+                if notes:
+                    injury_note = "⚠️ " + ", ".join(notes)
+            except:
+                pass
+        
         # ML Filter (73.3% backtest) - Added odds_min check
         f = VEGAS_FILTERS['moneyline']
         odds_min = f.get('odds_min', -300)
         if home_s.get('net', 0) >= f['net_min'] and away_s.get('def', 0) >= f['opp_def_min'] and away_s.get('off', 999) <= f['opp_off_max']:
             if home_ml and home_ml >= odds_min:  # Don't bet huge favorites
-                game_picks.append({'type': 'GAME', 'subtype': 'ML', 'pick': f"{home} ML", 'matchup': f"{away} @ {home}", 'odds': home_ml, 'edge': round(home_s['net'] - away_s['net'], 1), 'tier': 1})
+                game_picks.append({'type': 'GAME', 'subtype': 'ML', 'pick': f"{home} ML", 'matchup': f"{away} @ {home}", 'odds': home_ml, 'edge': round(home_s['net'] - away_s['net'], 1), 'tier': 1, 'injury_note': injury_note})
         if away_s.get('net', 0) >= f['net_min'] and home_s.get('def', 0) >= f['opp_def_min'] and home_s.get('off', 999) <= f['opp_off_max']:
             if away_ml and away_ml >= odds_min:  # Don't bet huge favorites
-                game_picks.append({'type': 'GAME', 'subtype': 'ML', 'pick': f"{away} ML", 'matchup': f"{away} @ {home}", 'odds': away_ml, 'edge': round(away_s['net'] - home_s['net'], 1), 'tier': 1})
+                game_picks.append({'type': 'GAME', 'subtype': 'ML', 'pick': f"{away} ML", 'matchup': f"{away} @ {home}", 'odds': away_ml, 'edge': round(away_s['net'] - home_s['net'], 1), 'tier': 1, 'injury_note': injury_note})
         
         # UNDER Filter
         f = VEGAS_FILTERS['under']

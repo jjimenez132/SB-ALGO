@@ -59,6 +59,25 @@ except ImportError:
 _prop_engine = None
 _math_engine = None
 
+# Health alert webhook for engine issues
+HEALTH_WEBHOOK_URL = "https://discord.com/api/webhooks/1453117705984151724/22JltUkGycD-TyNUlzymZEN6D9UoJsmF_GH2v0Ctv8f77DvPFOqHQi0dxR4nZP7kK0WX"
+
+def send_health_alert(message, alert_type="warning"):
+    """Send health alert to Discord #algo-health channel"""
+    import requests
+    colors = {"error": 0xff0000, "warning": 0xffa500, "info": 0x00ff00}
+    try:
+        requests.post(HEALTH_WEBHOOK_URL, json={
+            "embeds": [{
+                "title": f"⚙️ Engine Health Alert",
+                "description": message,
+                "color": colors.get(alert_type, 0xffa500),
+                "footer": {"text": f"SB-ALGO v4.0 • {datetime.now().strftime('%I:%M %p ET')}"}
+            }]
+        }, timeout=5)
+    except:
+        pass  # Don't fail main process if alert fails
+
 def get_prop_engine():
     global _prop_engine
     if _prop_engine is None and PROP_ENGINE_AVAILABLE:
@@ -521,6 +540,14 @@ def get_todays_picks(force_refresh=False, target_date=None):
             'engine_available': PROP_ENGINE_AVAILABLE,
         }
     }
+    
+    # Send health alert if engine issues detected
+    total_props = engine_used_count + fallback_count
+    if not PROP_ENGINE_AVAILABLE:
+        send_health_alert("❌ **PlayerPropEngine OFFLINE**\n\nAll props using L5/L10/L15 fallback.\nPace/defense adjustments NOT applied.", "error")
+    elif total_props > 0 and fallback_count > total_props * 0.3:
+        pct = round(fallback_count / total_props * 100)
+        send_health_alert(f"⚠️ **High Fallback Rate: {pct}%**\n\n• Engine: {engine_used_count} props\n• Fallback: {fallback_count} props\n\nSome players missing from engine DB.", "warning")
     
     _picks_cache[today_str] = result
     _cache_time = datetime.now()

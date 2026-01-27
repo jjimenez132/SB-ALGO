@@ -473,14 +473,9 @@ def get_todays_picks(force_refresh=False, target_date=None):
             adjustments = engine_result.get('adjustments', {})
             engine_used_count += 1
         else:
-            # Fallback to simple L5/L10/L15 projection
-            proj, cv = get_proj(player_games, player, stat, today)
-            if proj is None:
-                continue
-            over_prob = None
-            under_prob = None
-            adjustments = {'method': 'L5/L10/L15'}
+            # Fallback - SKIP this prop (only push full-engine props)
             fallback_count += 1
+            continue  # Don't add fallback props to official picks
         
         # OVER
         edge = (proj - line) / line

@@ -158,8 +158,11 @@ def main():
     
     print(f"\n{'='*60}")
     
-    # Post to Discord
-    post_grading_results_to_discord(yesterday, game_graded, props_graded, game_stats, props_stats)
+    # Only post to Discord if we actually graded some picks
+    if game_graded + props_graded > 0:
+        post_grading_results_to_discord(yesterday, game_graded, props_graded, game_stats, props_stats)
+    else:
+        print("   ⏭️ No picks to grade today - skipping Discord post")
     
     print(f"✅ GRADING COMPLETE")
     print(f"{'='*60}")

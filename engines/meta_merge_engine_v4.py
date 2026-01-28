@@ -198,7 +198,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.30,
         'min_proj': 10,
         'tier': 1,
-        'enabled': False,  # 50% - DISABLED
+        'enabled': True,  # 80.0% (4-1)
     },
     
     # REB UNDER T1: 83.3% (10-2) | edge>=20%, cv<=0.35, proj>=4
@@ -266,7 +266,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.45,
         'min_proj': 6,
         'tier': 2,
-        'enabled': False,  # 57% - DISABLED  # Disabled - calibrating
+        'enabled': True,  # 70.8% (17-7)
     },
     
     # AST OVER T2: 70.4% (19-8) | edge>=30%, cv<=0.30, proj>=3
@@ -284,7 +284,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.35,
         'min_proj': 6,
         'tier': 2,
-        'enabled': False,  # 40% - DISABLED  # Disabled - calibrating
+        'enabled': True,  # 72.2% (13-5)
     },
     
     # PTS OVER T2: DISABLED (best was 69.7% - moved to T3)
@@ -360,9 +360,9 @@ VEGAS_FILTERS = {
     'prop_ast_under_t3': {
         'edge_max': -10,
         'cv_max': 0.45,
-        'min_proj': 5,
+        'min_proj': 6,
         'tier': 3,
-        'enabled': False,  # 53% - DISABLED  # Disabled - calibrating
+        'enabled': True,  # 69.0% (20-9)
     },
     
     # =========================================================================

@@ -179,64 +179,65 @@ EDGE_THRESHOLDS = {
 
 VEGAS_FILTERS = {
     # =========================================================================
-    # TIER 1: PREMIUM PICKS (80.4% win rate) - 1.0 unit stakes
+    # TIER 1: ELITE PICKS (81.8% backtest) - 1.5 unit stakes
+    # V3 Optimizer: 36-8 record, 0.85 picks/day
     # =========================================================================
     
-    # PTS OVER T1: Edge>=25%, CV<=0.40, Proj>=22 → 13-3 (81.2%)
-    'prop_pts_over_t1': {
-        'edge_min': 25,
-        'cv_max': 0.40,
-        'min_proj': 22,
-        'tier': 1,
-        'enabled': True,
-    },
-    
-    # PTS UNDER T1: Edge>=18%, CV<=0.40, Proj>=20 → 14-3 (82.4%)
+    # PTS UNDER T1: 80.0% (16-4) | edge>=15%, cv<=0.40, proj>=20
     'prop_pts_under_t1': {
-        'edge_max': -18,
+        'edge_max': -15,
         'cv_max': 0.40,
         'min_proj': 20,
         'tier': 1,
         'enabled': True,
     },
     
-    # REB OVER T1: Edge>=15%, CV<=0.40, Proj>=11 → 10-3 (76.9%)
+    # REB OVER T1: 80.0% (4-1) | edge>=25%, cv<=0.30, proj>=10
     'prop_reb_over_t1': {
-        'edge_min': 15,
-        'cv_max': 0.40,
-        'min_proj': 11,
-        'tier': 1,
-        'enabled': True,
-    },
-    
-    # REB UNDER T1: Edge>=15%, CV<=0.45, Proj>=8 → 12-3 (80.0%)
-    'prop_reb_under_t1': {
-        'edge_max': -15,
-        'cv_max': 0.45,
-        'min_proj': 8,
-        'tier': 1,
-        'enabled': True,
-    },
-    
-    # AST OVER T1: Edge>=25%, CV<=0.40, Proj>=8 → 11-2 (84.6%)
-    'prop_ast_over_t1': {
         'edge_min': 25,
-        'cv_max': 0.40,
-        'min_proj': 8,
+        'cv_max': 0.30,
+        'min_proj': 10,
         'tier': 1,
         'enabled': True,
     },
     
-    # AST UNDER T1: Edge>=15%, CV<=0.45, Proj>=6 → 11-3 (78.6%)
+    # REB UNDER T1: 83.3% (10-2) | edge>=20%, cv<=0.35, proj>=4
+    'prop_reb_under_t1': {
+        'edge_max': -20,
+        'cv_max': 0.35,
+        'min_proj': 4,
+        'tier': 1,
+        'enabled': True,
+    },
+    
+    # AST UNDER T1: 85.7% (6-1) | edge>=15%, cv<=0.35, proj>=6
     'prop_ast_under_t1': {
         'edge_max': -15,
-        'cv_max': 0.45,
+        'cv_max': 0.35,
         'min_proj': 6,
         'tier': 1,
         'enabled': True,
     },
     
-    # 3PM UNDER T1: Edge>=22%, CV<=0.45, Proj>=0 → 11-3 (78.6%)
+    # PTS OVER: DISABLED in T1 (no filter met 80%+ with volume)
+    'prop_pts_over_t1': {
+        'edge_min': 50,  # Effectively disabled
+        'cv_max': 0.20,
+        'min_proj': 30,
+        'tier': 1,
+        'enabled': False,
+    },
+    
+    # AST OVER: DISABLED in T1 (no filter met 80%+ with volume)
+    'prop_ast_over_t1': {
+        'edge_min': 50,
+        'cv_max': 0.20,
+        'min_proj': 15,
+        'tier': 1,
+        'enabled': False,
+    },
+    
+    # 3PM UNDER: Keep existing (78.6%)
     'prop_3pm_under_t1': {
         'edge_max': -22,
         'cv_max': 0.45,
@@ -246,71 +247,121 @@ VEGAS_FILTERS = {
     },
     
     # =========================================================================
-    # TIER 2: VOLUME PICKS (64.3% incremental) - 0.5 unit stakes
-    # Only applies if pick does NOT qualify for Tier 1
+    # TIER 2: STRONG PICKS (72.3% backtest) - 1.0 unit stakes
+    # V3 Optimizer: 60-23 record, 1.60 picks/day
     # =========================================================================
     
-    # PTS OVER T2: Edge>=22%, CV<=0.40, Proj>=22 → incremental 1-2
-    'prop_pts_over_t2': {
-        'edge_min': 22,
-        'cv_max': 0.40,
-        'min_proj': 22,
-        'tier': 2,
-        'enabled': False,  # DISABLED: 1-2 (33.3%)
-    },
-    
-    # PTS UNDER T2: Edge>=16%, CV<=0.40, Proj>=20 → incremental 4-3
+    # PTS UNDER T2: 78.6% (11-3) | edge>=15%, cv<=0.35, proj>=20
     'prop_pts_under_t2': {
-        'edge_max': -16,
-        'cv_max': 0.40,
+        'edge_max': -15,
+        'cv_max': 0.35,
         'min_proj': 20,
-        'tier': 2,
-        'enabled': False,  # DISABLED: 4-3 (57.1%)
-    },
-    
-    # REB OVER T2: Edge>=14%, CV<=0.50, Proj>=11 → incremental 1-1
-    'prop_reb_over_t2': {
-        'edge_min': 14,
-        'cv_max': 0.50,
-        'min_proj': 11,
-        'tier': 2,
-        'enabled': False,  # DISABLED: 1-1 (50.0%)
-    },
-    
-    # REB UNDER T2: Edge>=20%, CV<=0.48, Proj>=7 → incremental 5-2
-    'prop_reb_under_t2': {
-        'edge_max': -20,
-        'cv_max': 0.48,
-        'min_proj': 7,
         'tier': 2,
         'enabled': True,
     },
     
-    # AST OVER T2: Edge>=25%, CV<=0.35, Proj>=7 → incremental 1-1
-    'prop_ast_over_t2': {
-        'edge_min': 25,
-        'cv_max': 0.35,
-        'min_proj': 7,
-        'tier': 2,
-        'enabled': False,  # DISABLED: 1-1 (50.0%)
-    },
-    
-    # AST UNDER T2: Edge>=8%, CV<=0.45, Proj>=6 → incremental 15-5 (75%) 🔥 KEY VALUE
-    'prop_ast_under_t2': {
-        'edge_max': -8,
+    # REB UNDER T2: 70.8% (17-7) | edge>=20%, cv<=0.45, proj>=6
+    'prop_reb_under_t2': {
+        'edge_max': -20,
         'cv_max': 0.45,
         'min_proj': 6,
         'tier': 2,
         'enabled': True,
     },
     
-    # 3PM UNDER T2: Edge>=20%, CV<=0.45, Proj>=0 → incremental 0-1
-    'prop_3pm_under_t2': {
-        'edge_max': -20,
-        'cv_max': 0.45,
-        'min_proj': 0,
+    # AST OVER T2: 70.4% (19-8) | edge>=30%, cv<=0.30, proj>=3
+    'prop_ast_over_t2': {
+        'edge_min': 30,
+        'cv_max': 0.30,
+        'min_proj': 3,
         'tier': 2,
-        'enabled': False,  # DISABLED: 0-1 (0.0%)
+        'enabled': True,
+    },
+    
+    # AST UNDER T2: 72.2% (13-5) | edge>=10%, cv<=0.35, proj>=6
+    'prop_ast_under_t2': {
+        'edge_max': -10,
+        'cv_max': 0.35,
+        'min_proj': 6,
+        'tier': 2,
+        'enabled': True,
+    },
+    
+    # PTS OVER T2: DISABLED (best was 69.7% - moved to T3)
+    'prop_pts_over_t2': {
+        'edge_min': 50,
+        'cv_max': 0.20,
+        'min_proj': 30,
+        'tier': 2,
+        'enabled': False,
+    },
+    
+    # REB OVER T2: DISABLED (best was 65.5% - moved to T3)
+    'prop_reb_over_t2': {
+        'edge_min': 50,
+        'cv_max': 0.20,
+        'min_proj': 15,
+        'tier': 2,
+        'enabled': False,
+    },
+    
+    # =========================================================================
+    # TIER 3: VOLUME PICKS (65.9% backtest) - 0.5 unit stakes
+    # V3 Optimizer: Additional volume for 4+ picks/day target
+    # Only enable if you want more action at slightly lower win rate
+    # =========================================================================
+    
+    # PTS OVER T3: 65.3% (203-108) | edge>=25%, cv<=0.55, proj>=12
+    'prop_pts_over_t3': {
+        'edge_min': 25,
+        'cv_max': 0.55,
+        'min_proj': 12,
+        'tier': 3,
+        'enabled': False,  # Enable for more volume
+    },
+    
+    # PTS UNDER T3: 68.6% (35-16) | edge>=10%, cv<=0.40, proj>=20
+    'prop_pts_under_t3': {
+        'edge_max': -10,
+        'cv_max': 0.40,
+        'min_proj': 20,
+        'tier': 3,
+        'enabled': False,  # Enable for more volume
+    },
+    
+    # REB OVER T3: 65.5% (19-10) | edge>=25%, cv<=0.30, proj>=8
+    'prop_reb_over_t3': {
+        'edge_min': 25,
+        'cv_max': 0.30,
+        'min_proj': 8,
+        'tier': 3,
+        'enabled': False,  # Enable for more volume
+    },
+    
+    # REB UNDER T3: 66.7% (22-11) | edge>=18%, cv<=0.50, proj>=6
+    'prop_reb_under_t3': {
+        'edge_max': -18,
+        'cv_max': 0.50,
+        'min_proj': 6,
+        'tier': 3,
+        'enabled': False,  # Enable for more volume
+    },
+    
+    # AST OVER T3: 66.0% (33-17) | edge>=30%, cv<=0.55, proj>=6
+    'prop_ast_over_t3': {
+        'edge_min': 30,
+        'cv_max': 0.55,
+        'min_proj': 6,
+        'tier': 3,
+        'enabled': False,  # Enable for more volume
+    },
+    
+    # AST UNDER T3: 67.9% (19-9) | edge>=10%, cv<=0.45, proj>=6
+    'prop_ast_under_t3': {
+        'edge_max': -10,
+        'cv_max': 0.45,
+        'min_proj': 6,
+        'tier': 3,
     },
     
     # =========================================================================

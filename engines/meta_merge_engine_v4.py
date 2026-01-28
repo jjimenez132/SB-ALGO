@@ -254,7 +254,7 @@ VEGAS_FILTERS = {
     # PTS UNDER T2: 78.6% (11-3) | edge>=15%, cv<=0.35, proj>=20
     'prop_pts_under_t2': {
         'edge_max': -15,
-        'cv_max': 0.33,  # Optimized for 74.4%
+        'cv_max': 0.35,
         'min_proj': 20,
         'tier': 2,
         'enabled': True,  # Disabled - calibrating
@@ -262,8 +262,8 @@ VEGAS_FILTERS = {
     
     # REB UNDER T2: 70.8% (17-7) | edge>=20%, cv<=0.45, proj>=6
     'prop_reb_under_t2': {
-        'edge_max': -22,
-        'cv_max': 0.40,  # Optimized for 74.4%
+        'edge_max': -20,
+        'cv_max': 0.45,
         'min_proj': 6,
         'tier': 2,
         'enabled': True,  # 70.8% (17-7)
@@ -280,8 +280,8 @@ VEGAS_FILTERS = {
     
     # AST UNDER T2: 72.2% (13-5) | edge>=10%, cv<=0.35, proj>=6
     'prop_ast_under_t2': {
-        'edge_max': -14,
-        'cv_max': 0.35,  # Optimized for 74.4%
+        'edge_max': -10,
+        'cv_max': 0.35,
         'min_proj': 6,
         'tier': 2,
         'enabled': True,  # 72.2% (13-5)
@@ -326,7 +326,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.40,
         'min_proj': 20,
         'tier': 3,
-        'enabled': False,  # Disabled - dilutes to <70%  # Disabled - calibrating
+        'enabled': True,  # Disabled - calibrating
     },
     
     # REB OVER T3: 65.5% (19-10) | edge>=25%, cv<=0.30, proj>=8
@@ -344,7 +344,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.45,
         'min_proj': 5,
         'tier': 3,
-        'enabled': False,  # Disabled - dilutes to <70%  # Disabled - calibrating
+        'enabled': True,  # Disabled - calibrating
     },
     
     # AST OVER T3: 66.0% (33-17) | edge>=30%, cv<=0.55, proj>=6
@@ -362,7 +362,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.45,
         'min_proj': 6,
         'tier': 3,
-        'enabled': False,  # Disabled - dilutes to <70%  # 69.0% (20-9)
+        'enabled': True,  # 69.0% (20-9)
     },
     
     # =========================================================================

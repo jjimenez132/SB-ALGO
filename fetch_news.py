@@ -196,3 +196,19 @@ def main():
                 inserted += 1
             except Exception as e:
                 print(f"   ⚠️ {e}")
+        
+        conn.commit()
+    
+    print(f"   ✅ Inserted/updated {inserted} news items")
+    
+    # Send important news to Discord
+    send_news_to_discord(data)
+    
+    print(f"\n{'='*60}")
+    print(f"✅ NEWS FETCH COMPLETE")
+    print(f"{'='*60}")
+
+
+if __name__ == "__main__":
+    main()
+

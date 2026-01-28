@@ -257,7 +257,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.35,
         'min_proj': 20,
         'tier': 2,
-        'enabled': False,  # Disabled - calibrating
+        'enabled': True,  # Disabled - calibrating
     },
     
     # REB UNDER T2: 70.8% (17-7) | edge>=20%, cv<=0.45, proj>=6
@@ -266,7 +266,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.45,
         'min_proj': 6,
         'tier': 2,
-        'enabled': False,  # Disabled - calibrating
+        'enabled': True,  # Disabled - calibrating
     },
     
     # AST OVER T2: 70.4% (19-8) | edge>=30%, cv<=0.30, proj>=3
@@ -275,7 +275,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.30,
         'min_proj': 3,
         'tier': 2,
-        'enabled': False,  # Disabled - calibrating
+        'enabled': True,  # Disabled - calibrating
     },
     
     # AST UNDER T2: 72.2% (13-5) | edge>=10%, cv<=0.35, proj>=6
@@ -284,7 +284,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.35,
         'min_proj': 6,
         'tier': 2,
-        'enabled': False,  # Disabled - calibrating
+        'enabled': True,  # Disabled - calibrating
     },
     
     # PTS OVER T2: DISABLED (best was 69.7% - moved to T3)
@@ -326,7 +326,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.40,
         'min_proj': 20,
         'tier': 3,
-        'enabled': False,  # Disabled - calibrating
+        'enabled': True,  # Disabled - calibrating
     },
     
     # REB OVER T3: 65.5% (19-10) | edge>=25%, cv<=0.30, proj>=8
@@ -344,7 +344,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.45,
         'min_proj': 5,
         'tier': 3,
-        'enabled': False,  # Disabled - calibrating
+        'enabled': True,  # Disabled - calibrating
     },
     
     # AST OVER T3: 66.0% (33-17) | edge>=30%, cv<=0.55, proj>=6
@@ -362,7 +362,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.45,
         'min_proj': 5,
         'tier': 3,
-        'enabled': False,  # Disabled - calibrating
+        'enabled': True,  # Disabled - calibrating
     },
     
     # =========================================================================

@@ -157,31 +157,66 @@ def _convert_filters():
     prop_filters = {}
     vegas_filters = {}
     
-    # Prop filters - convert edge from int to decimal, rename keys
-    # TIERED SYSTEM v2.1 - Use T1 filters (80.4% win rate)
-    prop_mappings = {
-        'prop_pts_over_t1': 'pts_over',
-        'prop_pts_under_t1': 'pts_under', 
+    # ==========================================================================
+    # TIERED PROP SYSTEM - T1 (81.8%) + T2 (72.3%) + T3 (69.4%)
+    # Total: 72.8% at 4.53 picks/day
+    # ==========================================================================
+    
+    # T1 ELITE FILTERS (5 filters, 81.8% win rate, 1.5 units)
+    t1_mappings = {
+        'prop_pts_under_t1': 'pts_under',
         'prop_reb_over_t1': 'reb_over',
         'prop_reb_under_t1': 'reb_under',
-        'prop_ast_over_t1': 'ast_over',
         'prop_ast_under_t1': 'ast_under',
         'prop_3pm_under_t1': '3pm_under',
     }
     
-    # T2 filters (add volume at 0.5 units) - only enabled ones
+    # T2 STRONG FILTERS (4 filters, 72.3% win rate, 1.0 units)
     t2_mappings = {
+        'prop_pts_under_t2': 'pts_under_t2',
         'prop_reb_under_t2': 'reb_under_t2',
+        'prop_ast_over_t2': 'ast_over_t2',
         'prop_ast_under_t2': 'ast_under_t2',
     }
     
-    for master_key, api_key in prop_mappings.items():
-        if master_key in MASTER_FILTERS and MASTER_FILTERS[master_key].get('enabled', True):
+    # T3 VOLUME FILTERS (3 filters, 69.4% win rate, 0.5 units)
+    t3_mappings = {
+        'prop_pts_under_t3': 'pts_under_t3',
+        'prop_reb_under_t3': 'reb_under_t3',
+        'prop_ast_under_t3': 'ast_under_t3',
+    }
+    
+    # Process T1 filters
+    for master_key, api_key in t1_mappings.items():
+        if master_key in MASTER_FILTERS and MASTER_FILTERS[master_key].get('enabled', False):
             f = MASTER_FILTERS[master_key]
             prop_filters[api_key] = {
-                'edge_min': abs(f.get('edge_min', f.get('edge_max', 15))) / 100,  # Convert 20 -> 0.20
+                'edge_min': abs(f.get('edge_min', f.get('edge_max', 15))) / 100,
                 'cv_max': f.get('cv_max', 0.45),
                 'proj_min': f.get('min_proj', 0),
+                'tier': 1,
+            }
+    
+    # Process T2 filters
+    for master_key, api_key in t2_mappings.items():
+        if master_key in MASTER_FILTERS and MASTER_FILTERS[master_key].get('enabled', False):
+            f = MASTER_FILTERS[master_key]
+            prop_filters[api_key] = {
+                'edge_min': abs(f.get('edge_min', f.get('edge_max', 15))) / 100,
+                'cv_max': f.get('cv_max', 0.45),
+                'proj_min': f.get('min_proj', 0),
+                'tier': 2,
+            }
+    
+    # Process T3 filters
+    for master_key, api_key in t3_mappings.items():
+        if master_key in MASTER_FILTERS and MASTER_FILTERS[master_key].get('enabled', False):
+            f = MASTER_FILTERS[master_key]
+            prop_filters[api_key] = {
+                'edge_min': abs(f.get('edge_min', f.get('edge_max', 10))) / 100,
+                'cv_max': f.get('cv_max', 0.45),
+                'proj_min': f.get('min_proj', 0),
+                'tier': 3,
             }
     
     # Game filters - rename keys
@@ -589,69 +624,102 @@ def get_todays_picks(force_refresh=False, target_date=None):
             fallback_count += 1
             continue  # Don't add fallback props to official picks
         
-        # OVER
+        # OVER - Check all tiers (T1, T2, T3)
         edge = (proj - line) / line
-        fkey = f"{stat}_over"
-        if fkey in PROP_FILTERS:
-            f = PROP_FILTERS[fkey]
-            e_pass = edge >= f['edge_min']
-            c_pass = cv <= f['cv_max']
-            p_pass = proj >= f['proj_min']
-            if e_pass and c_pass and p_pass:
-                units, grade = calculate_kelly_grade(over_prob, over_odds or -110, edge)
-                official_props.append({
-                    'type': 'PROP', 'player': player, 
-                    'pick': f"{stat.upper()} OVER {line}", 
-                    'projection': round(proj, 1), 
-                    'edge': round(edge * 100, 1), 
-                    'cv': round(cv, 2), 
-                    'odds': over_odds or -110, 
-                    'tier': 1,
-                    'units': units,
-                    'grade': grade
-                })
-            elif sum([e_pass, c_pass, p_pass]) == 2:
-                near, reason = False, ""
-                if not e_pass and edge >= (f['edge_min'] - 0.03):
-                    near, reason = True, f"Edge {edge*100:.1f}%"
-                elif not c_pass and cv <= (f['cv_max'] + 0.05):
-                    near, reason = True, f"CV {cv:.2f}"
-                elif not p_pass and proj >= (f['proj_min'] - 2):
-                    near, reason = True, f"Proj {proj:.1f}"
-                if near:
-                    watchlist_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} OVER {line}", 'projection': round(proj, 1), 'edge': round(edge * 100, 1), 'cv': round(cv, 2), 'near_miss': reason})
+        over_added = False
+        for tier_suffix, tier_num in [('', 1), ('_t2', 2), ('_t3', 3)]:
+            fkey = f"{stat}_over{tier_suffix}"
+            if fkey in PROP_FILTERS and not over_added:
+                f = PROP_FILTERS[fkey]
+                e_pass = edge >= f['edge_min']
+                c_pass = cv <= f['cv_max']
+                p_pass = proj >= f['proj_min']
+                if e_pass and c_pass and p_pass:
+                    tier = f.get('tier', tier_num)
+                    # Unit sizing by tier: T1=1.5u, T2=1.0u, T3=0.5u
+                    tier_units = {1: 1.5, 2: 1.0, 3: 0.5}
+                    units, grade = calculate_kelly_grade(over_prob, over_odds or -110, edge)
+                    units = min(units, tier_units.get(tier, 1.0))
+                    official_props.append({
+                        'type': 'PROP', 'player': player, 
+                        'pick': f"{stat.upper()} OVER {line}", 
+                        'projection': round(proj, 1), 
+                        'edge': round(edge * 100, 1), 
+                        'cv': round(cv, 2), 
+                        'odds': over_odds or -110, 
+                        'tier': tier,
+                        'units': units,
+                        'grade': grade
+                    })
+                    over_added = True
+                    break
         
-        # UNDER
+        # OVER watchlist (T1 near-misses only)
+        if not over_added:
+            fkey = f"{stat}_over"
+            if fkey in PROP_FILTERS:
+                f = PROP_FILTERS[fkey]
+                e_pass = edge >= f['edge_min']
+                c_pass = cv <= f['cv_max']
+                p_pass = proj >= f['proj_min']
+                if sum([e_pass, c_pass, p_pass]) == 2:
+                    near, reason = False, ""
+                    if not e_pass and edge >= (f['edge_min'] - 0.03):
+                        near, reason = True, f"Edge {edge*100:.1f}%"
+                    elif not c_pass and cv <= (f['cv_max'] + 0.05):
+                        near, reason = True, f"CV {cv:.2f}"
+                    elif not p_pass and proj >= (f['proj_min'] - 2):
+                        near, reason = True, f"Proj {proj:.1f}"
+                    if near:
+                        watchlist_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} OVER {line}", 'projection': round(proj, 1), 'edge': round(edge * 100, 1), 'cv': round(cv, 2), 'near_miss': reason})
+        
+        # UNDER - Check all tiers (T1, T2, T3)
         edge_u = (line - proj) / line
-        fkey = f"{stat}_under"
-        if fkey in PROP_FILTERS:
-            f = PROP_FILTERS[fkey]
-            e_pass = edge_u >= f.get('edge_min', 0.15)
-            c_pass = cv <= f['cv_max']
-            p_pass = proj >= f['proj_min']
-            if e_pass and c_pass and p_pass:
-                units, grade = calculate_kelly_grade(under_prob, under_odds or -110, edge_u)
-                official_props.append({
-                    'type': 'PROP', 'player': player, 
-                    'pick': f"{stat.upper()} UNDER {line}", 
-                    'projection': round(proj, 1), 
-                    'edge': round(edge_u * 100, 1), 
-                    'cv': round(cv, 2), 
-                    'odds': under_odds or -110, 
-                    'tier': 1,
-                    'units': units,
-                    'grade': grade
-                })
-            elif sum([e_pass, c_pass, p_pass]) == 2:
-                near, reason = False, ""
-                if not e_pass and edge_u >= (f['edge_min'] - 0.03):
-                    near, reason = True, f"Edge {edge_u*100:.1f}%"
-                elif not c_pass and cv <= (f['cv_max'] + 0.05):
-                    near, reason = True, f"CV {cv:.2f}"
-                elif not p_pass and proj >= (f['proj_min'] - 2):
-                    near, reason = True, f"Proj {proj:.1f}"
-                if near:
-                    watchlist_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} UNDER {line}", 'projection': round(proj, 1), 'edge': round(edge_u * 100, 1), 'cv': round(cv, 2), 'near_miss': reason})
+        under_added = False
+        for tier_suffix, tier_num in [('', 1), ('_t2', 2), ('_t3', 3)]:
+            fkey = f"{stat}_under{tier_suffix}"
+            if fkey in PROP_FILTERS and not under_added:
+                f = PROP_FILTERS[fkey]
+                e_pass = edge_u >= f.get('edge_min', 0.15)
+                c_pass = cv <= f['cv_max']
+                p_pass = proj >= f['proj_min']
+                if e_pass and c_pass and p_pass:
+                    tier = f.get('tier', tier_num)
+                    tier_units = {1: 1.5, 2: 1.0, 3: 0.5}
+                    units, grade = calculate_kelly_grade(under_prob, under_odds or -110, edge_u)
+                    units = min(units, tier_units.get(tier, 1.0))
+                    official_props.append({
+                        'type': 'PROP', 'player': player, 
+                        'pick': f"{stat.upper()} UNDER {line}", 
+                        'projection': round(proj, 1), 
+                        'edge': round(edge_u * 100, 1), 
+                        'cv': round(cv, 2), 
+                        'odds': under_odds or -110, 
+                        'tier': tier,
+                        'units': units,
+                        'grade': grade
+                    })
+                    under_added = True
+                    break
+        
+        # UNDER watchlist (T1 near-misses only)
+        if not under_added:
+            fkey = f"{stat}_under"
+            if fkey in PROP_FILTERS:
+                f = PROP_FILTERS[fkey]
+                e_pass = edge_u >= f.get('edge_min', 0.15)
+                c_pass = cv <= f['cv_max']
+                p_pass = proj >= f['proj_min']
+                if sum([e_pass, c_pass, p_pass]) == 2:
+                    near, reason = False, ""
+                    if not e_pass and edge_u >= (f['edge_min'] - 0.03):
+                        near, reason = True, f"Edge {edge_u*100:.1f}%"
+                    elif not c_pass and cv <= (f['cv_max'] + 0.05):
+                        near, reason = True, f"CV {cv:.2f}"
+                    elif not p_pass and proj >= (f['proj_min'] - 2):
+                        near, reason = True, f"Proj {proj:.1f}"
+                    if near:
+                        watchlist_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} UNDER {line}", 'projection': round(proj, 1), 'edge': round(edge_u * 100, 1), 'cv': round(cv, 2), 'near_miss': reason})
     
     watchlist_props.sort(key=lambda x: -abs(x['edge']))
     

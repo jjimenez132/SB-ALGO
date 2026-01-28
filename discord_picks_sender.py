@@ -1040,6 +1040,109 @@ def test_picks():
     else:
         print("❌ No picks")
 
+def send_clv_report():
+    """
+    Generate and send daily CLV (Closing Line Value) report.
+    Analyzes yesterday's picks to see if we beat the closing line.
+    """
+    import psycopg2
+    from datetime import datetime, timedelta
+    import pytz
+    
+    print("\n📊 Generating CLV Report...")
+    
+    # Get yesterday's date
+    et = pytz.timezone('US/Eastern')
+    yesterday = (datetime.now(et) - timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        
+        # Get yesterday's picks from tracking table
+        cur.execute("""
+            SELECT pick_name, pick_type, line_at_pick, odds_at_pick, 
+                   closing_line, closing_odds, result, units
+            FROM algo_picks_tracking
+            WHERE DATE(created_at AT TIME ZONE 'America/New_York') = %s
+            ORDER BY created_at
+        """, (yesterday,))
+        
+        picks = cur.fetchall()
+        conn.close()
+        
+        if not picks:
+            print(f"   No picks found for {yesterday}")
+            return
+        
+        # Calculate CLV for each pick
+        clv_data = []
+        total_clv = 0
+        positive_clv = 0
+        
+        for pick_name, pick_type, line_at, odds_at, closing_line, closing_odds, result, units in picks:
+            if closing_line and line_at:
+                # CLV = movement in our favor
+                if 'OVER' in pick_name.upper():
+                    clv = float(line_at) - float(closing_line)  # Line moved up = good for over
+                elif 'UNDER' in pick_name.upper():
+                    clv = float(closing_line) - float(line_at)  # Line moved down = good for under
+                else:
+                    clv = 0
+                
+                total_clv += clv
+                if clv > 0:
+                    positive_clv += 1
+                
+                emoji = "🟢" if clv > 0 else "🔴" if clv < 0 else "⚪"
+                result_emoji = "✅" if result == 'W' else "❌" if result == 'L' else "⏳"
+                
+                clv_data.append({
+                    'name': pick_name,
+                    'type': pick_type,
+                    'line_at': line_at,
+                    'closing': closing_line,
+                    'clv': clv,
+                    'result': result,
+                    'emoji': emoji,
+                    'result_emoji': result_emoji
+                })
+        
+        # Create report embed
+        avg_clv = total_clv / len(clv_data) if clv_data else 0
+        clv_pct = (positive_clv / len(clv_data) * 100) if clv_data else 0
+        
+        # Build description
+        desc_lines = []
+        desc_lines.append(f"**Date:** {yesterday}")
+        desc_lines.append(f"**Picks Analyzed:** {len(clv_data)}")
+        desc_lines.append(f"**Positive CLV:** {positive_clv}/{len(clv_data)} ({clv_pct:.0f}%)")
+        desc_lines.append(f"**Avg CLV:** {avg_clv:+.2f} pts")
+        desc_lines.append("")
+        desc_lines.append("**Top CLV Picks:**")
+        
+        # Sort by CLV and show top 5
+        sorted_picks = sorted(clv_data, key=lambda x: x['clv'], reverse=True)[:5]
+        for p in sorted_picks:
+            desc_lines.append(f"{p['emoji']} {p['name']}: {p['clv']:+.1f} pts | {p['result_emoji']}")
+        
+        embed = {
+            "title": "📊 Daily CLV Report",
+            "description": "\n".join(desc_lines),
+            "color": 0x00ff00 if avg_clv > 0 else 0xffa500,
+            "footer": {
+                "text": f"SB-ALGO v4.0 • {datetime.now(et).strftime('%I:%M %p ET')}"
+            }
+        }
+        
+        # Send to game picks channel (could create dedicated CLV channel)
+        send_discord_message(GAME_PICKS_CHANNEL, embed=embed)
+        print(f"   ✅ CLV report sent for {yesterday}")
+        print(f"   Avg CLV: {avg_clv:+.2f} | Positive: {positive_clv}/{len(clv_data)}")
+        
+    except Exception as e:
+        print(f"   ❌ Error generating CLV report: {e}")
+
 # ============================================================
 # MAIN
 # ============================================================
@@ -1065,8 +1168,11 @@ if __name__ == "__main__":
         check_new_picks()
     elif mode == 'linecheck':
         check_line_movement()
+    elif mode == 'clvreport':
+        send_clv_report()
     elif mode == 'test':
         test_picks()
     else:
         print(f"Unknown mode: {mode}")
-        print("Usage: python3 discord_picks_sender.py [morning|alert|linecheck|test]")
+        print("Usage: python3 discord_picks_sender.py [morning|alert|linecheck|clvreport|test]")
+

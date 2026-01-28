@@ -63,9 +63,28 @@ except ImportError:
     KELLY_ENGINE_AVAILABLE = False
     print("⚠️ KellyEngine not available - using 1 unit default")
 
+# CLVEngine - Closing Line Value tracking
+try:
+    from clv_engine import CLVEngine
+    CLV_ENGINE_AVAILABLE = True
+except ImportError:
+    CLV_ENGINE_AVAILABLE = False
+    print("⚠️ CLVEngine not available - CLV tracking disabled")
+
+# InjuryEngine - Team injury impact
+try:
+    from injury_engine import InjuryEngine
+    INJURY_ENGINE_AVAILABLE = True
+except ImportError:
+    INJURY_ENGINE_AVAILABLE = False
+    print("⚠️ InjuryEngine not available - injury tracking disabled")
+
 # Initialize engines (lazy load)
 _prop_engine = None
 _math_engine = None
+_kelly_engine = None
+_clv_engine = None
+_injury_engine = None
 
 # Health alert webhook for engine issues
 HEALTH_WEBHOOK_URL = "https://discord.com/api/webhooks/1453117705984151724/22JltUkGycD-TyNUlzymZEN6D9UoJsmF_GH2v0Ctv8f77DvPFOqHQi0dxR4nZP7kK0WX"
@@ -119,6 +138,13 @@ def get_injury_engine():
     if _injury_engine is None and INJURY_ENGINE_AVAILABLE:
         _injury_engine = InjuryEngine()
     return _injury_engine
+
+# CLV Engine - Closing Line Value tracking
+def get_clv_engine():
+    global _clv_engine
+    if _clv_engine is None and CLV_ENGINE_AVAILABLE:
+        _clv_engine = CLVEngine()
+    return _clv_engine
 
 # =============================================================================
 # FILTERS - Imported from meta_merge_engine_v4.py (SINGLE SOURCE OF TRUTH)

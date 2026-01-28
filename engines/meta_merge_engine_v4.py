@@ -326,7 +326,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.40,
         'min_proj': 20,
         'tier': 3,
-        'enabled': False,  # Enable for more volume
+        'enabled': True,  # 68.6% - HYBRID T3 ENABLED
     },
     
     # REB OVER T3: 65.5% (19-10) | edge>=25%, cv<=0.30, proj>=8
@@ -338,13 +338,13 @@ VEGAS_FILTERS = {
         'enabled': False,  # Enable for more volume
     },
     
-    # REB UNDER T3: 66.7% (22-11) | edge>=18%, cv<=0.50, proj>=6
+    # REB UNDER T3: 71.4% (20-8) | edge>=20%, cv<=0.45, proj>=5
     'prop_reb_under_t3': {
-        'edge_max': -18,
-        'cv_max': 0.50,
-        'min_proj': 6,
+        'edge_max': -20,
+        'cv_max': 0.45,
+        'min_proj': 5,
         'tier': 3,
-        'enabled': False,  # Enable for more volume
+        'enabled': True,  # 71.4% - HYBRID T3 ENABLED
     },
     
     # AST OVER T3: 66.0% (33-17) | edge>=30%, cv<=0.55, proj>=6
@@ -356,12 +356,13 @@ VEGAS_FILTERS = {
         'enabled': False,  # Enable for more volume
     },
     
-    # AST UNDER T3: 67.9% (19-9) | edge>=10%, cv<=0.45, proj>=6
+    # AST UNDER T3: 69.0% (20-9) | edge>=10%, cv<=0.45, proj>=6
     'prop_ast_under_t3': {
         'edge_max': -10,
         'cv_max': 0.45,
         'min_proj': 6,
         'tier': 3,
+        'enabled': True,  # 69.0% - HYBRID T3 ENABLED
     },
     
     # =========================================================================

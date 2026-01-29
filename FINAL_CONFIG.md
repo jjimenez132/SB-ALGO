@@ -1,81 +1,47 @@
-# 🎯 SB-ALGO FINAL CONFIGURATION - READY FOR LAUNCH
+# 🎯 SB-ALGO FINAL CONFIG - READY TO SHIP
 
-**Backtest Period:** Dec 1, 2025 - Jan 25, 2026 (52 days)  
-**Commit:** `e4aeb03`  
-**Date:** January 28, 2026
+**Backtest Period:** Dec 1, 2025 - Jan 25, 2026 (56 days)
 
 ---
 
-## 📊 CASCADING RESULTS (Live System Behavior)
+## 📊 PERFORMANCE METRICS
 
-| Tier | Units | Record | Win % | PPD |
-|------|-------|--------|-------|-----|
-| 🏆 T1 Elite | 1.5u | 36-8 | **81.8%** | 0.85 |
-| ✅ T2 Strong | 1.0u | 36-19 | 65.5% | 1.06 |
-| 📊 T3 Hybrid | 0.5u | 10-6 | 62.5% | 0.31 |
-| **TOTAL** | | **82-33** | **71.3%** ✅ | **2.21** |
+| Metric | Value |
+|--------|-------|
+| **Win Rate** | 72.6% (independent) / **69% (cascading)** |
+| **Record** | 98-44 (cascading) |
+| **Picks/Day** | ~2.5 |
 
----
+### Tier Breakdown (Independent Testing)
+| Tier | Units | Record | Win % |
+|------|-------|--------|-------|
+| 🏆 T1 Elite | 1.5u | 36-8 | **81.8%** |
+| ✅ T2 Strong | 1.0u | 60-23 | 72.3% |
+| 📊 T3 Volume | 0.5u | 74-33 | 69.2% |
 
-## 📋 FILTER DETAILS
-
-### 🏆 TIER 1 ELITE (1.5 units per pick)
-
-| Stat | Edge | CV | Proj |
-|------|------|-----|------|
-| PTS UNDER | ≥15% | ≤0.40 | ≥20 |
-| REB OVER | ≥25% | ≤0.30 | ≥10 |
-| REB UNDER | ≥20% | ≤0.35 | ≥4 |
-| AST UNDER | ≥15% | ≤0.35 | ≥6 |
-
-### ✅ TIER 2 STRONG (1.0 units per pick)
-
-| Stat | Edge | CV | Proj |
-|------|------|-----|------|
-| PTS UNDER | ≥15% | ≤0.35 | ≥20 |
-| REB UNDER | ≥20% | ≤0.45 | ≥6 |
-| AST OVER | ≥30% | ≤0.30 | ≥3 |
-| AST UNDER | ≥10% | ≤0.35 | ≥6 |
-
-### 📊 TIER 3 HYBRID (0.5 units per pick) - OPTIMIZED
-
-| Stat | Edge | CV | Proj | Note |
-|------|------|-----|------|------|
-| PTS UNDER | ≥14% | ≤0.40 | ≥20 | ← tightened from 10% |
-| REB UNDER | ≥20% | ≤0.45 | ≥5 | |
-| AST UNDER | ≥14% | ≤0.45 | ≥6 | ← tightened from 10% |
+### 3-Day Test (Jan 26-28): 5-3 (62%) | +1.51u ✅
 
 ---
 
-## 🔧 OPTIMIZATION CHANGE
+## 📋 FILTER CONFIG
 
-**Single surgical fix to hit 70%+:**
-- T3 `pts_under` edge: 10% → **14%**
-- T3 `ast_under` edge: 10% → **14%**
+### T1 ELITE (1.5u)
+- pts_under: E≥15% CV≤0.40 P≥20
+- reb_over: E≥25% CV≤0.30 P≥10
+- reb_under: E≥20% CV≤0.35 P≥4
+- ast_under: E≥15% CV≤0.35 P≥6
+- 3pm_under: E≥22% CV≤0.45 P≥0
 
-**Before:** 98-45 (68.5%) at 2.75 ppd  
-**After:** 82-33 (71.3%) at 2.21 ppd ✅
+### T2 STRONG (1.0u)
+- pts_under: E≥15% CV≤0.35 P≥20
+- reb_under: E≥20% CV≤0.45 P≥6
+- ast_over: E≥30% CV≤0.30 P≥3
+- ast_under: E≥10% CV≤0.35 P≥6
 
----
-
-## 📈 EXPECTED DAILY PERFORMANCE
-
-- **Min:** 1-2 picks on slow days
-- **Avg:** 2-3 picks per day
-- **Max:** 5-6 picks on heavy slates
-- **Win Rate:** ~71%+ overall
-
----
-
-## ✅ LAUNCH READY
-
-- [x] All 11 filters configured
-- [x] Cascading accuracy above 70%
-- [x] Unit sizing by tier
-- [x] Watchlist for near-misses
-- [x] Discord integration ready
-- [x] Website API ready
+### T3 VOLUME (0.5u)
+- pts_under: E≥14% CV≤0.40 P≥20
+- reb_under: E≥20% CV≤0.45 P≥5
 
 ---
 
-## 🚀 HIT 70%+ TARGET - READY FOR LAUNCH!
+✅ **READY TO PUSH**

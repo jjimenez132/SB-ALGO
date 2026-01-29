@@ -413,9 +413,9 @@ VEGAS_FILTERS = {
 def get_prop_tier(stat, is_over, edge_pct, cv, proj):
     """
     Determine which tier a prop bet belongs to.
-    Returns: (tier, filter_key) where tier is 1, 2, or 0 (no bet)
+    Returns: (tier, filter_key) where tier is 1, 2, 3, or 0 (no bet)
     
-    IMPORTANT: Check Tier 1 FIRST. If it qualifies for T1, don't check T2.
+    IMPORTANT: Check Tier 1 FIRST. If it qualifies for T1, don't check T2/T3.
     """
     direction = 'over' if is_over else 'under'
     
@@ -426,6 +426,7 @@ def get_prop_tier(stat, is_over, edge_pct, cv, proj):
     # Build filter keys
     t1_key = f'prop_{stat_key}_{direction}_t1'
     t2_key = f'prop_{stat_key}_{direction}_t2'
+    t3_key = f'prop_{stat_key}_{direction}_t3'
     
     # Check Tier 1 first
     if t1_key in VEGAS_FILTERS:
@@ -457,15 +458,32 @@ def get_prop_tier(stat, is_over, edge_pct, cv, proj):
             if cv_ok and proj_ok and edge_ok:
                 return 2, t2_key
     
+    # Check Tier 3 only if NOT Tier 1 or 2
+    if t3_key in VEGAS_FILTERS:
+        f = VEGAS_FILTERS[t3_key]
+        if f.get('enabled', False):
+            cv_ok = cv <= f.get('cv_max', 1.0)
+            proj_ok = proj >= f.get('min_proj', 0)
+            
+            if is_over:
+                edge_ok = edge_pct >= f.get('edge_min', 100)
+            else:
+                edge_ok = edge_pct <= f.get('edge_max', -100)
+            
+            if cv_ok and proj_ok and edge_ok:
+                return 3, t3_key
+    
     return 0, None
 
 
 def get_unit_size(tier):
     """Returns unit size based on tier"""
     if tier == 1:
-        return 1.0
+        return 1.5  # T1 Elite = 1.5 units
     elif tier == 2:
-        return 0.5
+        return 1.0  # T2 Strong = 1.0 units
+    elif tier == 3:
+        return 0.5  # T3 Volume = 0.5 units
     return 0
 
 

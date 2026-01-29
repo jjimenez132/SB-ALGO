@@ -182,9 +182,27 @@ def generate_game_explanation(pick_data: dict) -> str:
         
         # Parse teams from matchup (e.g., "BOS @ BKN")
         import re
-        teams = matchup.replace(' ', '').split('@')
-        away_team = teams[0] if len(teams) >= 1 else 'Away'
-        home_team = teams[1] if len(teams) >= 2 else 'Home'
+        
+        # Try to parse from matchup first
+        if '@' in matchup:
+            teams = matchup.replace(' ', '').split('@')
+            away_team = teams[0] if len(teams) >= 1 else 'Away'
+            home_team = teams[1] if len(teams) >= 2 else 'Home'
+        else:
+            # Fallback: try to extract teams from pick string
+            # Pick format examples: "BOS ML", "UNDER 228.5", "UTA +10.5"
+            pick_parts = pick.upper().split()
+            team_abbrs = {'ATL', 'BOS', 'BKN', 'CHA', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 
+                         'GSW', 'HOU', 'IND', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN',
+                         'NOP', 'NYK', 'OKC', 'ORL', 'PHI', 'PHX', 'POR', 'SAC', 'SAS',
+                         'TOR', 'UTA', 'WAS'}
+            found_teams = [p for p in pick_parts if p in team_abbrs]
+            if found_teams:
+                away_team = found_teams[0]
+                home_team = found_teams[0]  # Use same if only one found
+            else:
+                away_team = 'Away'
+                home_team = 'Home'
         
         # FETCH REAL TEAM STATS FROM DATABASE
         home_stats = get_team_advanced_stats(home_team)

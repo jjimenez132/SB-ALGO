@@ -30,7 +30,6 @@ def capture_closing_odds():
             SELECT id, pick_id, pick_name, pick_type, odds, line
             FROM algo_picks_tracking 
             WHERE pick_date = CURRENT_DATE 
-            AND status = 'pending'
             AND (closing_odds IS NULL OR clv_cents IS NULL)
         """)).fetchall()
         

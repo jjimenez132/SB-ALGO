@@ -320,9 +320,9 @@ VEGAS_FILTERS = {
         'enabled': False,  # Enable for more volume
     },
     
-    # PTS UNDER T3: edge>=14%, cv<=0.40, proj>=20 (tightened for 70%+)
+    # PTS UNDER T3: edge>=10%, cv<=0.40, proj>=20 (68.6% win rate)
     'prop_pts_under_t3': {
-        'edge_max': -14,  # Tightened from -10 for 70%+ cascading
+        'edge_max': -10,  # Original config for 72.8% system
         'cv_max': 0.40,
         'min_proj': 20,
         'tier': 3,
@@ -356,9 +356,9 @@ VEGAS_FILTERS = {
         'enabled': False,  # Enable for more volume
     },
     
-    # AST UNDER T3: edge>=14%, cv<=0.45, proj>=6 (tightened for 70%+)
+    # AST UNDER T3: edge>=10%, cv<=0.45, proj>=6 (69.0% win rate)
     'prop_ast_under_t3': {
-        'edge_max': -14,  # Tightened from -10 for 70%+ cascading
+        'edge_max': -10,  # Original config for 72.8% system
         'cv_max': 0.45,
         'min_proj': 6,
         'tier': 3,

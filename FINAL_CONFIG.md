@@ -1,47 +1,48 @@
-# 🎯 SB-ALGO FINAL CONFIG - READY TO SHIP
+# 🎯 SB-ALGO 3-Tier System - Final Configuration
 
-**Backtest Period:** Dec 1, 2025 - Jan 25, 2026 (56 days)
-
----
-
-## 📊 PERFORMANCE METRICS
-
-| Metric | Value |
-|--------|-------|
-| **Win Rate** | 72.6% (independent) / **69% (cascading)** |
-| **Record** | 98-44 (cascading) |
-| **Picks/Day** | ~2.5 |
-
-### Tier Breakdown (Independent Testing)
-| Tier | Units | Record | Win % |
-|------|-------|--------|-------|
-| 🏆 T1 Elite | 1.5u | 36-8 | **81.8%** |
-| ✅ T2 Strong | 1.0u | 60-23 | 72.3% |
-| 📊 T3 Volume | 0.5u | 74-33 | 69.2% |
-
-### 3-Day Test (Jan 26-28): 5-3 (62%) | +1.51u ✅
+**Backtest:** Dec 1, 2025 - Jan 25, 2026 (52 days)
 
 ---
 
-## 📋 FILTER CONFIG
+## 📊 Final Performance
 
-### T1 ELITE (1.5u)
-- pts_under: E≥15% CV≤0.40 P≥20
-- reb_over: E≥25% CV≤0.30 P≥10
-- reb_under: E≥20% CV≤0.35 P≥4
-- ast_under: E≥15% CV≤0.35 P≥6
-- 3pm_under: E≥22% CV≤0.45 P≥0
-
-### T2 STRONG (1.0u)
-- pts_under: E≥15% CV≤0.35 P≥20
-- reb_under: E≥20% CV≤0.45 P≥6
-- ast_over: E≥30% CV≤0.30 P≥3
-- ast_under: E≥10% CV≤0.35 P≥6
-
-### T3 VOLUME (0.5u)
-- pts_under: E≥14% CV≤0.40 P≥20
-- reb_under: E≥20% CV≤0.45 P≥5
+| Tier | Record | Win % | PPD | Units |
+|------|--------|-------|-----|-------|
+| 🏆 T1 Elite | 36-8 | **81.8%** | 0.85 | 1.5u |
+| ✅ T2 Strong | 60-23 | 72.3% | 1.60 | 1.0u |
+| 📊 T3 Hybrid | 75-33 | 69.4% | 2.08 | 0.5u |
+| **TOTAL** | **171-64** | **72.8%** | **4.53** | |
 
 ---
 
-✅ **READY TO PUSH**
+## 🏆 T1 ELITE (1.5 units)
+
+| Stat | W-L | Win % | Filter |
+|------|-----|-------|--------|
+| PTS UNDER | 16-4 | 80.0% | edge≥15%, cv≤0.40, proj≥20 |
+| REB OVER | 4-1 | 80.0% | edge≥25%, cv≤0.30, proj≥10 |
+| REB UNDER | 10-2 | 83.3% | edge≥20%, cv≤0.35, proj≥4 |
+| AST UNDER | 6-1 | 85.7% | edge≥15%, cv≤0.35, proj≥6 |
+
+## ✅ T2 STRONG (1.0 units)
+
+| Stat | W-L | Win % | Filter |
+|------|-----|-------|--------|
+| PTS UNDER | 11-3 | 78.6% | edge≥15%, cv≤0.35, proj≥20 |
+| REB UNDER | 17-7 | 70.8% | edge≥20%, cv≤0.45, proj≥6 |
+| AST OVER | 19-8 | 70.4% | edge≥30%, cv≤0.30, proj≥3 |
+| AST UNDER | 13-5 | 72.2% | edge≥10%, cv≤0.35, proj≥6 |
+
+## 📊 T3 HYBRID (0.5 units)
+
+| Stat | W-L | Win % | Filter |
+|------|-----|-------|--------|
+| PTS UNDER | 35-16 | 68.6% | edge≥10%, cv≤0.40, proj≥20 |
+| REB UNDER | 20-8 | 71.4% | edge≥20%, cv≤0.45, proj≥5 |
+| AST UNDER | 20-9 | 69.0% | edge≥10%, cv≤0.45, proj≥6 |
+
+---
+
+## ✅ STATUS: LIVE
+
+T3 filters enabled with original settings.

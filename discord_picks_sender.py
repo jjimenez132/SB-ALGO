@@ -319,7 +319,7 @@ def create_pick_key(pick, pick_type):
         return f"PROP_{player}_{stat}_{direction}"
 
 def send_discord_message(channel_id, content=None, embed=None):
-    """Send a message to Discord channel"""
+    """Send a message to Discord channel with proper rate limit handling"""
     headers = {
         'Authorization': f'Bot {DISCORD_TOKEN}',
         'Content-Type': 'application/json'
@@ -334,31 +334,55 @@ def send_discord_message(channel_id, content=None, embed=None):
     url = f"{DISCORD_API}/channels/{channel_id}/messages"
     
     import time
-    for attempt in range(3):
+    base_delay = 3  # Start with 3 seconds between requests
+    
+    for attempt in range(5):
         try:
-            time.sleep(1.5)  # Rate limit prevention
+            # Pre-request delay to respect rate limits (increases with each attempt)
+            delay = base_delay * (2 ** attempt)  # Exponential backoff: 3s, 6s, 12s, 24s, 48s
+            if attempt > 0:
+                print(f"   ⏳ Waiting {delay}s before retry #{attempt+1}...")
+            time.sleep(min(delay, 60))  # Cap at 60 seconds
+            
             response = requests.post(url, headers=headers, json=data, timeout=30)
             
-            if response.status_code == 200:
+            # Discord returns 200 or 201 for successful message creation
+            if response.status_code in (200, 201):
                 return True
             elif response.status_code == 429:
+                # Rate limited - respect the retry_after header
                 try:
-                    retry_after = response.json().get('retry_after', 2)
+                    retry_after = response.json().get('retry_after', 5)
                 except:
-                    retry_after = 2
-                print(f"   ⏳ Rate limited, waiting {retry_after}s...")
-                time.sleep(retry_after + 1)
+                    retry_after = 5
+                print(f"   ⏳ Rate limited, waiting {retry_after + 2}s...")
+                time.sleep(retry_after + 2)
                 continue
+            elif response.status_code == 403:
+                # Check for Cloudflare ban in response
+                if '1015' in response.text or 'banned' in response.text.lower():
+                    print(f"   🚫 IP BANNED by Discord/Cloudflare! Wait 30-60 minutes before retrying.")
+                    return False
+                print(f"   ⚠️ Forbidden: {response.text[:100] if response.text else 'empty'}")
+                return False
             else:
                 print(f"   ⚠️ Discord error {response.status_code}: {response.text[:100] if response.text else 'empty'}")
-                return False
+                # Don't retry on client errors (4xx) except rate limits
+                if 400 <= response.status_code < 500:
+                    return False
+                continue
         except requests.exceptions.Timeout:
-            print(f"   ⏳ Timeout, retrying ({attempt+1}/3)...")
-            time.sleep(2)
+            print(f"   ⏳ Timeout, retrying ({attempt+1}/5)...")
+        except requests.exceptions.ConnectionError as e:
+            # Connection error could indicate IP ban
+            if 'cloudflare' in str(e).lower() or '1015' in str(e):
+                print(f"   🚫 Connection blocked - possible IP ban. Wait 30-60 minutes.")
+                return False
+            print(f"   ❌ Connection error ({attempt+1}/5): {e}")
         except Exception as e:
-            print(f"   ❌ Request error ({attempt+1}/3): {e}")
-            time.sleep(2)
+            print(f"   ❌ Request error ({attempt+1}/5): {e}")
     
+    print(f"   ❌ Failed after 5 attempts - stopping to prevent IP ban escalation")
     return False
 
 def create_game_pick_embed(pick, is_alert=False):
@@ -1162,17 +1186,25 @@ if __name__ == "__main__":
     
     mode = sys.argv[1] if len(sys.argv) > 1 else 'morning'
     
-    if mode == 'morning':
-        send_morning_report()
-    elif mode == 'alert':
-        check_new_picks()
-    elif mode == 'linecheck':
-        check_line_movement()
-    elif mode == 'clvreport':
-        send_clv_report()
-    elif mode == 'test':
-        test_picks()
-    else:
-        print(f"Unknown mode: {mode}")
-        print("Usage: python3 discord_picks_sender.py [morning|alert|linecheck|clvreport|test]")
+    try:
+        if mode == 'morning':
+            send_morning_report()
+        elif mode == 'alert':
+            check_new_picks()
+        elif mode == 'linecheck':
+            check_line_movement()
+        elif mode == 'clvreport':
+            send_clv_report()
+        elif mode == 'test':
+            test_picks()
+        else:
+            print(f"Unknown mode: {mode}")
+            print("Usage: python3 discord_picks_sender.py [morning|alert|linecheck|clvreport|test]")
+    except Exception as e:
+        import traceback
+        print(f"\n❌ FATAL ERROR: {e}")
+        print("Full traceback:")
+        traceback.print_exc()
+        # Exit with 0 to prevent Render from crashing/restarting in a loop
+        sys.exit(0)
 

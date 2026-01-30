@@ -252,10 +252,10 @@ VEGAS_FILTERS = {
         'enabled': False,
     },
     
-    # 3PM UNDER: Keep existing (78.6%)
+    # 3PM UNDER T1: 76.7% (23-7) | edge>=25%, cv<=0.50
     'prop_3pm_under_t1': {
-        'edge_max': -22,
-        'cv_max': 0.45,
+        'edge_max': -25,
+        'cv_max': 0.50,
         'min_proj': 0,
         'tier': 1,
         'enabled': True,
@@ -320,6 +320,15 @@ VEGAS_FILTERS = {
         'enabled': False,
     },
     
+    # 3PM UNDER T2: 71.7% (33-13) | edge>=20%, cv<=0.50
+    'prop_3pm_under_t2': {
+        'edge_max': -20,
+        'cv_max': 0.50,
+        'min_proj': 0,
+        'tier': 2,
+        'enabled': True,
+    },
+    
     # =========================================================================
     # TIER 3: VOLUME PICKS (65.9% backtest) - 0.5 unit stakes
     # V3 Optimizer: Additional volume for 4+ picks/day target
@@ -376,6 +385,15 @@ VEGAS_FILTERS = {
         'edge_max': -10,  # Original config for 72.8% system
         'cv_max': 0.45,
         'min_proj': 6,
+        'tier': 3,
+        'enabled': True,
+    },
+    
+    # 3PM UNDER T3: 70.3% (52-22) | edge>=10%, cv<=0.50
+    'prop_3pm_under_t3': {
+        'edge_max': -10,
+        'cv_max': 0.50,
+        'min_proj': 0,
         'tier': 3,
         'enabled': True,
     },

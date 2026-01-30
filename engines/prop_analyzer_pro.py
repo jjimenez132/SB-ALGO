@@ -31,6 +31,11 @@ from engines.live_odds_connector import LiveOddsConnector
 from engines.player_prop_engine import PlayerPropEngine
 from calibration_engine import CalibrationEngine
 from kelly_engine import KellyEngine
+try:
+    from poisson_engine import PoissonEngine
+    POISSON_AVAILABLE = True
+except ImportError:
+    POISSON_AVAILABLE = False
 
 DATABASE_URL = "postgresql://sb_algo_db_user:0HDtYp4EY2Lo5At8iyf44PD1zDioSPK7@dpg-d495uhchg0os738l1a50-a.virginia-postgres.render.com/sb_algo_db"
 
@@ -71,6 +76,9 @@ class PropAnalyzerPro:
         self.prop_engine = PlayerPropEngine()  # FULL MATH ENGINE
         self.bankroll = bankroll
         self.db = create_engine(DATABASE_URL)
+        
+        # Poisson engine for discrete probability
+        self.poisson = PoissonEngine() if POISSON_AVAILABLE else None
         
         # Cache for player game logs
         self._game_logs = {}
@@ -746,6 +754,24 @@ class PropAnalyzerPro:
             # Kelly
             kelly_result = self.kelly.calculate_bet(adjusted_prob, odds, self.bankroll)
             
+            # Calculate Poisson probability for XGBoost features
+            poisson_prob = None
+            if self.poisson:
+                try:
+                    # Get opponent from matchup
+                    home = prop.get('home_team', '')
+                    away = prop.get('away_team', '')
+                    lambda_info = self.poisson.calculate_player_lambda(player, stat, home or away)
+                    if lambda_info:
+                        poisson_prob = self.poisson.hit_probability(
+                            lambda_info['adjusted_lambda'],
+                            line,
+                            best_side,
+                            lambda_info.get('variance')
+                        )
+                except:
+                    pass
+            
             if kelly_result.get('should_bet'):
                 qualified.append({
                     'player': player,
@@ -762,6 +788,7 @@ class PropAnalyzerPro:
                     'best_side': best_side,
                     'edge_pct': round(edge_pct, 1),
                     'ev_pct': round(ev_pct, 1),
+                    'cv': round(cv, 3),  # For XGBoost
                     'filters': {
                         'gp': len(games),
                         'mpg': round(mpg, 1),
@@ -772,6 +799,7 @@ class PropAnalyzerPro:
                     'probabilities': {
                         'raw': round(win_prob, 3),
                         'adjusted': round(adjusted_prob, 3),
+                        'poisson': round(poisson_prob, 4) if poisson_prob else None,  # For XGBoost
                     },
                     'stake': round(kelly_result.get('recommended_amount', 0), 2),
                     'grade': kelly_result.get('grade', 'N/A'),

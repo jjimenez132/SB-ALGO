@@ -24,14 +24,17 @@ def capture_closing_odds():
     
     engine = create_engine(DATABASE_URL)
     
+    # Get today's date in Eastern Time (not UTC)
+    today_et = get_eastern_time().date()
+    
     with engine.connect() as conn:
         # Get today's pending picks that need closing odds
         picks = conn.execute(text("""
             SELECT id, pick_id, pick_name, pick_type, odds, line
             FROM algo_picks_tracking 
-            WHERE pick_date = CURRENT_DATE 
+            WHERE pick_date = :today 
             AND (closing_odds IS NULL OR clv_cents IS NULL)
-        """)).fetchall()
+        """), {'today': today_et}).fetchall()
         
         if not picks:
             print("   ℹ️ No pending picks need closing odds")
@@ -42,8 +45,8 @@ def capture_closing_odds():
         # Get sent picks for full pick info (has stat type and side)
         sent_picks = conn.execute(text("""
             SELECT pick_key FROM discord_sent_picks 
-            WHERE sent_date = CURRENT_DATE
-        """)).fetchall()
+            WHERE sent_date = :today
+        """), {'today': today_et}).fetchall()
         sent_keys = [row[0] for row in sent_picks]
         
         updated = 0
@@ -74,18 +77,18 @@ def capture_closing_odds():
                 stat_map = {'PTS': 'player_points', 'REB': 'player_rebounds', 'AST': 'player_assists'}
                 market = stat_map.get(stat, 'player_points')
                 
-                # Get latest odds for this player/market (with non-null values)
+                # Get latest odds for this player/market
+                # Only require the side we need to have odds
                 result = conn.execute(text("""
                     SELECT over_odds, under_odds, line
                     FROM player_props 
-                    WHERE game_date = CURRENT_DATE 
+                    WHERE game_date = :today 
                     AND LOWER(player_name) LIKE :player
                     AND market = :market
-                    AND over_odds IS NOT NULL
-                    AND under_odds IS NOT NULL
                     ORDER BY updated_at DESC 
                     LIMIT 1
                 """), {
+                    'today': today_et,
                     'player': f'%{player_name.lower()}%',
                     'market': market
                 }).fetchone()
@@ -93,16 +96,19 @@ def capture_closing_odds():
                 if result:
                     over_close, under_close, prop_line = result
                     
-                    if side == 'OVER':
+                    if side == 'OVER' and over_close:
                         closing_odds = over_close
-                    elif side == 'UNDER':
+                    elif side == 'UNDER' and under_close:
                         closing_odds = under_close
-                    else:
-                        # Guess based on which side matches opening odds better
-                        # If opening was negative and close moved more negative on one side, that's likely it
-                        closing_odds = under_close  # Default to under if unknown
+                    elif over_close:
+                        closing_odds = over_close
+                    elif under_close:
+                        closing_odds = under_close
                     
-                    print(f"   ✅ {player_name} {stat} {side or '?'}: {opening_odds} → {closing_odds}")
+                    if closing_odds:
+                        print(f"   ✅ {player_name} {stat} {side or '?'}: {opening_odds} → {closing_odds}")
+                    else:
+                        print(f"   ⚠️ {player_name}: Odds for {side} not available")
                 else:
                     print(f"   ⚠️ {player_name}: No odds data found")
             
@@ -122,10 +128,10 @@ def capture_closing_odds():
                     if 'UNDER' in pick_name.upper():
                         result = conn.execute(text("""
                             SELECT under_odds FROM games_with_odds 
-                            WHERE game_date = CURRENT_DATE 
+                            WHERE game_date = :today 
                             AND home_team = :home AND visitor_team = :visitor
                             LIMIT 1
-                        """), {'home': home_team, 'visitor': visitor_team}).fetchone()
+                        """), {'today': today_et, 'home': home_team, 'visitor': visitor_team}).fetchone()
                         if result and result[0]:
                             closing_odds = result[0]
                     
@@ -141,10 +147,10 @@ def capture_closing_odds():
                         
                         result = conn.execute(text("""
                             SELECT home_ml, away_ml FROM games_with_odds 
-                            WHERE game_date = CURRENT_DATE 
+                            WHERE game_date = :today 
                             AND home_team = :home AND visitor_team = :visitor
                             LIMIT 1
-                        """), {'home': home_team, 'visitor': visitor_team}).fetchone()
+                        """), {'today': today_et, 'home': home_team, 'visitor': visitor_team}).fetchone()
                         if result:
                             closing_odds = result[0] if team == home_team else result[1]
                     
@@ -152,11 +158,11 @@ def capture_closing_odds():
                         # Spread bet - use betting_odds table
                         result = conn.execute(text("""
                             SELECT home_spread_odds, away_spread_odds FROM betting_odds 
-                            WHERE game_date = CURRENT_DATE 
+                            WHERE game_date = :today 
                             AND home_team = :home AND away_team = :visitor
                             ORDER BY updated_at DESC
                             LIMIT 1
-                        """), {'home': home_team, 'visitor': visitor_team}).fetchone()
+                        """), {'today': today_et, 'home': home_team, 'visitor': visitor_team}).fetchone()
                         if result:
                             # Check if picked team is visitor (getting points) or home
                             if f"{visitor_team} +" in pick_name:

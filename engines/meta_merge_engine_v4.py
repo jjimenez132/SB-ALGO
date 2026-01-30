@@ -142,6 +142,21 @@ try:
 except ImportError:
     pass
 
+# v4.1: Poisson and XGBoost engines
+try:
+    from poisson_engine import PoissonEngine
+    ENGINES_AVAILABLE['poisson'] = True
+except ImportError:
+    ENGINES_AVAILABLE['poisson'] = False
+
+try:
+    from xgboost_gatekeeper import XGBoostGatekeeper
+    XGBOOST_GATEKEEPER = XGBoostGatekeeper()
+    ENGINES_AVAILABLE['xgboost'] = XGBOOST_GATEKEEPER.is_loaded
+except ImportError:
+    XGBOOST_GATEKEEPER = None
+    ENGINES_AVAILABLE['xgboost'] = False
+
 # ==============================================================================
 # CONFIGURATION
 # ==============================================================================
@@ -1394,10 +1409,39 @@ class MetaMergeEngine:
         if passes_prop_filter and self.kelly and calibrated_prob > 0.52:
             kelly_result = self.kelly.calculate_bet(calibrated_prob, -110, self.bankroll)
             if kelly_result.get('should_bet'):
-                # Apply tier-based unit sizing (T1 = 1.0, T2 = 0.5)
+                # Apply tier-based unit sizing (T1 = 1.5, T2 = 1.0, T3 = 0.5)
                 kelly_stake = kelly_result['recommended_amount'] * unit_size
                 grade = kelly_result['grade']
-                should_bet = True
+                
+                # v4.1: XGBoost gatekeeper check
+                gatekeeper_approved = True
+                if XGBOOST_GATEKEEPER and XGBOOST_GATEKEEPER.is_loaded:
+                    pick_features = {
+                        'stat': stat,
+                        'best_side': 'OVER' if is_over_bet else 'UNDER',
+                        'edge_pct': edge_pct,
+                        'cv': cv,
+                        'odds': -110,
+                        'filters': {
+                            'gp': result.get('games_played', 20),
+                            'mpg': result.get('avg_minutes', 28),
+                            'hit_rate': {'hit_rate': 0.55},
+                        },
+                        'probabilities': {
+                            'raw': over_prob if is_over_bet else (1 - over_prob),
+                            'adjusted': calibrated_prob,
+                            'poisson': None,  # Add if poisson engine available
+                        },
+                    }
+                    gk_result = XGBOOST_GATEKEEPER.should_approve(pick_features, pick_tier)
+                    gatekeeper_approved = gk_result['approved']
+                    result['gatekeeper'] = gk_result
+                
+                if gatekeeper_approved:
+                    should_bet = True
+                else:
+                    result['gatekeeper_killed'] = True
+                    result['prop_filter'] = result.get('prop_filter', '') + ' [KILLED by XGBoost]'
         
         result.update({
             'base_projection': round(base_proj, 2),

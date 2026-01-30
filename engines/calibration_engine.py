@@ -116,6 +116,7 @@ class CalibrationEngine:
             'total': [],
             'moneyline': [],
             'player_prop': [],
+            'xgboost': [],  # v4.1: XGBoost gatekeeper predictions
         }
         
         # Default calibration adjustments (prior to learning)
@@ -124,6 +125,7 @@ class CalibrationEngine:
             'total': {'slope': 0.90, 'intercept': 0.05},
             'moneyline': {'slope': 0.95, 'intercept': 0.025},
             'player_prop': {'slope': 0.85, 'intercept': 0.075},
+            'xgboost': {'slope': 0.95, 'intercept': 0.02},  # XGBoost predictions
         }
     
     # ==========================================================================

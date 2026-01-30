@@ -29,6 +29,9 @@ def get_todays_clv_data():
     """Get CLV data for today's picks that have closing odds"""
     engine = get_engine()
     
+    # Get today's date in Eastern Time (not UTC)
+    today_et = get_eastern_time().date()
+    
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT 
@@ -39,11 +42,11 @@ def get_todays_clv_data():
                 clv_cents,
                 status
             FROM algo_picks_tracking 
-            WHERE pick_date = CURRENT_DATE
+            WHERE pick_date = :today
             AND closing_odds IS NOT NULL
             AND clv_cents IS NOT NULL
             ORDER BY clv_cents DESC
-        """))
+        """), {'today': today_et})
         
         picks = []
         for row in result:
@@ -134,21 +137,16 @@ def send_clv_report():
     print(f"   📊 Avg CLV: {stats['avg_clv']:+.1f}¢")
     print(f"   📊 Positive CLV: {stats['positive_picks']}/{stats['total_picks']} ({stats['pct_positive']:.0f}%)")
     
-    # THRESHOLDS - Only post if we actually beat the books
-    MIN_AVG_CLV = 3.0  # At least +3 cents average
-    MIN_PCT_POSITIVE = 50  # At least 50% of picks beat closing
-    
-    # Check if we should post
-    if stats['avg_clv'] < MIN_AVG_CLV or stats['pct_positive'] < MIN_PCT_POSITIVE:
-        print(f"\n   ❄️ Thresholds not met. Staying silent.")
-        print(f"      Required: Avg CLV ≥ {MIN_AVG_CLV}¢, {MIN_PCT_POSITIVE}%+ positive")
-        print(f"      Actual: Avg CLV = {stats['avg_clv']:+.1f}¢, {stats['pct_positive']:.0f}% positive")
+    # ONLY send when we have positive CLV - NEVER post negative news
+    if stats['avg_clv'] <= 0:
+        print(f"\n   ❄️ CLV not positive. Staying silent (never post negative news).")
         return False
     
-    # Determine notification level
+    # Determine notification level based on performance
     is_dominant = stats['avg_clv'] >= 10 and stats['pct_positive'] >= 75
+    is_good = stats['avg_clv'] >= 3 and stats['pct_positive'] >= 50
     
-    # Build the embed
+    # Build the embed based on performance tier
     if is_dominant:
         # 🔥 DOMINANT DAY
         title = "🚨 MARKET DOMINATED"
@@ -161,16 +159,27 @@ def send_clv_report():
             f"*This is edge. This is why we play.*"
         )
         ping = "@everyone "
-    else:
-        # ✅ STANDARD DAY
+    elif is_good:
+        # ✅ STANDARD GOOD DAY
         title = "📊 MARKET CHECK-IN"
         color = 0x00AA00  # Green
         description = (
             f"**SB-ALGO beat the closing line today.**\n\n"
             f"• Avg CLV: **{stats['avg_clv']:+.1f}¢**\n"
             f"• Markets beaten: **{stats['positive_picks']}/{stats['total_picks']}**\n"
-            f"• Books adjusted after release\n\n"
+            f"• {stats['pct_positive']:.0f}% of lines closed worse\n\n"
             f"*Value confirmed. Results still loading.*"
+        )
+        ping = ""
+    else:
+        # 📈 SLIGHT POSITIVE - Show value gained
+        title = "📊 MARKET CHECK-IN"
+        color = 0x3498DB  # Blue
+        description = (
+            f"Picks gained **{stats['avg_clv']:+.1f}¢** value on average.\n\n"
+            f"• Avg CLV: **{stats['avg_clv']:+.1f}¢**\n"
+            f"• Markets beaten: **{stats['positive_picks']}/{stats['total_picks']}**\n"
+            f"• {stats['pct_positive']:.0f}% of lines closed worse"
         )
         ping = ""
     
@@ -192,13 +201,6 @@ def send_clv_report():
     }
     
     # Send to Discord
-    if CLV_WEBHOOK == 'https://discord.com/api/webhooks/1464404517402706046/hOveHjIOa_zG_hKgEiTXiVq0BzFlqUiRI2G_CwTZ1imQ9anw4qE7vEnNHiDqHpg-py7l':
-        print("\n   ⚠️ CLV_WEBHOOK not configured!")
-        print("   📋 Would have sent:")
-        print(f"      Title: {title}")
-        print(f"      Avg CLV: {stats['avg_clv']:+.1f}¢")
-        print(f"      Breakdown:\n{breakdown}")
-        return False
     
     try:
         payload = {"embeds": [embed]}

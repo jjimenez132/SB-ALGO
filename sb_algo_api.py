@@ -35,6 +35,50 @@ _cache_time = None
 CACHE_DURATION = 300
 
 # =============================================================================
+# PLAYER NAME NORMALIZATION
+# Handles Jr/Jr., II/III suffixes, and common nickname variations
+# =============================================================================
+PLAYER_NAME_ALIASES = {
+    # Nicknames to full names
+    'herb jones': 'herbert jones',
+    'gg jackson': 'g.g. jackson',
+    'rj barrett': 'r.j. barrett',
+    'pj washington': 'p.j. washington',
+    'cj mccollum': 'c.j. mccollum',
+    'tj mcconnell': 't.j. mcconnell',
+    'tj warren': 't.j. warren',
+    'oj anunoby': 'o.g. anunoby',
+    'og anunoby': 'o.g. anunoby',
+}
+
+def normalize_player_name(name):
+    """
+    Normalize player name for consistent matching across tables.
+    Handles: Jr/Jr., II/III, common nicknames
+    """
+    if not name:
+        return name
+    
+    normalized = name.strip()
+    
+    # Lowercase for comparison
+    lower = normalized.lower()
+    
+    # Check aliases first (Herb → Herbert, etc.)
+    if lower in PLAYER_NAME_ALIASES:
+        normalized = PLAYER_NAME_ALIASES[lower].title()
+    
+    # Normalize suffix variations: "Jr" → "Jr.", "Sr" → "Sr."
+    import re
+    # Add period after Jr/Sr if missing
+    normalized = re.sub(r'\b(Jr|Sr)\b(?!\.)', r'\1.', normalized)
+    # Remove extra suffixes for matching (keep original for display)
+    # "Jr." and "Jr" should match, "II" and " II" should match
+    
+    return normalized
+
+
+# =============================================================================
 # ENGINE IMPORTS
 # =============================================================================
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'engines'))
@@ -608,8 +652,11 @@ def get_todays_picks(force_refresh=False, target_date=None):
         opponent = get_opponent(player)
         engine_result = None
         
+        # Normalize player name to handle Jr/Jr., nicknames, etc.
+        normalized_player = normalize_player_name(player)
+        
         if opponent and PROP_ENGINE_AVAILABLE:
-            engine_result = get_engine_proj(player, stat, opponent, line, player_games, today)
+            engine_result = get_engine_proj(normalized_player, stat, opponent, line, player_games, today)
         
         if engine_result and engine_result.get('engine_used'):
             # Use engine projection

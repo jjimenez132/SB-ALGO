@@ -45,6 +45,78 @@ class PlayerPropEngine:
     def __init__(self):
         self.engine = create_engine(DATABASE_URL)
         self._cache = {}
+        
+        # Player name aliases for matching variations
+        self._name_aliases = {
+            # Nicknames to full names
+            'herb jones': 'herbert jones',
+            'gg jackson': 'g.g. jackson',
+            'rj barrett': 'r.j. barrett',
+            'pj washington': 'p.j. washington',
+            'cj mccollum': 'c.j. mccollum',
+            'tj mcconnell': 't.j. mcconnell',
+            'tj warren': 't.j. warren',
+            'oj anunoby': 'o.g. anunoby',
+            'og anunoby': 'o.g. anunoby',
+            # Unicode name variations (ASCII → actual DB name)
+            'luka doncic': 'Luka Dončić',
+            'jonas valanciunas': 'Jonas Valančiūnas',
+            'nikola jokic': 'Nikola Jokić',
+            'nikola vucevic': 'Nikola Vučević',
+            'bojan bogdanovic': 'Bojan Bogdanović',
+            'bogdan bogdanovic': 'Bogdan Bogdanović',
+            'dario saric': 'Dario Šarić',
+            'jusuf nurkic': 'Jusuf Nurkić',
+            'goran dragic': 'Goran Dragić',
+            'kristaps porzingis': 'Kristaps Porziņģis',
+            'deni avdija': 'Deni Avdija',
+            'alperen sengun': 'Alperen Şengün',
+            'nicolas claxton': 'Nic Claxton',  # Different first name
+        }
+    
+    def _normalize_name(self, name):
+        """Normalize player name for DB matching - handles Unicode, punctuation, nicknames"""
+        if not name:
+            return name
+        import re
+        normalized = name.strip()
+        lower = normalized.lower()
+        
+        # Check aliases first (before other transformations)
+        if lower in self._name_aliases:
+            normalized = self._name_aliases[lower].title()
+        
+        # Add period after Jr/Sr if missing
+        normalized = re.sub(r'\b(Jr|Sr)\b(?!\.)', r'\1.', normalized)
+        
+        # IMPORTANT: Also create a search-friendly version by stripping periods
+        # This helps match "R.J. Barrett" to "RJ Barrett"
+        # We store BOTH the normalized name AND a stripped version for search
+        
+        return normalized
+    
+    def _get_search_name(self, name):
+        """Get a simplified search name for fuzzy DB matching"""
+        if not name:
+            return name
+        import re
+        
+        # First normalize
+        name = self._normalize_name(name)
+        
+        # Strip periods and extra spaces for search
+        search_name = name.replace('.', '').replace('  ', ' ').strip()
+        
+        # Try to transliterate Unicode characters (Dončić → Doncic)
+        try:
+            import unicodedata
+            # Remove diacritics by normalizing to NFKD and keeping only ASCII
+            nfkd = unicodedata.normalize('NFKD', search_name)
+            search_name = ''.join(c for c in nfkd if not unicodedata.combining(c))
+        except:
+            pass
+        
+        return search_name
     
     # ========================================================
     # PLAYER DATA - ALL ALREADY PER-GAME!
@@ -52,11 +124,19 @@ class PlayerPropEngine:
     
     def get_player_base(self, player_name):
         """nba_player_base_stats - ALREADY PER GAME"""
+        player_name = self._normalize_name(player_name)
         cache_key = f"base_{player_name}"
         if cache_key in self._cache:
             return self._cache[cache_key]
         
+        # Get search-friendly version (strips periods, transliterates Unicode)
+        search_name = self._get_search_name(player_name)
+        name_parts = search_name.split()
+        
         with self.engine.connect() as conn:
+            result = None
+            
+            # First try exact ILIKE match
             result = conn.execute(text("""
                 SELECT "PLAYER_NAME", "TEAM_ABBREVIATION", "GP", "MIN", 
                        "PTS", "REB", "AST", "STL", "BLK", "TOV",
@@ -66,6 +146,20 @@ class PlayerPropEngine:
                 WHERE "PLAYER_NAME" ILIKE :name
                 ORDER BY pull_date DESC LIMIT 1
             """), {"name": f"%{player_name}%"}).fetchone()
+            
+            # If no match and we have first+last name, try matching each part
+            if not result and len(name_parts) >= 2:
+                first_name = name_parts[0]
+                last_name = name_parts[-1]
+                result = conn.execute(text("""
+                    SELECT "PLAYER_NAME", "TEAM_ABBREVIATION", "GP", "MIN", 
+                           "PTS", "REB", "AST", "STL", "BLK", "TOV",
+                           "FGM", "FGA", "FG_PCT", "FG3M", "FG3A", "FG3_PCT",
+                           "FTM", "FTA", "FT_PCT", "OREB", "DREB", "PF", "PLUS_MINUS"
+                    FROM nba_player_base_stats
+                    WHERE "PLAYER_NAME" ILIKE :first AND "PLAYER_NAME" ILIKE :last
+                    ORDER BY pull_date DESC LIMIT 1
+                """), {"first": f"%{first_name}%", "last": f"%{last_name}%"}).fetchone()
             
             if result:
                 data = {
@@ -99,6 +193,7 @@ class PlayerPropEngine:
     
     def get_player_advanced(self, player_name):
         """nba_player_advanced_stats"""
+        player_name = self._normalize_name(player_name)
         cache_key = f"advanced_{player_name}"
         if cache_key in self._cache:
             return self._cache[cache_key]
@@ -136,6 +231,7 @@ class PlayerPropEngine:
     
     def get_player_usage(self, player_name):
         """nba_player_usage - % of team stats"""
+        player_name = self._normalize_name(player_name)
         cache_key = f"usage_{player_name}"
         if cache_key in self._cache:
             return self._cache[cache_key]
@@ -170,6 +266,7 @@ class PlayerPropEngine:
     
     def get_player_scoring(self, player_name):
         """nba_player_scoring - scoring breakdown"""
+        player_name = self._normalize_name(player_name)
         cache_key = f"scoring_{player_name}"
         if cache_key in self._cache:
             return self._cache[cache_key]
@@ -201,6 +298,7 @@ class PlayerPropEngine:
     
     def get_player_possessions(self, player_name):
         """nba_player_tracking_possessions - ALREADY PER GAME"""
+        player_name = self._normalize_name(player_name)
         cache_key = f"poss_{player_name}"
         if cache_key in self._cache:
             return self._cache[cache_key]
@@ -233,6 +331,7 @@ class PlayerPropEngine:
     
     def get_player_passes(self, player_name):
         """nba_player_tracking_passes - ALREADY PER GAME"""
+        player_name = self._normalize_name(player_name)
         cache_key = f"passes_{player_name}"
         if cache_key in self._cache:
             return self._cache[cache_key]
@@ -262,6 +361,7 @@ class PlayerPropEngine:
     
     def get_player_rebounding(self, player_name):
         """nba_player_tracking_rebounding - ALREADY PER GAME"""
+        player_name = self._normalize_name(player_name)
         cache_key = f"reb_{player_name}"
         if cache_key in self._cache:
             return self._cache[cache_key]
@@ -295,6 +395,7 @@ class PlayerPropEngine:
     
     def get_player_hustle(self, player_name):
         """nba_player_hustle - ALREADY PER GAME"""
+        player_name = self._normalize_name(player_name)
         cache_key = f"hustle_{player_name}"
         if cache_key in self._cache:
             return self._cache[cache_key]
@@ -324,6 +425,7 @@ class PlayerPropEngine:
     
     def get_player_clutch(self, player_name):
         """nba_player_clutch - ALREADY PER GAME"""
+        player_name = self._normalize_name(player_name)
         cache_key = f"clutch_{player_name}"
         if cache_key in self._cache:
             return self._cache[cache_key]
@@ -355,6 +457,7 @@ class PlayerPropEngine:
     
     def get_player_bpm(self, player_name):
         """nba_player_bpm_vorp"""
+        player_name = self._normalize_name(player_name)
         cache_key = f"bpm_{player_name}"
         if cache_key in self._cache:
             return self._cache[cache_key]

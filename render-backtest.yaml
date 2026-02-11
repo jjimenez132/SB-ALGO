@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: sb-algo-backtest
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements-backtest.txt
+    startCommand: streamlit run backtest_dashboard.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sb-algo-db
+          property: connectionString
+      - key: STREAMLIT_SERVER_ENABLE_CORS
+        value: "false"
+      - key: STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION
+        value: "false"

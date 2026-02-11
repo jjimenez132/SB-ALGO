@@ -223,11 +223,15 @@ def _convert_filters():
         'prop_ast_under_t2': 'ast_under_t2',
     }
     
-    # T3 VOLUME FILTERS (3 filters, 69.4% win rate, 0.5 units)
+    # T3 VOLUME FILTERS (expanded with OVER filters for balance)
     t3_mappings = {
         'prop_pts_under_t3': 'pts_under_t3',
         'prop_reb_under_t3': 'reb_under_t3',
         'prop_ast_under_t3': 'ast_under_t3',
+        'prop_pts_over_t3': 'pts_over_t3',
+        'prop_reb_over_t3': 'reb_over_t3',
+        'prop_ast_over_t3': 'ast_over_t3',
+        'prop_3pm_under_t3': '3pm_under_t3',
     }
     
     # Process T1 filters
@@ -428,7 +432,7 @@ def get_engine_proj(player, stat, opponent_team, line, player_games=None, game_d
         edge_result = engine.find_edge(player, opponent_team, engine_stat, line)
         
         if edge_result:
-            return {
+            result = {
                 'proj': edge_result['expected'],
                 'cv': edge_result.get('std', 5) / edge_result['expected'] if edge_result['expected'] > 0 else 0.5,
                 'over_prob': edge_result['over_prob'] / 100,
@@ -439,6 +443,35 @@ def get_engine_proj(player, stat, opponent_team, line, player_games=None, game_d
                 'adjustments': edge_result.get('adjustments', {}),
                 'engine_used': True
             }
+            
+            # Fix 4: Blend with recent form (L5/L10/L15)
+            # Engine uses season avg — blend with recent games for recency
+            if player_games and game_date:
+                fallback_proj, fallback_cv = get_proj(player_games, player, stat, game_date)
+                if fallback_proj:
+                    # 60% engine (has pace/defense adjustments) + 40% recent form
+                    blended = 0.60 * result['proj'] + 0.40 * fallback_proj
+                    result['proj'] = round(blended, 1)
+                    # Use the better (lower) CV
+                    result['cv'] = min(result['cv'], fallback_cv) if fallback_cv else result['cv']
+                    result['adjustments']['recent_form'] = round(fallback_proj, 1)
+                    result['adjustments']['blend'] = '60/40'
+                    
+                    # Recalculate probabilities with blended projection
+                    blended_edge = (blended - line) / line if line > 0 else 0
+                    # Shift probabilities proportionally to the blend shift
+                    if blended > edge_result['expected']:
+                        # Recent form is higher → shift toward OVER
+                        shift = (blended - edge_result['expected']) / (edge_result['expected'] * 0.30) * 0.10
+                        result['over_prob'] = min(0.95, result['over_prob'] + shift)
+                        result['under_prob'] = max(0.05, 1 - result['over_prob'])
+                    elif blended < edge_result['expected']:
+                        # Recent form is lower → shift toward UNDER
+                        shift = (edge_result['expected'] - blended) / (edge_result['expected'] * 0.30) * 0.10
+                        result['under_prob'] = min(0.95, result['under_prob'] + shift)
+                        result['over_prob'] = max(0.05, 1 - result['under_prob'])
+            
+            return result
     except Exception as e:
         fallback_reason = f"Engine error: {str(e)[:50]}"
         print(f"   ⚠️ {fallback_reason}")
@@ -555,14 +588,20 @@ def get_todays_picks(force_refresh=False, target_date=None):
         if not home_team or not away_team:
             return None
         
-        # We need to figure out which team the player is on
-        # Check player's most recent boxscore for team
-        if player in player_games and player_games[player]:
-            # For now, just return the matchup opponent - we have both teams
-            # The engine will figure out the player's team
-            return away_team if home_team else home_team
+        # Look up the player's actual team from the prop engine's DB
+        normalized = normalize_player_name(player)
+        engine = get_prop_engine()
+        if engine:
+            base = engine.get_player_base(normalized)
+            if base and base.get('team'):
+                player_team = base['team']
+                # If player is on home team, opponent is away team, and vice versa
+                if player_team == home_team:
+                    return away_team
+                elif player_team == away_team:
+                    return home_team
         
-        # Default: return away team (more conservative - assume player might face any team)
+        # Fallback: return away_team (assumes player is on home team)
         return away_team
     
     # GAME PICKS
@@ -659,6 +698,28 @@ def get_todays_picks(force_refresh=False, target_date=None):
             engine_result = get_engine_proj(normalized_player, stat, opponent, line, player_games, today)
         
         if engine_result and engine_result.get('engine_used'):
+            # Fix 6: Home/away adjustment
+            prop_info = player_teams.get(player, {})
+            engine = get_prop_engine()
+            if engine:
+                base = engine.get_player_base(normalized_player)
+                if base and base.get('team'):
+                    is_home = (base['team'] == prop_info.get('home'))
+                    ha_factor = 1.015 if is_home else 0.985
+                    engine_result['proj'] = round(engine_result['proj'] * ha_factor, 1)
+            
+            # Fix 7: Injury boost when opponent is missing key players
+            if opponent and INJURY_ENGINE_AVAILABLE:
+                try:
+                    inj_engine = get_injury_engine()
+                    opp_injuries = inj_engine.get_team_injury_report(opponent)
+                    if opp_injuries and opp_injuries.get('total_spread_impact', 0) > 2:
+                        # Opponent weakened → boost player projection slightly
+                        injury_boost = 1 + (opp_injuries['total_spread_impact'] * 0.005)
+                        engine_result['proj'] = round(engine_result['proj'] * injury_boost, 1)
+                except:
+                    pass
+            
             # Use engine projection
             proj = engine_result['proj']
             cv = engine_result['cv']
@@ -769,6 +830,19 @@ def get_todays_picks(force_refresh=False, target_date=None):
                         watchlist_props.append({'type': 'PROP', 'player': player, 'pick': f"{stat.upper()} UNDER {line}", 'projection': round(proj, 1), 'edge': round(edge_u * 100, 1), 'cv': round(cv, 2), 'near_miss': reason})
     
     watchlist_props.sort(key=lambda x: -abs(x['edge']))
+    
+    # Fix 3: XGBoost Gatekeeper — kill low-quality T3 picks
+    try:
+        from engines.xgboost_gatekeeper import XGBoostGatekeeper
+        gatekeeper = XGBoostGatekeeper()
+        if gatekeeper.is_loaded:
+            pre_gate = len(official_props)
+            official_props = gatekeeper.gate_picks(official_props, tier=3)
+            killed = pre_gate - len(official_props)
+            if killed > 0:
+                print(f"   🛡️ XGBoost gatekeeper killed {killed} picks")
+    except Exception as e:
+        print(f"   ⚠️ XGBoost gatekeeper unavailable: {e}")
     
     result = {
         'date': today_str,

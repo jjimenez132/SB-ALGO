@@ -617,7 +617,7 @@ class PlayerPropEngine:
         else:
             game_pace = 0.52 * p1 + 0.48 * p2
         
-        return game_pace / 100
+        return game_pace / 99.5  # 2025-26 NBA league average pace
     
     def calculate_defense_adjustment(self, stat_type, opponent_team):
         """Defensive matchup adjustment"""

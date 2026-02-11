@@ -341,7 +341,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.55,
         'min_proj': 12,
         'tier': 3,
-        'enabled': False,  # Enable for more volume
+        'enabled': True,  # 65.3% backtest - adds OVER diversity
     },
     
     # PTS UNDER T3: edge>=10%, cv<=0.40, proj>=20 (68.6% win rate)
@@ -359,7 +359,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.30,
         'min_proj': 8,
         'tier': 3,
-        'enabled': False,  # Enable for more volume
+        'enabled': True,  # 65.5% backtest - adds OVER diversity
     },
     
     # REB UNDER T3: 71.4% (20-8) | edge>=20%, cv<=0.45, proj>=5
@@ -377,7 +377,7 @@ VEGAS_FILTERS = {
         'cv_max': 0.55,
         'min_proj': 6,
         'tier': 3,
-        'enabled': False,  # Enable for more volume
+        'enabled': True,  # 66.0% backtest - adds OVER diversity
     },
     
     # AST UNDER T3: edge>=10%, cv<=0.45, proj>=6 (69.0% win rate)

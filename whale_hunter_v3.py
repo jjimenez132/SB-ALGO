@@ -156,36 +156,53 @@ def is_basketball_market(market: dict) -> bool:
 
 def get_basketball_markets() -> list:
     """
-    Fetch ALL active markets and filter for basketball in Python.
+    Fetch NBA daily game markets using the /events endpoint.
     
-    This is the UNIVERSAL SEARCH approach that fixes the v2.0 bug.
-    We fetch 500 markets because NBA markets may be further down the list.
+    FIX v3.1: Uses series_id=10345 (NBA) to get daily games directly.
+    This properly returns games like "Pistons vs Warriors" that were
+    missing when using /markets endpoint.
     """
-    logger.info("Fetching active markets from Polymarket...")
+    logger.info("Fetching NBA daily games from Polymarket /events...")
     
+    all_markets = []
+    
+    # NBA series_id = 10345 (discovered from Polymarket API docs)
     try:
         response = requests.get(
-            f"{POLYMARKET_API_BASE}/markets",
-            params={"active": "true", "closed": "false", "limit": 500},  # Increased to 500
+            f"{POLYMARKET_API_BASE}/events",
+            params={
+                "series_id": "10345",  # NBA
+                "active": "true",
+                "closed": "false",
+                "limit": 50
+            },
             timeout=API_TIMEOUT
         )
         
         if response.status_code != 200:
-            logger.error(f"API error: {response.status_code}")
+            logger.error(f"Events API error: {response.status_code}")
             return []
         
-        all_markets = response.json()
+        events = response.json()
         
-        # Filter for basketball
-        basketball_markets = [m for m in all_markets if is_basketball_market(m)]
+        # Extract markets from each event
+        for event in events:
+            event_title = event.get("title", "Unknown")
+            markets = event.get("markets", [])
+            
+            for market in markets:
+                # Add event context to market
+                market["event_title"] = event_title
+                market["event_slug"] = event.get("slug", "")
+                all_markets.append(market)
         
-        # DEBUG OUTPUT - Critical for troubleshooting
-        print(f"✅ DEBUG: Found {len(basketball_markets)} Basketball Markets (out of {len(all_markets)} total)")
+        # DEBUG OUTPUT
+        print(f"✅ DEBUG: Found {len(events)} NBA Events with {len(all_markets)} total markets")
         
-        if basketball_markets:
-            logger.info(f"🏀 Active basketball markets: {len(basketball_markets)}")
+        if all_markets:
+            logger.info(f"🏀 Active NBA markets: {len(all_markets)} (from {len(events)} games)")
         
-        return basketball_markets
+        return all_markets
         
     except requests.RequestException as e:
         logger.error(f"Request failed: {e}")
@@ -219,20 +236,29 @@ def detect_whales(market: dict) -> list:
     Detect whale trades (>$1K) in a market.
     
     Returns list of whale trade dicts ready for Discord.
+    
+    FIX v3.1: Parse clobTokenIds from /events endpoint (JSON string format).
     """
     global seen_trades
     
-    # Get token(s)
-    tokens = market.get("tokens", [])
-    if not tokens:
+    # Parse clobTokenIds (JSON string from /events endpoint)
+    clob_token_ids_str = market.get("clobTokenIds", "[]")
+    outcomes_str = market.get("outcomes", '["Yes", "No"]')
+    
+    try:
+        token_ids = json.loads(clob_token_ids_str) if isinstance(clob_token_ids_str, str) else clob_token_ids_str
+        outcomes = json.loads(outcomes_str) if isinstance(outcomes_str, str) else outcomes_str
+    except json.JSONDecodeError:
+        return []
+    
+    if not token_ids:
         return []
     
     whale_trades = []
     
-    # Check both YES and NO tokens
-    for token in tokens:
-        token_id = token.get("token_id")
-        outcome = token.get("outcome", "YES").upper()
+    # Check each token (usually Yes=index 0, No=index 1)
+    for idx, token_id in enumerate(token_ids):
+        outcome = outcomes[idx].upper() if idx < len(outcomes) else "YES" if idx == 0 else "NO"
         
         if not token_id:
             continue
@@ -267,9 +293,14 @@ def detect_whales(market: dict) -> list:
                 
                 seen_trades.add(trade_id)
                 
+                # Use event context added in get_basketball_markets()
+                event_title = market.get("event_title", "")
+                question = market.get("question", "Unknown Market")
+                display_title = f"{event_title}: {question}" if event_title else question
+                
                 whale_trades.append({
-                    "market_question": market.get("question", "Unknown Market"),
-                    "market_slug": market.get("slug", ""),
+                    "market_question": display_title,
+                    "market_slug": market.get("event_slug") or market.get("slug", ""),
                     "outcome": outcome,
                     "usd_value": usd_value,
                     "price": price,

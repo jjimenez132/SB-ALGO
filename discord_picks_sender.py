@@ -115,7 +115,7 @@ def get_recent_players(days=1):
         return []
 
 
-def filter_cooldown_picks(picks, cooldown_days=1):
+def filter_cooldown_picks(picks, cooldown_days=3):
     """Remove picks for players that were picked in the last N days"""
     recent_players = get_recent_players(cooldown_days)
     if not recent_players:
@@ -127,7 +127,7 @@ def filter_cooldown_picks(picks, cooldown_days=1):
         if player and not any(recent in player or player in recent for recent in recent_players):
             filtered.append(pick)
         else:
-            print(f"   ⏸️ Cooldown: Skipping {pick.get('player')} (picked yesterday)")
+            print(f"   ⏸️ Cooldown: Skipping {pick.get('player')} (picked in last {cooldown_days} days)")
     
     return filtered
 
@@ -688,7 +688,10 @@ def send_morning_report():
     game_picks = picks_data.get('game_picks', [])
     prop_picks = picks_data.get('prop_picks', [])
     
-    print(f"   📊 {len(game_picks)} game picks, {len(prop_picks)} prop picks")
+    # Apply cooldown filter to prevent same players repeating
+    prop_picks = filter_cooldown_picks(prop_picks, cooldown_days=3)
+    
+    print(f"   📊 {len(game_picks)} game picks, {len(prop_picks)} prop picks (after cooldown filter)")
     
     # === SEND GAME PICKS ===
     print(f"\n   📤 Sending to #top-edges...")
@@ -733,11 +736,18 @@ def send_morning_report():
             sent_props += 1
             pick_key = create_pick_key(pick, 'prop')
             mark_pick_sent(pick_key, 'prop')
-            # Save for grading
+            # Save for grading — MUST include full stat/direction/line in pick_name
             pick_id = pick.get('id', f'P{sent_props:02d}')
-            pick_name = f"{pick.get('player', 'Unknown')} {pick.get('prop', '')}"
+            prop_str = pick.get('pick', pick.get('prop', ''))
+            pick_name = f"{pick.get('player', 'Unknown')} {prop_str}".strip()
             real_odds = pick.get('odds', -110)
             line_val = pick.get('book_line', pick.get('line'))
+            # Extract line from pick string if not in pick dict (e.g. "PTS UNDER 29.5" -> 29.5)
+            if line_val is None and prop_str:
+                import re
+                line_match = re.search(r'[\d.]+', prop_str)
+                if line_match:
+                    line_val = float(line_match.group())
             save_pick_for_grading(pick_id, pick_name, 'prop', 1.5, odds=real_odds, line=line_val)
     
     print(f"   ✅ Sent {sent_props} prop picks")

@@ -133,6 +133,7 @@ def analyze_games():
 
 def analyze_props():
     """Analyze player props for edges - OPTIMIZED VERSION"""
+    from math_engine import PropsMemory
     engine = get_engine()
     
     eastern = pytz.timezone('US/Eastern')

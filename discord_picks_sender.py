@@ -1025,8 +1025,12 @@ def check_new_picks():
             # Save for grading
             pick_id = pick.get('id', f'G{games_sent_today + alerts_sent + 1:02d}')
             pick_name = f"{pick.get('matchup', 'Unknown')} {pick.get('pick', '')}"
+            real_odds = pick.get('odds', -110)
+            import re
+            line_match = re.search(r'[\d.]+', str(pick.get('pick', '')))
+            line_val = float(line_match.group()) if line_match else None
             units = 2.0 if is_lock else 0.5
-            save_pick_for_grading(pick_id, pick_name, 'game', units)
+            save_pick_for_grading(pick_id, pick_name, 'game', units, odds=real_odds, line=line_val)
             alerts_sent += 1
     
     # Send new prop picks
@@ -1039,11 +1043,19 @@ def check_new_picks():
         if send_discord_message(PROP_PICKS_CHANNEL, embed=embed):
             pick_key = create_pick_key(pick, 'prop')
             mark_pick_sent(pick_key, 'prop')
-            # Save for grading
+            # Save for grading — MUST include full stat/direction/line in pick_name
             pick_id = pick.get('id', f'P{props_sent_today + props_sent_this_run + 1:02d}')
-            pick_name = f"{pick.get('player', 'Unknown')} {pick.get('prop', '')}"
+            prop_str = pick.get('pick', pick.get('prop', ''))
+            pick_name = f"{pick.get('player', 'Unknown')} {prop_str}".strip()
+            real_odds = pick.get('odds', -110)
+            line_val = pick.get('book_line', pick.get('line'))
+            if line_val is None and prop_str:
+                import re
+                line_match = re.search(r'[\d.]+', prop_str)
+                if line_match:
+                    line_val = float(line_match.group())
             units = 1.5 if is_lock else 0.5
-            save_pick_for_grading(pick_id, pick_name, 'prop', units)
+            save_pick_for_grading(pick_id, pick_name, 'prop', units, odds=real_odds, line=line_val)
             alerts_sent += 1
             props_sent_this_run += 1
     
